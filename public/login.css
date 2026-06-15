@@ -1,0 +1,159 @@
+/* ── RESET & VARIÁVEIS ─────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --orange:#F15A24; --orange2:#FF8C42; --orange-light:#FFF0EA;
+  --bg:#FFF8F5; --surface:#FFFFFF; --border:#F0E0D6;
+  --text:#1A1A2E; --muted:#8B7E78; --success:#22C55E; --danger:#EF4444;
+  --font:'Nunito',sans-serif; --mono:'JetBrains Mono',monospace;
+  --shadow:0 4px 24px rgba(241,90,36,0.10);
+  --shadow-lg:0 16px 48px rgba(241,90,36,0.18);
+}
+
+/* ── BODY ──────────────────────────────────────────────────────────────────── */
+body{
+  background:var(--bg);
+  font-family:var(--font);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  overflow:hidden;
+}
+
+/* ── FUNDO DECORATIVO ──────────────────────────────────────────────────────── */
+.bg-circles{position:fixed;inset:0;pointer-events:none;z-index:0;}
+.bg-circle{position:absolute;border-radius:50%;opacity:0.07;}
+.bg-circle:nth-child(1){width:600px;height:600px;background:var(--orange);top:-200px;right:-200px;}
+.bg-circle:nth-child(2){width:400px;height:400px;background:var(--orange2);bottom:-150px;left:-100px;}
+.bg-circle:nth-child(3){width:200px;height:200px;background:var(--orange);top:40%;left:5%;}
+
+/* ── WRAPPER ───────────────────────────────────────────────────────────────── */
+.login-wrap{position:relative;z-index:1;width:100%;max-width:440px;padding:24px;}
+
+/* ── CARD ──────────────────────────────────────────────────────────────────── */
+.login-card{
+  background:var(--surface);
+  border-radius:24px;
+  padding:48px 40px;
+  box-shadow:var(--shadow-lg);
+  border:1px solid var(--border);
+}
+
+/* ── HEADER ────────────────────────────────────────────────────────────────── */
+.login-header{text-align:center;margin-bottom:36px;}
+.astronaut-logo{width:90px;height:90px;margin:0 auto 16px;position:relative;}
+.astronaut-logo img{
+  width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 8px 16px rgba(241,90,36,0.3));
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.login-title{font-size:1.8rem;font-weight:900;color:var(--text);letter-spacing:-0.03em;margin-bottom:4px;}
+.login-title span{color:var(--orange);}
+.login-subtitle{font-size:0.85rem;color:var(--muted);font-weight:600;}
+
+/* ── FORMULÁRIO ────────────────────────────────────────────────────────────── */
+.form-field{margin-bottom:18px;}
+.form-label{
+  display:block;font-size:0.75rem;font-weight:800;color:var(--text);
+  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;
+}
+.form-input{
+  width:100%;padding:12px 16px;border:2px solid var(--border);
+  border-radius:12px;font-family:var(--font);font-size:0.95rem;
+  color:var(--text);background:var(--bg);outline:none;transition:all 0.2s;
+}
+.form-input:focus{border-color:var(--orange);background:#fff;box-shadow:0 0 0 4px rgba(241,90,36,0.08);}
+.form-input::placeholder{color:var(--muted);}
+
+/* ── WRAPPER SENHA + BOTÃO OLHO ────────────────────────────────────────────── */
+.password-wrap{position:relative;display:flex;align-items:center;}
+.password-wrap .form-input{padding-right:44px;}
+.btn-eye{
+  position:absolute;right:12px;
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);padding:4px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:6px;transition:color 0.2s;
+  line-height:0;
+}
+.btn-eye:hover,.btn-eye.active{color:var(--orange);}
+
+/* ── BOTÃO LOGIN ───────────────────────────────────────────────────────────── */
+.btn-login{
+  width:100%;padding:14px;border:none;border-radius:12px;
+  background:linear-gradient(135deg,var(--orange),var(--orange2));
+  color:#fff;font-family:var(--font);font-size:1rem;font-weight:800;
+  cursor:pointer;transition:all 0.2s;
+  box-shadow:0 4px 16px rgba(241,90,36,0.35);
+  margin-top:8px;letter-spacing:0.02em;
+}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(241,90,36,0.45);}
+.btn-login:active{transform:translateY(0);}
+.btn-login:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+
+/* ── MENSAGEM DE ERRO ──────────────────────────────────────────────────────── */
+.error-msg{
+  background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);
+  border-radius:10px;padding:10px 14px;font-size:0.82rem;color:var(--danger);
+  font-weight:600;margin-bottom:16px;display:none;
+}
+.error-msg.show{display:block;animation:fadeInDown 0.2s ease;}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── RODAPÉ ────────────────────────────────────────────────────────────────── */
+.login-footer{margin-top:32px;text-align:center;border-top:1px solid var(--border);padding-top:24px;}
+.footer-logos{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;}
+.footer-logo{height:28px;object-fit:contain;opacity:0.7;}
+.footer-copy{font-size:0.7rem;color:var(--muted);margin-top:10px;}
+/* Crédito BA.tec */
+.footer-batec{
+  display:flex;align-items:center;justify-content:center;
+  gap:6px;margin-top:14px;
+}
+.footer-batec-label{
+  font-size:0.62rem;font-weight:600;color:var(--muted);
+  letter-spacing:0.04em;font-family:var(--font);
+}
+.footer-batec-logo{
+  height:32px;max-width:140px;object-fit:contain;
+  filter:grayscale(0.2);opacity:0.85;
+  transition:opacity 0.2s;
+}
+.footer-batec-logo:hover{opacity:1;}
+
+/* ── TEMA ESCURO ───────────────────────────────────────────────────────────── */
+body.dark{
+  --bg:#0F0F14;--surface:#1A1A24;--border:#2A2A3D;
+  --text:#E8E8F0;
+  /* #9090AA sobre #0F0F14 = 6.44:1 — passa WCAG AA */
+  --muted:#9090AA;
+  --shadow:0 4px 24px rgba(0,0,0,0.4);
+  --shadow-lg:0 16px 48px rgba(0,0,0,0.6);
+  --orange-light:rgba(241,90,36,0.1);
+}
+body.dark .form-input{background:var(--surface);}
+body.dark .form-input:focus{background:#22222F;}
+body.dark .login-card{border-color:var(--border);}
+
+/* ── SPINNER ───────────────────────────────────────────────────────────────── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn-login{display:flex;align-items:center;justify-content:center;gap:8px;}
+
+/* ── PREFERS-REDUCED-MOTION ────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .astronaut-logo img { animation: none; }
+  .bg-circle { animation: none; }
+  #loginSpinner { animation: none !important; }
+}
+
+/* ── BOTÃO DE TEMA ─────────────────────────────────────────────────────────── */
+.theme-toggle{
+  position:fixed;top:20px;right:20px;z-index:10;
+  background:transparent;border:none;box-shadow:none;
+  padding:6px;font-size:1.2rem;
+  color:var(--orange);cursor:pointer;transition:opacity 0.2s;
+  line-height:1;display:flex;align-items:center;justify-content:center;
+}
+.theme-toggle:hover{opacity:0.75;}

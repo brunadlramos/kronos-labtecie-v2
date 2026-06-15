@@ -1,0 +1,27 @@
+# Firebase cache
+.firebase/
+
+# Logs
+*.log
+firebase-debug.log*
+firebase-debug.*.log*
+
+# Node
+node_modules/
+.npm
+
+# Variáveis de ambiente
+.env
+
+# Temporários do Word/Office
+~$*.docx
+~$*.doc
+~WRL*.tmp
+*.tmp
+
+# Sistema
+Thumbs.db
+.DS_Store
+
+# Configs locais do Claude Code
+.claude/

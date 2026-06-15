@@ -1,0 +1,1518 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+  <meta name="description" content="Kronos · Labtecie — Sistema de registro de horas e gestão de demandas">
+  <meta name="theme-color" content="#F15A24">
+  <meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!--
+  CSP removida da meta tag — o Firebase SDK moderno usa lazy loading dinâmico
+  incompatível com CSP via HTML. Implementar futuramente via firebase.json:
+  "headers": [{ "source": "**", "headers": [{ "key": "Content-Security-Policy", "value": "..." }] }]
+-->
+
+<title>Kronos · Labtecie</title>
+<link rel="icon" type="image/svg+xml" href="favicon.png">
+<link rel="shortcut icon" href="favicon.png">
+<!-- Preload recursos críticos -->
+<link rel="preload" href="index.css?v=1780677452" as="style">
+
+<link rel="dns-prefetch" href="//fonts.googleapis.com">
+<link rel="dns-prefetch" href="//fonts.gstatic.com">
+<link rel="dns-prefetch" href="//www.gstatic.com">
+<link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="index.css?v=1780677452">
+</head>
+<body>
+
+<!-- ── LOADING SCREEN ───────────────────────────────────────────────────── -->
+<div id="appLoading" aria-live="polite" aria-label="Carregando Kronos">
+  <div class="app-loading-inner">
+    <div class="app-loading-logo">
+      <img src="Labtecie.png" alt="" aria-hidden="true" width="56" height="56" onerror="this.style.display='none'">
+    </div>
+    <div class="app-loading-spinner" aria-hidden="true"></div>
+    <div class="app-loading-text">Conectando ao Kronos…</div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Novo Registro</div>
+    <div class="modal-grid">
+      <div class="modal-field full"><label class="modal-label" for="mTask">Tarefa</label><input class="modal-input" id="mTask" type="text" placeholder="Descrição da tarefa" maxlength="200" aria-required="true"></div>
+      <div class="modal-field" id="mCollabField" style="display:none"><label class="modal-label" for="mCollab">Colaborador</label>
+        <select class="modal-select" id="mCollab">
+          
+        </select>
+      </div>
+      <div class="modal-field"><label class="modal-label" for="mProject">Projeto</label>
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span id="mProjectColorDot" style="width:10px;height:10px;border-radius:50%;background:#94A3B8;flex-shrink:0;transition:background 0.2s;"></span>
+          <select class="modal-select" id="mProject" onchange="updateProjectColorDot(this,'mProjectColorDot')" style="flex:1;">
+          <option value="">Selecione um projeto...</option>
+        </select>
+        </div>
+      </div>
+      <!-- Campos simples de tempo (entradas sem múltiplos períodos) -->
+      <div id="mSimpleTimeFields" style="display:contents">
+        <div class="modal-field"><label class="modal-label" for="mDate">Data</label><input class="modal-input" id="mDate" type="date"></div>
+        <div class="modal-field"><label class="modal-label" for="mStart">Início</label><input class="modal-input" id="mStart" type="time"></div>
+        <div class="modal-field"><label class="modal-label" for="mEnd">Fim</label><input class="modal-input" id="mEnd" type="time"></div>
+      </div>
+      <!-- Períodos editáveis (entradas com múltiplos períodos) -->
+      <div id="mPeriodsWrap" class="modal-field full" style="display:none"></div>
+      <div class="modal-field full"><label class="modal-label">Tags</label>
+        <div class="modal-tags" id="mTagsContainer">
+          <button class="btn-add-custom" onclick="openAddTagModal()" title="Criar nova tag para a equipe">+ Tag</button>
+        </div>
+      </div>
+      <div class="modal-field full"><label class="modal-label" for="mObs">Observação</label><input class="modal-input" id="mObs" type="text" placeholder="Opcional..." maxlength="500"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveModal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DESAFIO MODAL -->
+<div class="modal-overlay" id="desafioOverlay" role="dialog" aria-modal="true" aria-labelledby="desafioModalTitle">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title" id="desafioModalTitle">🎯 Definir Desafio do Dia</div>
+    <div class="modal-field full" style="margin-bottom:16px;">
+      <label class="modal-label" for="desafioModalInput">Desafio</label>
+      <input class="modal-input" id="desafioModalInput" type="text" placeholder="Ex: Quem fechar mais HTML hoje ganha destaque!" maxlength="120">
+    </div>
+    <div style="font-size:0.75rem;color:var(--muted);font-weight:600;margin-bottom:16px;">O desafio aparece para todos no topo da tela e expira à meia-noite.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeDesafioModal()" aria-label="Cancelar">Cancelar</button>
+      <button class="btn-cancel" onclick="clearDesafio()" style="border-color:var(--danger);color:var(--danger);" aria-label="Remover desafio">🗑 Remover</button>
+      <button class="btn-save" onclick="saveDesafio()" aria-label="Publicar desafio">Publicar</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- AVATAR PICKER MODAL -->
+<div class="modal-overlay" id="avatarModal" role="dialog" aria-modal="true" aria-labelledby="avatarModalTitle">
+  <div class="avatar-modal">
+    <div class="modal-title" id="avatarModalTitle">✏️ Personalizar Perfil</div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div class="avatar-preview" id="avatarPreview">😊</div>
+      <div style="font-size:0.75rem;color:var(--muted);font-weight:600;">Prévia do seu avatar</div>
+    </div>
+    <label class="modal-label" style="margin-bottom:6px;display:block;" for="avatarNameInput">Seu nome de exibição</label>
+    <input class="modal-input" id="avatarNameInput" type="text" maxlength="40" placeholder="Como seu nome aparece para a equipe" style="width:100%;margin-bottom:16px;">
+    <div class="modal-label" style="margin-bottom:8px;">Escolha um emoji</div>
+    <div class="avatar-grid" id="avatarEmojiGrid">
+      <div class="avatar-opt" onclick="selectEmoji(this,'😊')" role="button" tabindex="0" aria-label="Emoji 😊">😊</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🚀')" role="button" tabindex="0" aria-label="Emoji 🚀">🚀</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'⭐')" role="button" tabindex="0" aria-label="Emoji ⭐">⭐</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🎯')" role="button" tabindex="0" aria-label="Emoji 🎯">🎯</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'💡')" role="button" tabindex="0" aria-label="Emoji 💡">💡</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🔥')" role="button" tabindex="0" aria-label="Emoji 🔥">🔥</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🎨')" role="button" tabindex="0" aria-label="Emoji 🎨">🎨</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'📚')" role="button" tabindex="0" aria-label="Emoji 📚">📚</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🌟')" role="button" tabindex="0" aria-label="Emoji 🌟">🌟</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'💎')" role="button" tabindex="0" aria-label="Emoji 💎">💎</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🦁')" role="button" tabindex="0" aria-label="Emoji 🦁">🦁</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐯')" role="button" tabindex="0" aria-label="Emoji 🐯">🐯</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🦊')" role="button" tabindex="0" aria-label="Emoji 🦊">🦊</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐺')" role="button" tabindex="0" aria-label="Emoji 🐺">🐺</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🦅')" role="button" tabindex="0" aria-label="Emoji 🦅">🦅</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🌙')" role="button" tabindex="0" aria-label="Emoji 🌙">🌙</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'⚡')" role="button" tabindex="0" aria-label="Emoji ⚡">⚡</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🎭')" role="button" tabindex="0" aria-label="Emoji 🎭">🎭</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐱')" role="button" tabindex="0" aria-label="Emoji 🐱">🐱</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐶')" role="button" tabindex="0" aria-label="Emoji 🐶">🐶</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐼')" role="button" tabindex="0" aria-label="Emoji 🐼">🐼</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐨')" role="button" tabindex="0" aria-label="Emoji 🐨">🐨</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🦄')" role="button" tabindex="0" aria-label="Emoji 🦄">🦄</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐢')" role="button" tabindex="0" aria-label="Emoji 🐢">🐢</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🐬')" role="button" tabindex="0" aria-label="Emoji 🐬">🐬</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🦉')" role="button" tabindex="0" aria-label="Emoji 🦉">🦉</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🌈')" role="button" tabindex="0" aria-label="Emoji 🌈">🌈</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🍀')" role="button" tabindex="0" aria-label="Emoji 🍀">🍀</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'☕')" role="button" tabindex="0" aria-label="Emoji ☕">☕</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🎧')" role="button" tabindex="0" aria-label="Emoji 🎧">🎧</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🎮')" role="button" tabindex="0" aria-label="Emoji 🎮">🎮</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🏆')" role="button" tabindex="0" aria-label="Emoji 🏆">🏆</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'🎸')" role="button" tabindex="0" aria-label="Emoji 🎸">🎸</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'✨')" role="button" tabindex="0" aria-label="Emoji ✨">✨</div>
+      <div class="avatar-opt" onclick="selectEmoji(this,'💪')" role="button" tabindex="0" aria-label="Emoji 💪">💪</div>
+    </div>
+    <div class="modal-label" style="margin-bottom:8px;">Cor do fundo</div>
+    <div class="color-grid" id="avatarColorGrid">
+      <div class="color-opt selected" onclick="selectColor(this,'#F15A24')" style="background:#F15A24"></div>
+      <div class="color-opt" onclick="selectColor(this,'#7C6AFF')" style="background:#7C6AFF"></div>
+      <div class="color-opt" onclick="selectColor(this,'#10B981')" style="background:#10B981"></div>
+      <div class="color-opt" onclick="selectColor(this,'#F59E0B')" style="background:#F59E0B"></div>
+      <div class="color-opt" onclick="selectColor(this,'#EF4444')" style="background:#EF4444"></div>
+      <div class="color-opt" onclick="selectColor(this,'#8B5CF6')" style="background:#8B5CF6"></div>
+      <div class="color-opt" onclick="selectColor(this,'#EC4899')" style="background:#EC4899"></div>
+      <div class="color-opt" onclick="selectColor(this,'#06B6D4')" style="background:#06B6D4"></div>
+      <div class="color-opt" onclick="selectColor(this,'#6366F1')" style="background:#6366F1"></div>
+      <div class="color-opt" onclick="selectColor(this,'#1A1A2E')" style="background:#1A1A2E"></div>
+      <div class="color-opt" onclick="selectColor(this,'#0EA5E9')" style="background:#0EA5E9"></div>
+      <div class="color-opt" onclick="selectColor(this,'#22C55E')" style="background:#22C55E"></div>
+      <div class="color-opt" onclick="selectColor(this,'#EAB308')" style="background:#EAB308"></div>
+      <div class="color-opt" onclick="selectColor(this,'#F97316')" style="background:#F97316"></div>
+      <div class="color-opt" onclick="selectColor(this,'#D946EF')" style="background:#D946EF"></div>
+      <div class="color-opt" onclick="selectColor(this,'#64748B')" style="background:#64748B"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+      <label for="avatarColorWheel" style="font-size:0.75rem;color:var(--muted);font-weight:600;">Ou escolha qualquer cor:</label>
+      <input type="color" id="avatarColorWheel" value="#F15A24" oninput="selectColorWheel(this.value)" aria-label="Seletor de cor livre" style="width:48px;height:34px;padding:2px;border-radius:8px;cursor:pointer;border:1.5px solid var(--border);">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAvatarPicker()">Cancelar</button>
+      <button class="btn-save" onclick="saveAvatar()">Salvar avatar</button>
+    </div>
+  </div>
+</div>
+
+<!-- KANBAN CARD MODAL -->
+<div class="modal-overlay" id="kanbanCardModal" role="dialog" aria-modal="true" aria-labelledby="kanbanCardModalTitle">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-title" id="kanbanCardModalTitle">Nova Disciplina</div>
+    <div class="modal-grid">
+      <div class="modal-field full">
+        <label class="modal-label" for="kcName">Nome da disciplina</label>
+        <input class="modal-input" id="kcName" type="text" placeholder="Ex: CARTOGRAFIA">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label" for="kcAssignee">Responsável</label>
+        <select class="modal-select" id="kcAssignee">
+          
+        </select>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label" for="kcColumn">Coluna</label>
+        <select class="modal-select" id="kcColumn">
+            <option value="">Selecione uma coluna...</option>
+          </select>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label" for="kcModule">Módulo</label>
+        <select class="modal-select" id="kcModule">
+          <option value="none">Sem módulo</option>
+        </select>
+      </div>
+      <div class="modal-field full">
+        <label class="modal-label">Tipo / Etiqueta</label>
+        <div class="modal-tags" id="kcTagsWrap">
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+        </div>
+      </div>
+      <div class="modal-field full">
+        <label class="modal-label">🔗 Links de acesso</label>
+        <div id="kcLinksList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+        <button class="btn-sm" onclick="addKcLink()" style="width:fit-content;">+ Adicionar link</button>
+      </div>
+      <div class="modal-field full">
+        <label class="modal-label" for="kcObs">Observação</label>
+        <input class="modal-input" id="kcObs" type="text" placeholder="Opcional...">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeKanbanCardModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveKanbanCard()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- KANBAN DETAIL MODAL -->
+<div class="modal-overlay" id="kanbanDetailModal" role="dialog" aria-modal="true" aria-labelledby="kdName">
+  <div class="modal" style="max-width:540px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;">
+      <div>
+        <div class="modal-title" id="kdName" style="margin-bottom:6px;"></div>
+        <div id="kdLabels" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+      </div>
+      <button onclick="closeKanbanDetail()" aria-label="Fechar detalhes" style="background:none;border:none;cursor:pointer;color:var(--muted);flex-shrink:0;display:flex;align-items:center;padding:4px;border-radius:6px;transition:all 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div><div class="modal-label" style="margin-bottom:5px;">Responsável</div><div id="kdAssignee"></div></div>
+      <div><div class="modal-label" style="margin-bottom:5px;">Etapa atual</div><div id="kdColumn" style="font-weight:800;color:var(--orange);font-size:0.88rem;"></div></div>
+      <div><div class="modal-label" style="margin-bottom:5px;">Horas registradas</div><div id="kdHours" style="font-family:var(--mono);font-size:0.95rem;font-weight:500;color:var(--success);"></div></div>
+      <div><div class="modal-label" style="margin-bottom:5px;">Criado em</div><div id="kdCreated" style="font-family:var(--mono);font-size:0.75rem;color:var(--muted);"></div></div>
+    </div>
+    <!-- ✅ Links inline — visível e editável para todos diretamente no detalhe -->
+    <div id="kdLinksSection" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="modal-label">🔗 Links de acesso</div>
+        <button id="kdAddLinkBtn"
+          style="background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;padding:3px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;">
+          + Adicionar link
+        </button>
+      </div>
+      <!-- Lista editável de links -->
+      <div id="kdLinksList" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+    <div id="kdObsSection" style="margin-bottom:14px;display:none;">
+      <div class="modal-label" style="margin-bottom:4px;">Observação</div>
+      <div id="kdObs" style="font-size:0.82rem;color:var(--muted);font-style:italic;"></div>
+    </div>
+    <!-- Avaliação da Gestora — visibilidade controlada por JS -->
+    <div id="kdAvaliacaoSection" style="display:none;margin-bottom:14px;">
+      <div class="modal-label" style="color:var(--orange);margin-bottom:10px;">🎯 Avaliação da Gestão</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="kdAvaliacaoBody"></div>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <div class="modal-label" style="margin-bottom:8px;">Histórico de movimentações</div>
+      <div id="kdHistory" style="display:flex;flex-direction:column;max-height:140px;overflow-y:auto;"></div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div class="modal-label" style="margin-bottom:8px;">Histórico de trabalho por colaborador</div>
+      <div id="kdWorkers" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div class="modal-label" style="margin-bottom:8px;">Comentários</div>
+      <div id="kdComments" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;">
+        <input id="kdCommentInput" class="modal-input" type="text" placeholder="Escreva um comentário..." maxlength="200" style="flex:1;padding:7px 10px;">
+        <button onclick="addKanbanComment()" class="btn-save" style="padding:7px 14px;font-size:0.75rem;">Enviar</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="kdEditBtn" class="btn-cancel">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Editar
+      </button>
+      <button id="kdArchiveBtn" class="btn-cancel" style="border-color:rgba(239,68,68,0.3);color:var(--danger);">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        Arquivar
+      </button>
+      <button class="btn-save" onclick="closeKanbanDetail()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ESCOLHA DE ARQUIVAMENTO -->
+<div class="modal-overlay" id="archiveChoiceModal" role="dialog" aria-modal="true" aria-labelledby="archChoiceTitle" style="z-index:1100;" onclick="if(event.target===this)closeArchiveChoiceModal()">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title" id="archChoiceTitle">Arquivar Disciplina</div>
+    <div id="archChoiceCardName" style="font-size:0.82rem;color:var(--muted);margin-bottom:18px;font-style:italic;"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+      <div id="archChoiceOptionArq" style="padding:14px;border:1.5px solid var(--orange);border-radius:10px;cursor:pointer;background:rgba(241,90,36,0.04);"
+        onmouseover="this.style.background='rgba(241,90,36,0.09)'" onmouseout="this.style.background='rgba(241,90,36,0.04)'">
+        <div style="font-weight:700;margin-bottom:4px;">📦 Arquivar no Arquivo Morto</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px;">Escolha o módulo de destino:</div>
+        <select id="archChoiceModSelect" class="filter-select" style="width:100%;margin-bottom:8px;" onclick="event.stopPropagation()"></select>
+        <button id="archChoiceConfirmArq" class="btn-save" style="width:100%;padding:8px 0;font-size:0.82rem;">Arquivar aqui</button>
+      </div>
+      <div id="archChoiceOptionLix" style="padding:14px;border:1.5px solid rgba(239,68,68,0.35);border-radius:10px;cursor:pointer;background:rgba(239,68,68,0.03);"
+        onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='rgba(239,68,68,0.03)'">
+        <div style="font-weight:700;color:var(--danger);margin-bottom:2px;">🗑 Excluir (Lixeira)</div>
+        <div style="font-size:0.75rem;color:var(--muted);">O card pode ser recuperado depois no Arquivo Morto</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeArchiveChoiceModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- KANBAN TIMER WIDGET -->
+<div class="k-timer-widget" id="kTimerWidget" style="display:none;">
+  <div class="k-timer-title" style="display:flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Timer — Fluxo de Demandas</div>
+  <div class="k-timer-task" id="kTimerTask">—</div>
+  <div class="k-timer-display" id="kTimerDisplay">00:00:00</div>
+  <div class="k-timer-actions">
+    <button class="k-btn-stop" onclick="stopKanbanTimer()" style="display:flex;align-items:center;justify-content:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> Finalizar</button>
+    <button class="k-btn-cancel-t" onclick="cancelKanbanTimer()">Cancelar</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="Labtecie.png" alt="Labtecie" style="height:32px;flex-shrink:0;" onerror="this.style.display='none'">
+        <div class="sidebar-logo-text-wrap">
+          <div class="sidebar-logo-text">Kronos</div>
+          <div class="sidebar-logo-sub">Labtecie</div>
+        </div>
+      </div>
+      <button class="sidebar-pin-btn" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar sidebar" aria-label="Fixar sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L8 8H3l4.5 4.5L6 20l6-3 6 3-1.5-7.5L21 8h-5L12 2z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- USER AVATAR -->
+    <div class="sidebar-user" onclick="openAvatarPicker()" style="cursor:pointer;transition:background 0.2s;" title="Clique para personalizar seu avatar">
+      <div class="user-av" id="sidebarAv" style="background:#F15A24;font-size:1.1rem;">BR</div>
+      <div class="sidebar-text" style="flex:1;min-width:0;max-width:140px;">
+        <div class="user-name" id="sidebarName">Carregando...</div>
+        <div class="user-role" id="sidebarRole">colaborador</div>
+      </div>
+      <div class="sidebar-text" style="font-size:0.65rem;color:var(--muted);max-width:20px;">✏️</div>
+    </div>
+
+    <nav class="sidebar-nav" style="overflow-y:auto;flex:1;">
+
+      <!-- MEU ESPAÇO -->
+      <div class="nav-group">
+
+        <div class="nav-item active" id="navTimer" onclick="showPage('timer',this)" title="Timer">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
+          </svg>
+          <span class="sidebar-text">Timer</span>
+        </div>
+
+        <div class="nav-item" id="navMeuHistorico" onclick="showPage('meuhistorico',this)" title="Meus Registros">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          <span class="sidebar-text">Meus Registros</span>
+        </div>
+
+        <div class="nav-item" id="navKanban" onclick="showPage('kanban',this)" title="Fluxo de Demandas">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="11" rx="1"/><rect x="17" y="3" width="4" height="15" rx="1"/>
+          </svg>
+          <span class="sidebar-text">Fluxo de Demandas</span>
+        </div>
+
+        <!-- DASHBOARD INDIVIDUAL — só colaboradores -->
+        <div class="nav-item" id="navMeuDashboard" onclick="showPage('meu-dashboard',this)" title="Dashboard" style="display:none">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span class="sidebar-text">Dashboard</span>
+        </div>
+      </div>
+
+      <!-- DASHBOARD — só gestora -->
+      <div class="nav-group" id="navDashboard" style="display:none;">
+        <div class="nav-item nav-item-dashboard" onclick="showPage('dashboard',this)" title="Dashboard">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span class="sidebar-text">Dashboard</span>
+        </div>
+      </div>
+
+      <!-- G7: DASHBOARD RH legado removido (nav inalcançável; página renderiza pelo Dashboard padrão) -->
+
+      <!-- GESTÃO — colapsável -->
+      <div class="nav-group" id="navGestora" style="display:none;">
+        <div class="nav-item nav-item-group" onclick="toggleNavGroup(this)" title="Gestão">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          <span class="sidebar-text">Gestão</span>
+          <svg class="nav-icon nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;width:14px;height:14px;">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+        <div class="nav-group-body" style="display:none;">
+          <div class="nav-item nav-item-sub" onclick="showPage('demandas',this)"><span class="sidebar-text">Demandas</span></div>
+          <div class="nav-item nav-item-sub" onclick="showPage('graficos',this)"><span class="sidebar-text">Gráficos</span></div>
+          <div class="nav-item nav-item-sub" onclick="showPage('historico4s',this)"><span class="sidebar-text">Histórico Mensal</span></div>
+          <div class="nav-item nav-item-sub" id="navIndicadores" style="display:none" onclick="showPage('indicadores',this)"><span class="sidebar-text">Indicadores</span></div>
+          <div class="nav-item nav-item-sub" onclick="showPage('usuarios',this)"><span class="sidebar-text">Usuários</span></div>
+        </div>
+      </div>
+
+      <!-- FERRAMENTAS -->
+      <div class="nav-group" id="navFerramentas" style="display:none;">
+        <div class="nav-item" onclick="showPage('ferramentas',this)" title="Ferramentas">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+          <span class="sidebar-text">Ferramentas</span>
+          <span id="approvalNavBadge" style="display:none;background:var(--danger);color:#fff;font-family:var(--mono);font-size:0.52rem;font-weight:800;min-width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;padding:0 3px;margin-left:auto;flex-shrink:0;" aria-label="aprovações pendentes"></span>
+        </div>
+      </div>
+
+      <!-- V2: Configurações (gestora only) -->
+      <div class="nav-group" id="navConfiguracoes" style="display:none;">
+        <div class="nav-item" onclick="showPage('configuracoes',this)" title="Configurações">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="sidebar-text">Configurações</span>
+        </div>
+      </div>
+
+    </nav>
+
+    <!-- MURAL COMPACTO -->
+    <div class="mural-section">
+      <div class="mural-title" onclick="toggleMural()" id="muralToggleBtn">
+        <div class="mural-title-left">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Mural da equipe
+          <span id="muralCount" style="font-size:0.6rem;color:var(--muted);font-weight:600;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button onclick="event.stopPropagation();clearMural()" title="Limpar mural" aria-label="Limpar mural" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:4px;transition:color 0.2s;display:flex;align-items:center;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+          <span class="mural-toggle-arrow" id="muralArrow">▾</span>
+        </div>
+      </div>
+      <div class="mural-body" id="muralBody">
+        <div class="mural-posts" id="muralPosts" style="max-height:100px;">
+          <div style="font-size:0.72rem;color:var(--muted);text-align:center;padding:8px">Carregando...</div>
+        </div>
+        <div class="mural-input-wrap">
+          <input class="mural-input" id="muralInput" type="text" placeholder="Escreva algo..." maxlength="120">
+          <button class="mural-send" onclick="sendMuralPost()" aria-label="Enviar mensagem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-row">
+        <button class="btn-logout" onclick="doLogout()" aria-label="Sair">
+          <svg style="width:16px;height:16px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span class="sidebar-text">Sair</span>
+        </button>
+        <img src="BA.tec.png" alt="BA.tec" class="sidebar-batec-logo" width="110" height="22" loading="lazy" decoding="async" onerror="this.style.display='none'">
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <h1 class="sr-only">Kronos · Labtecie — Sistema de gestão de horas</h1>
+    <div class="topbar">
+      <div class="topbar-title"><span class="topbar-title-kronos">Kronos</span><span class="topbar-title-labtecie" id="topbarTeamName">· Labtecie</span></div>
+      <div class="topbar-right" id="topbarRight">
+        <div class="topbar-date" id="topbarDate"></div>
+        <div class="topbar-sep"></div>
+        <div id="topbarSync" class="topbar-sync">
+          <div id="topbarSyncDot" class="topbar-sync-dot"></div>
+          <span id="topbarSyncText" class="topbar-sync-text">Conectando…</span>
+        </div>
+        <!-- Notification Bell -->
+        <div style="position:relative;display:inline-flex;align-items:center;">
+          <button onclick="toggleNotifPanel()" title="Notificações" aria-label="Notificações" class="topbar-icon-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </button>
+          <span id="notifBadge" aria-live="polite" aria-atomic="true" style="display:none;position:absolute;top:-2px;right:-2px;background:var(--orange);color:#fff;font-family:var(--mono);font-size:0.55rem;font-weight:800;min-width:15px;height:15px;border-radius:50%;align-items:center;justify-content:center;line-height:1;padding:0 3px;pointer-events:none;"></span>
+          <!-- Notif Panel -->
+          <div id="notifPanel" class="notif-panel" style="display:none;" role="dialog" aria-label="Notificações"></div>
+        </div>
+        
+<button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Abrir menu lateral" style="display:none;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <line x1="3" y1="12" x2="21" y2="12"></line>
+    <line x1="3" y1="6" x2="21" y2="6"></line>
+    <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+</button>
+        <button id="desafioTopBtn" onclick="openDesafioModal()" title="Definir Desafio do Dia" aria-label="Definir Desafio do Dia" class="topbar-icon-btn" style="display:none;">
+          <img src="target.png" alt="Desafio do dia" width="20" height="20" style="filter:grayscale(1) opacity(0.6); display:block;">
+        </button>
+        <button id="themeBtn" onclick="toggleTheme()" title="Alternar tema escuro/claro" aria-label="Alternar tema escuro/claro" class="topbar-icon-btn">
+          <svg id="themeBtnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- DESAFIO DO DIA BANNER -->
+    <div class="desafio-banner" id="desafioBanner" style="display:none;">
+      <div class="desafio-icon">🎯</div>
+      <div>
+        <div class="desafio-text" id="desafioText"></div>
+        <div class="desafio-sub">Desafio do dia — definido pela gestora</div>
+      </div>
+      <button class="desafio-edit" id="desafioEditBtn" style="display:none;" onclick="openDesafioModal()">✏️ Editar</button>
+    </div>
+
+    <div class="content">
+
+      <!-- ══ PAGE: TIMER (colaborador) ══ -->
+      <div class="page active" id="page-timer">
+        <div class="section-heading">Registro de Horas</div>
+        <div class="section-sub" id="timerSubtitle">Registre seu tempo de trabalho</div>
+        <!-- sync movido para topbar -->
+        <div id="syncDot" style="display:none;"></div><span id="syncText" style="display:none;"></span>
+
+        <div class="timer-card" id="timerCard">
+          <div class="timer-row">
+            <div class="task-input-wrap">
+              <input class="task-input" id="taskInput" type="text" placeholder="No que você está trabalhando?" maxlength="200" list="taskSuggestions" autocomplete="off">
+              <datalist id="taskSuggestions"></datalist>
+              <span class="task-char-counter" id="taskCharCounter">200</span>
+            </div>
+            <div class="project-select-wrap proj-combo" id="projectCombo" style="display:inline-flex;align-items:center;gap:5px;">
+              <span id="projectColorDot" style="width:10px;height:10px;border-radius:50%;background:#94A3B8;flex-shrink:0;transition:background 0.2s;"></span>
+              <input class="select-pill" id="projectSearch" placeholder="Digite ou selecione…" autocomplete="off" aria-label="Projeto" role="combobox" aria-expanded="false" aria-controls="projectComboList" style="min-width:150px;">
+              <input type="hidden" id="projectSelect">
+              <div class="proj-combo-list" id="projectComboList" role="listbox"></div>
+              <button class="btn-add-proj" onclick="openAddProjectModal()" title="Adicionar novo projeto personalizado" style="display:none">＋</button>
+            </div>
+            <div class="collab-wrap" id="collabWrap">
+              <div class="collab-avatar" id="collabAvatar" style="background:#F15A24">BR</div>
+              <select class="collab-select" id="collabSelect" onchange="updateCollabAvatar()">
+                
+              </select>
+            </div>
+            <div class="timer-display" id="timerDisplay">00:00:00</div>
+            <button class="btn-start" id="startBtn" onclick="toggleTimer()" aria-label="Iniciar timer">
+              <svg id="btnIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+          </div>
+          <div class="tags-row" id="timerTags">
+            <span class="tags-label">Tags:</span>
+            <button class="btn-add-custom" onclick="openAddTagModal()" title="Criar nova tag para a equipe">+ Tag</button>
+            <button class="btn-add-custom" id="btnManageTags" onclick="openManageTagsModal()" title="Gerenciar e remover tags" style="display:none"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Tags</button>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </div>
+          <div class="obs-row">
+            <input class="obs-input" id="obsInput" type="text" placeholder="Observação (opcional)...">
+          </div>
+        </div>
+        <button class="add-manual-btn" onclick="openModal(null)">+ Adicionar registro manualmente</button>
+
+        <div class="stats-row-compact">
+          <div class="stat-card-compact">
+            <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="stat-info"><div class="stat-info-label">Horas hoje</div><div class="stat-info-value orange" id="statToday">0h 00m</div></div>
+          </div>
+          <div class="stat-card-compact">
+            <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div>
+            <div class="stat-info"><div class="stat-info-label">Registros</div><div class="stat-info-value" id="statCount">0</div></div>
+          </div>
+          <div class="stat-card-compact">
+            <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="stat-info"><div class="stat-info-label">Último às</div><div class="stat-info-value" id="statLast">—</div></div>
+          </div>
+        </div>
+        <div id="minhasConquistas" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+
+        <div class="section-bar">
+          <div class="section-bar-title" id="entriesTitle">Últimos registros</div>
+        </div>
+        <div class="entries-list" id="entriesList"></div>
+      </div>
+
+      <!-- ══ PAGE: MEUS REGISTROS ══ -->
+      <div class="page" id="page-meuhistorico">
+        <div class="section-heading">Meus Registros</div>
+        <div class="section-sub">Histórico completo dos seus registros</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+          <input type="text" class="filter-select" id="myRecordsSearch" placeholder="Buscar..." oninput="_debouncedRenderMyHistory()" style="min-width:180px;height:34px;">
+          <span style="font-size:0.75rem;color:var(--muted);font-weight:600;white-space:nowrap;">De</span>
+          <input type="date" class="filter-select" id="myRecordsDateFrom" onchange="window.renderMyHistory()" style="height:34px;">
+          <span style="font-size:0.75rem;color:var(--muted);font-weight:600;white-space:nowrap;">Até</span>
+          <input type="date" class="filter-select" id="myRecordsDateTo" onchange="window.renderMyHistory()" style="height:34px;">
+          <button class="btn-sm" onclick="document.getElementById('myRecordsDateFrom').value='';document.getElementById('myRecordsDateTo').value='';document.getElementById('myRecordsSearch').value='';window.renderMyHistory()" style="height:34px;" aria-label="Limpar filtros">✕ Limpar</button>
+        </div>
+        <div class="entries-list" id="entriesList2"></div>
+      </div>
+
+      <!-- ══ PAGE: DASHBOARD ══ -->
+      <div class="page" id="page-dashboard">
+        <div class="equipe-filter-bar" id="equipe-filter-dashboard" aria-label="Selecionar equipe"></div>
+        <div class="section-heading">Dashboard</div>
+        <div class="section-sub">Visão completa da equipe em tempo real</div>
+        <span id="syncDot2" style="display:none"></span><span id="syncText2" style="display:none"></span>
+
+        <!-- SEÇÃO 1: EM ANDAMENTO -->
+        <div class="dash-section">
+          <div class="dash-section-title">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="pulse-dot" style="margin:0;"></span>
+              Em Andamento Agora
+            </span>
+          </div>
+          <div id="onlineBodyDash" class="online-cards-grid"></div>
+        </div>
+
+        <!-- SEÇÃO 2: INDICADORES DO DIA -->
+        <div class="dash-section">
+          <div class="dash-section-title">
+            <span>Indicadores do Dia</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button class="date-nav-btn" onclick="changeDashDay(-1)" aria-label="Dia anterior">&#8249;</button>
+              <span id="dashDayLabel" style="font-family:var(--mono);font-size:0.8rem;font-weight:500;min-width:160px;text-align:center;"></span>
+              <button class="date-nav-btn" onclick="changeDashDay(1)" aria-label="Próximo dia">&#8250;</button>
+              <input type="date" class="filter-select" id="dashDayPicker" onchange="setDashDay(this.value)" style="border-radius:8px;padding:5px 10px;">
+              <button class="today-btn" onclick="goDashToday()">Hoje</button>
+            </div>
+          </div>
+          <div class="collab-cards" id="cardsGrid"></div>
+        </div>
+
+        <!-- SEÇÃO 3: TABELA SEMANAL -->
+        <div class="dash-section">
+          <div class="dash-section-title">
+            <div id="dashTableTabs" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+              <span class="dash-tab-btn active" data-dtab="semanal" role="button" tabindex="0" onclick="switchDashTable('semanal')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchDashTable('semanal');}">Tabela Semanal</span>
+              <span class="dash-tab-btn" data-dtab="destaques" role="button" tabindex="0" onclick="switchDashTable('destaques')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchDashTable('destaques');}" style="display:none;">Tabela Destaques</span>
+              <span class="dash-tab-btn" data-dtab="remoto" role="button" tabindex="0" onclick="switchDashTable('remoto')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchDashTable('remoto');}" style="display:none;">Trabalho Remoto</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button class="date-nav-btn" onclick="changeWeek(-1)" aria-label="Semana anterior">&#8249;</button>
+              <span id="weekNavLabel" style="font-family:var(--mono);font-size:0.78rem;font-weight:500;min-width:190px;text-align:center;"></span>
+              <button class="date-nav-btn" onclick="changeWeek(1)" aria-label="Próxima semana">&#8250;</button>
+              <input type="date" class="filter-select" id="weekPicker" onchange="setWeekFromDate(this.value)" style="border-radius:8px;padding:5px 10px;">
+              <button class="today-btn" onclick="goCurrentWeek()">Semana atual</button>
+              <button class="btn-sm success" onclick="exportWeekCSV()">⬇ CSV</button>
+            </div>
+          </div>
+          <div id="dashTableSemanal" class="table-wrap"><table class="week-table"><thead id="weekTableHead"></thead><tbody id="weekTableBody"></tbody></table></div>
+          <div id="dashTableDestaques" style="display:none;"></div>
+          <div id="dashTableRemoto" style="display:none;"></div>
+        </div>
+
+        <!-- SEÇÃO 4: DEMANDAS DA SEMANA -->
+        <div class="dash-section" id="dashDemandasSection">
+          <div class="dash-section-title">
+            <span>Demandas da Semana</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input type="text" class="filter-select" id="dashDemandasSearch" placeholder="Buscar..." oninput="_debouncedRenderDashDemandas()" style="min-width:160px;font-size:0.78rem;">
+              <select id="dashDemandasCollab" class="filter-select" onchange="renderDashDemandasWeek()" style="font-size:0.78rem;">
+                <option value="">Todos os colaboradores</option>
+                
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+            <table class="demands-table">
+              <thead><tr>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Colaborador</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Tarefa</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Projeto</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Início</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Fim</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Duração</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">% Amt</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Tags</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Observação</th>
+                <th style="position:sticky;top:0;background:var(--surface2);z-index:1;">Status</th>
+              </tr></thead>
+              <tbody id="dashDemandasBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: ONLINE NOW ══ -->
+      <div class="page" id="page-online">
+        <div class="section-heading">Em Andamento Agora</div>
+        <div class="section-sub">Colaboradores com timer ativo neste momento</div>
+        <div id="onlineBody" class="online-cards-grid"></div>
+      </div>
+
+      <!-- ══ PAGE: DEMANDAS ══ -->
+      <div class="page" id="page-demandas">
+        <div class="equipe-filter-bar" id="equipe-filter-demandas" aria-label="Selecionar equipe"></div>
+        <div class="section-heading">Relatório de Demandas</div>
+        <div class="section-sub">Todas as tarefas registradas com detalhes completos</div>
+        <div class="section-bar">
+          <div class="section-bar-actions">
+            <input type="text" class="filter-select" id="filterSearchD" placeholder="Buscar tarefa, colaborador ou projeto..." oninput="_debouncedRenderDemandas()" style="min-width:260px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="date" class="filter-select" id="filterDateStart" onchange="renderDemandas(true)" title="Data inicial">
+              <span style="font-size:0.7rem;color:var(--muted);">→</span>
+              <input type="date" class="filter-select" id="filterDateEnd" onchange="renderDemandas(true)" title="Data final">
+            </div>
+            <select class="filter-select" id="filterCollabD" onchange="renderDemandas(true)">
+              <option value="">Todos</option>
+              
+            </select>
+            <select class="filter-select" id="filterProjD" onchange="renderDemandas(true)">
+              <option value="">Todos os projetos</option>
+            </select>
+            <button class="btn-sm success" onclick="exportDemandasCSV()">⬇ CSV</button>
+          </div>
+        </div>
+
+        <!-- Barra de ações em lote — visível apenas para gestora via JS -->
+        <div id="demandasActionsBar" style="display:none;align-items:center;gap:12px;padding:10px 14px;margin-bottom:8px;background:var(--surface2,#f8f4f1);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600;cursor:pointer;color:var(--muted)">
+            <input type="checkbox" id="selectAllDemandas" onchange="_selectAllDemandas(this.checked)"
+              style="width:15px;height:15px;accent-color:var(--orange);cursor:pointer">
+            Selecionar todos
+          </label>
+          <span id="demandasSelectedCount" style="font-size:0.82rem;font-weight:700;color:var(--orange)"></span>
+          <button id="btnRemoveSelected" onclick="deleteSelectedDemandas()"
+            style="display:none;align-items:center;gap:6px;background:var(--danger,#EF4444);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:0.8rem;font-weight:700;cursor:pointer;">
+            🗑 Remover selecionados
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="demands-table">
+            <thead><tr>
+              <th id="thCheckDemandas" style="width:32px"></th>
+              <th>Colaborador</th><th>Tarefa</th><th>Projeto</th>
+              <th>Início</th><th>Fim</th><th>Duração</th>
+              <th>% Amt</th><th>Tags</th><th>Observação</th><th>Status</th>
+            </tr></thead>
+            <tbody id="demandasBody"></tbody>
+          </table>
+          <div id="demandasPagination"></div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: PROJETOS ══ -->
+      <div class="page" id="page-projetos">
+        <div class="section-heading">Demandas por Projeto</div>
+        <div class="section-sub">Contagem e horas totais por tipo de projeto</div>
+        <div class="date-nav">
+          <button class="date-nav-btn" onclick="changeProjDay(-1)" aria-label="Dia anterior">&#8249;</button>
+          <span class="date-nav-label" id="projDateLabel"></span>
+          <button class="date-nav-btn" onclick="changeProjDay(1)" aria-label="Próximo dia">&#8250;</button>
+          <button class="today-btn" onclick="goProjToday()">Hoje</button>
+        </div>
+        <div class="proj-cards" id="projCards"></div>
+      </div>
+
+      <!-- ══ PAGE: GRÁFICOS ══ -->
+      <div class="page" id="page-graficos">
+        <div class="equipe-filter-bar" id="equipe-filter-graficos" aria-label="Selecionar equipe"></div>
+        <div class="section-heading">Gráficos</div>
+        <div class="section-sub">Análise visual do desempenho da equipe</div>
+
+        <!-- Controles de filtro de data -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:var(--surface2,#f8f4f1);border-radius:10px;border:1px solid var(--border);">
+          <span style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Filtros</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:0.75rem;color:var(--muted);font-weight:600;">Dia:</span>
+            <input type="date" class="filter-select" id="chartsDayPicker" onchange="setChartsDay(this.value)" style="border-radius:8px;padding:4px 8px;font-size:0.78rem;">
+            <button class="today-btn" onclick="setChartsDay(null);document.getElementById('chartsDayPicker').value=''">Hoje</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-left:8px;">
+            <span style="font-size:0.75rem;color:var(--muted);font-weight:600;">Semana:</span>
+            <button class="date-nav-btn" onclick="changeChartsWeek(-1)" aria-label="Semana anterior">&#8249;</button>
+            <button class="date-nav-btn" onclick="changeChartsWeek(1)" aria-label="Próxima semana">&#8250;</button>
+            <button class="today-btn" onclick="goChartsCurrentWeek()">Atual</button>
+          </div>
+        </div>
+
+        <div class="cards-row cols2" style="margin-bottom:20px;">
+          <div class="chart-card"><div class="chart-title">Distribuição por Projeto (horas)</div><div class="chart-wrap" style="height:260px;"><canvas id="chartPizza"></canvas></div></div>
+          <div class="chart-card"><div class="chart-title">Ranking de Colaboradores (% Total)</div><div class="chart-wrap" style="height:260px;"><canvas id="chartRanking"></canvas></div></div>
+        </div>
+        <div class="cards-row cols2">
+          <div class="chart-card"><div class="chart-title">Evolução Diária — % Total</div><div class="chart-wrap" style="height:260px;"><canvas id="chartLinha"></canvas></div></div>
+          <div class="chart-card"><div class="chart-title">Horas por Projeto por Dia</div><div class="chart-wrap" style="height:260px;"><canvas id="chartBarras"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: HISTÓRICO 4 SEMANAS ══ -->
+      <div class="page" id="page-historico4s">
+        <div class="equipe-filter-bar" id="equipe-filter-historico4s" aria-label="Selecionar equipe"></div>
+        <div class="section-heading">Histórico Mensal</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <button class="date-nav-btn" onclick="changeHist4Month(-1)" aria-label="Mês anterior">&#8249;</button>
+          <span id="hist4MonthLabel" style="font-family:var(--mono);font-size:0.85rem;font-weight:700;min-width:180px;text-align:center;text-transform:capitalize;color:var(--text);"></span>
+          <button class="date-nav-btn" onclick="changeHist4Month(1)" aria-label="Próximo mês">&#8250;</button>
+          <button class="btn-sm" onclick="goHist4Current()" style="margin-left:4px;">Mês atual</button>
+        </div>
+        <div class="section-sub" id="hist4Sub" style="margin-top:0;margin-bottom:16px;"></div>
+        <div class="chart-card" style="margin-bottom:20px;"><div class="chart-title">Médias semanais por colaborador</div><div class="chart-wrap" style="height:300px;"><canvas id="chartMensal"></canvas></div></div>
+        <div class="ranking-list" id="rankingList4w"></div>
+      </div>
+
+
+
+      <!-- ══ PAGE: INDICADORES DE AJUSTE ══ -->
+      <div class="page" id="page-indicadores">
+        <div class="equipe-filter-bar" id="equipe-filter-indicadores" aria-label="Selecionar equipe"></div>
+        <div class="section-heading">Indicadores de Ajuste</div>
+        <div class="section-sub">Avaliação de qualidade dos cards do Kanban</div>
+
+        <!-- Filtros -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:20px;">
+          <select class="filter-select" id="indMesFilter" onchange="renderIndicadores()">
+            <option value="">Todos os meses</option>
+          </select>
+          <select class="filter-select" id="indColabFilter" onchange="renderIndicadores()">
+            <option value="">Todos os colaboradores</option>
+          </select>
+          <select class="filter-select" id="indTipoFilter" onchange="renderIndicadores()">
+            <option value="diagramacao">Avaliação — Demanda</option>
+            <option value="curadoria">Avaliação — Curadoria</option>
+          </select>
+          <span id="indTotalLabel" style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-left:4px;"></span>
+        </div>
+
+        <!-- Pendências -->
+        <div class="dash-section" style="margin-bottom:20px;">
+          <div class="dash-section-title">
+            <span>Pendentes de Avaliação</span>
+            <span id="indPendenteBadge" style="background:var(--warn);color:#fff;font-family:var(--mono);font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:99px;">0</span>
+          </div>
+          <div id="indPendenteList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+
+        <!-- Resumo por colaborador -->
+        <div class="dash-section" style="margin-bottom:20px;">
+          <div class="dash-section-title"><span>Resumo por Colaborador</span></div>
+          <div id="indResumoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
+        </div>
+
+        <!-- Tabela detalhada -->
+        <div class="dash-section">
+          <div class="dash-section-title"><span>Cards Avaliados</span></div>
+          <div style="overflow-x:auto;">
+            <table class="demands-table" style="min-width:700px;">
+              <thead><tr>
+                <th>Disciplina</th>
+                <th>Colaborador</th>
+                <th>Avaliação Demanda</th>
+                <th>Avaliação Cur.</th>
+                <th>Observação</th>
+                <th>Data</th>
+              </tr></thead>
+              <tbody id="indTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: KANBAN ══ -->
+      <div class="page" id="page-kanban">
+        <div class="section-heading">Fluxo de Demandas</div>
+        <div class="section-sub">Acompanhe e gerencie o fluxo de disciplinas da equipe</div>
+        <div class="equipe-filter-bar" id="equipe-filter-kanban" aria-label="Selecionar equipe"></div>
+        <div class="kanban-search-bar" style="justify-content:space-between;">
+          <!-- F7: ícones outline (Arquivo Morto + Config) isolados à esquerda -->
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button class="btn-icon-tool" onclick="showPage('arquivo',null)" title="Arquivo Morto" aria-label="Arquivo Morto"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></button>
+            <button class="btn-icon-tool" onclick="openKanbanColsModal()" title="Configurar colunas do Kanban" aria-label="Configurar colunas do Kanban" id="btnKanbanCols" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+          </div>
+          <!-- F7: ações/filtros à direita na ordem: Buscar, Nova Disciplina, Colaboradores, Tipos, X -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex:1;">
+            <div class="kanban-search-wrap">
+              <input class="kanban-search kanban-search-compact" id="kanbanSearch" type="text" placeholder="Buscar disciplina..." autocomplete="off"
+                oninput="_debouncedRenderKanban(); window._updateArquivoDropdown?.(this.value)"
+                onblur="setTimeout(()=>window._hideArquivoDropdown?.(),180)"
+                onkeydown="if(event.key==='Escape')window._hideArquivoDropdown?.()">
+              <div id="kanbanSearchDropdown" class="kanban-search-dropdown"></div>
+            </div>
+            <button class="btn-sm" onclick="openKanbanCardModal(null)" style="color:var(--text);">+ Nova Disciplina</button>
+            <select class="filter-select" id="kanbanFilterCollab" onchange="renderKanban()">
+              <option value="">Todos os colaboradores</option>
+            </select>
+            <select class="filter-select" id="kanbanFilterType" onchange="renderKanban()">
+              <option value="">Todos os tipos</option>
+            </select>
+            <button class="btn-sm" onclick="clearKanbanFilters()" title="Limpar filtros" aria-label="Limpar filtros">✕</button>
+          </div>
+        </div>
+        <div class="kanban-board-wrap">
+          <div class="kanban-board-scroll" id="kanbanBoardScroll">
+            <div class="kanban-board" id="kanbanBoard"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: USUÁRIOS ══ -->
+      <div class="page" id="page-usuarios">
+        <div class="equipe-filter-bar" id="equipe-filter-usuarios" aria-label="Selecionar equipe"></div>
+        <div id="approvalSection"></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+          <div class="section-heading" style="margin-bottom:0;">Gestão de Colaboradores</div>
+          <button class="btn-sm success" id="btnNovoColab" onclick="openNovoColabModal()" style="display:none;">+ Novo Colaborador</button>
+        </div>
+        <div class="section-sub">Ative ou inative colaboradores. Registros históricos são sempre preservados.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:8px;" id="usuariosGrid"></div>
+
+        <!-- Configuração de jornada — visível apenas para gestora -->
+        <div id="usuariosConfigArea" style="margin-top:24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div class="section-heading" style="margin-bottom:0;font-size:1.1rem;">Configuração de Jornada</div>
+            <button class="btn-sm" onclick="document.getElementById('usuariosConfigArea').removeAttribute('data-loaded');renderUsuarios();" title="Recarregar">↺ Recarregar</button>
+          </div>
+          <div class="section-sub" style="margin-bottom:16px;">Configure horas diárias individuais. Útil para estagiários e jornadas reduzidas.</div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: RELATÓRIO ══ -->
+      <div class="page" id="page-relatorio">
+        <div class="section-heading">Relatório Semanal</div>
+        <div class="section-sub">Geração do relatório de produção para reunião com a diretoria</div>
+
+        <!-- Navegação de semana -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+          <button class="date-nav-btn" onclick="relChangeWeek(-1)" aria-label="Semana anterior">&#8249;</button>
+          <span id="relWeekLabel" style="font-family:var(--mono);font-size:0.85rem;font-weight:700;min-width:200px;text-align:center;color:var(--text);"></span>
+          <button class="date-nav-btn" onclick="relChangeWeek(1)" aria-label="Próxima semana">&#8250;</button>
+          <button class="today-btn" onclick="relGoThisWeek()">Semana atual</button>
+          <button class="btn-sm" onclick="window.print()" style="margin-left:auto;">🖨 Imprimir / Salvar PDF</button>
+        </div>
+
+        <!-- TABELA PRODUÇÃO -->
+        <div class="dash-section" style="margin-bottom:32px;" id="relProducaoSection">
+          <div class="dash-section-title" style="margin-bottom:12px;">
+            <span style="font-weight:800;font-size:1rem;letter-spacing:0.05em;">PRODUÇÃO</span>
+            <span id="relProducaoResumo" style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);margin-left:12px;"></span>
+          </div>
+          <div class="table-wrap" style="overflow-x:auto;">
+            <table class="demands-table" id="relProducaoTable">
+              <thead><tr>
+                <th>Mês</th><th>Semana</th><th>Diagramador</th><th>Formato</th><th>Padrão</th><th>Disciplina</th>
+                <th style="text-align:center;">CUR</th><th style="text-align:center;">AJU</th><th style="text-align:center;">LIB</th>
+              </tr></thead>
+              <tbody id="relProducaoBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TABELA DEMANDAS -->
+        <div class="dash-section" style="margin-bottom:32px;" id="relDemandasSection">
+          <div class="dash-section-title" style="margin-bottom:12px;">
+            <span style="font-weight:800;font-size:1rem;letter-spacing:0.05em;">DEMANDAS REALIZADAS</span>
+            <span id="relDemandasPeriodo" style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);margin-left:12px;"></span>
+          </div>
+          <div class="table-wrap" style="overflow-x:auto;">
+            <table class="demands-table" id="relDemandasTable">
+              <thead><tr>
+                <th>Formato / Tipo</th><th style="text-align:center;">PDF</th><th style="text-align:center;">HTML</th>
+              </tr></thead>
+              <tbody id="relDemandasBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RESUMO SEMANAL -->
+        <div class="dash-section">
+          <div class="dash-section-title" style="margin-bottom:12px;">
+            <span style="font-weight:800;font-size:1rem;">RESUMO DA SEMANA</span>
+            <button class="btn-sm" onclick="relGerarResumo()" style="margin-left:12px;">↺ Regenerar</button>
+          </div>
+          <textarea id="relResumoText" style="width:100%;min-height:180px;padding:14px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-family:var(--font);font-size:0.85rem;line-height:1.7;resize:vertical;" placeholder="Resumo gerado automaticamente..."></textarea>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('relResumoText').value).then(()=>showToast('Copiado!','Resumo copiado.'))">📋 Copiar Resumo</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: MEU DASHBOARD (colaborador) -->
+      <div class="page" id="page-meu-dashboard">
+
+        <div class="section-heading" id="meuDashHeading">Meu Dashboard</div>
+        <div class="section-sub" id="meuDashSub">Seus indicadores da semana</div>
+
+        <!-- Linha 1: Cards de resumo do dia -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+          <div class="stat-card-compact">
+            <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="stat-info">
+              <div class="stat-info-label">Horas Hoje</div>
+              <div class="stat-info-value orange" id="mdHojeTotal">0h 00m</div>
+            </div>
+          </div>
+          <div class="stat-card-compact">
+            <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div>
+            <div class="stat-info">
+              <div class="stat-info-label">Registros</div>
+              <div class="stat-info-value" id="mdHojeCount">0</div>
+            </div>
+          </div>
+          <div class="stat-card-compact">
+            <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div>
+            <div class="stat-info">
+              <div class="stat-info-label">% Total Hoje</div>
+              <div class="stat-info-value orange" id="mdHojePerc">0.0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navegação de semana -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+          <button class="date-nav-btn" onclick="window.mdChangeWeek(-1)" aria-label="Semana anterior">‹</button>
+          <span id="mdWeekLabel" style="font-size:0.82rem;font-weight:700;color:var(--text);min-width:160px;text-align:center;"></span>
+          <button class="date-nav-btn" onclick="window.mdChangeWeek(1)" aria-label="Próxima semana">›</button>
+          <button class="btn-sm" onclick="window.mdGoThisWeek()" style="margin-left:4px;">Esta semana</button>
+        </div>
+
+        <!-- Linha 2: Gráfico de barras % por dia -->
+        <div class="chart-card" style="margin-bottom:16px;">
+          <div class="chart-title">% por dia da semana</div>
+          <div style="height:240px;margin-top:12px;"><canvas id="mdChartBar"></canvas></div>
+        </div>
+
+        <!-- Linha 3: Semana detalhada + Por projeto (mesma altura) -->
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;margin-bottom:24px;align-items:start;">
+
+          <!-- Tabela semanal -->
+          <div class="chart-card" style="height:100%;">
+            <div class="chart-title">Semana detalhada</div>
+            <div style="overflow-x:auto;margin-top:12px;">
+              <table class="week-table" id="mdWeekTable" style="width:100%;border-collapse:collapse;">
+                <thead id="mdWeekHead"></thead>
+                <tbody id="mdWeekBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Pizza por projeto -->
+          <div class="chart-card" style="height:100%;">
+            <div class="chart-title">🥧 Por projeto (semana)</div>
+            <div style="height:280px;margin-top:12px;"><canvas id="mdChartPie"></canvas></div>
+          </div>
+
+        </div>
+
+        <!-- D5: Minhas Avaliações (avaliação de Demanda + observação do gestor) -->
+        <div id="mdAvaliacoesSection" class="chart-card" style="margin-bottom:24px;display:none;">
+          <div class="chart-title">⭐ Minhas Avaliações</div>
+          <div class="section-sub" style="margin-bottom:4px;">Nota de cada demanda e a observação do gestor — acompanhe seu desempenho.</div>
+          <div id="mdAvaliacoesResumo" style="margin-top:12px;"></div>
+          <div style="overflow-x:auto;margin-top:16px;">
+            <table class="demands-table" style="min-width:520px;">
+              <thead><tr><th>Demanda</th><th>Nota</th><th>Observação do gestor</th><th>Data</th></tr></thead>
+              <tbody id="mdAvaliacoesBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ══ PAGE: CONFIGURAÇÕES (V2) ══ -->
+      <div class="page" id="page-configuracoes">
+        <!-- Conteúdo renderizado dinamicamente por renderConfiguracoes() -->
+      </div>
+
+      <!-- ══ PAGE: FERRAMENTAS ══ -->
+      <div class="page" id="page-ferramentas">
+        <div class="section-heading">Ferramentas</div>
+        <div class="section-sub">Central de ferramentas de gestão e importação</div>
+        <div class="ferramentas-hub" id="ferramentasHub" style="margin-top:24px;">
+
+          <div class="ferr-card" onclick="showPage('usuarios',this)" id="ferrAprovacoes">
+            <div class="ferr-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="ferr-card-title">Aprovações <span id="ferrAprovBadge" style="display:none;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:100px;margin-left:4px;"></span></div>
+            <div class="ferr-card-desc">Revisar e aprovar solicitações de lançamento fora da janela</div>
+          </div>
+
+          <div class="ferr-card" onclick="showPage('arquivo',this)">
+            <div class="ferr-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </div>
+            <div class="ferr-card-title">Arquivo Morto</div>
+            <div class="ferr-card-desc">Disciplinas concluídas e arquivadas por módulo</div>
+          </div>
+
+          <div class="ferr-card" onclick="showPage('importar',this)">
+            <div class="ferr-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="ferr-card-title">Importadores</div>
+            <div class="ferr-card-desc">Importar registros via CSV, Trello ou avaliações históricas</div>
+          </div>
+
+          <div class="ferr-card" onclick="showPage('inconsistencias',this)">
+            <div class="ferr-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="ferr-card-title">Inconsistências</div>
+            <div class="ferr-card-desc">Detectar registros ausentes, muito curtos ou acima do limite</div>
+          </div>
+
+          <div class="ferr-card" id="ferrFeriados" style="display:none" onclick="openHolidaysModal()">
+            <div class="ferr-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+            </div>
+            <div class="ferr-card-title">Feriados e Folgas</div>
+            <div class="ferr-card-desc">Gerenciar feriados que zerão a meta do dia para toda a equipe</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══ PAGE: INCONSISTÊNCIAS ══ -->
+      <div class="page" id="page-inconsistencias">
+        <div class="section-heading">Inconsistências</div>
+        <div class="section-sub">Registros ausentes, muito curtos ou acima do limite nos últimos 7 dias</div>
+        <div id="inconList" style="margin-top:20px;display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- ══ PAGE: ARQUIVO MORTO ══ -->
+      <div class="page" id="page-arquivo">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div class="section-heading" style="margin-bottom:2px;">Arquivo Morto</div>
+            <div class="section-sub">Disciplinas concluídas e arquivadas por módulo</div>
+          </div>
+        </div>
+        <div class="equipe-filter-bar" id="equipe-filter-arquivo" aria-label="Selecionar equipe"></div>
+        <!-- F8: engrenagem outline isolada à esquerda (mesmo padrão do Fluxo de Demandas) -->
+        <div class="kanban-search-bar" style="justify-content:space-between;margin:16px 0 12px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button class="btn-icon-tool" id="btnArquivoCols" onclick="openArquivoColsModal()" title="Configurar Arquivo Morto" aria-label="Configurar Arquivo Morto" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;flex:1;">
+            <select id="arquivoModFilter" class="filter-select" onchange="window.renderArquivo()" style="min-width:160px;">
+              <option value="">Todos os módulos</option>
+            </select>
+            <select id="arquivoCollabFilter" class="filter-select" onchange="window.renderArquivo()" style="min-width:140px;">
+              <option value="">Todos os colaboradores</option>
+            </select>
+            <select id="arquivoTypeFilter" class="filter-select" onchange="window.renderArquivo()" style="min-width:130px;">
+              <option value="">Todos os tipos</option>
+            </select>
+            <input class="kanban-search kanban-search-compact" id="arquivoSearch" type="text" placeholder="Buscar disciplina..." oninput="window._debouncedRenderArquivo()" style="min-width:160px;">
+            <button id="btnArquivarTrello" class="btn-sm success" onclick="window.checkArquivoMigration?.()" style="display:none;">📦 Arquivar concluídos do Trello</button>
+          </div>
+        </div>
+        <!-- F8: estado de "mostrar cards antigos" — controle agora vive dentro da config (engrenagem) -->
+        <button id="arquivoShowOld" data-show="0" style="display:none;" onclick="this.dataset.show=this.dataset.show==='1'?'0':'1';window.renderArquivo()"></button>
+        <div class="kanban-board-wrap">
+          <div class="kanban-board-scroll" id="arquivoBoardScroll">
+            <div id="arquivoBoard" style="display:flex;gap:14px;padding:4px 2px;min-height:200px;min-width:max-content;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: IMPORTAR ══ -->
+      <div class="page" id="page-importar">
+        <div class="section-heading">Importadores</div>
+        <div class="section-sub">Importe registros de horas via CSV, Trello ou avaliações históricas</div>
+
+        <!-- Abas -->
+        <div style="display:flex;gap:6px;margin:16px 0 20px;border-bottom:1px solid var(--border);padding-bottom:0;">
+          <button id="itab-csv" class="import-tab active" onclick="switchImportTab('csv')" style="padding:8px 18px;font-size:0.82rem;font-weight:700;border:none;background:none;border-bottom:2px solid var(--orange);color:var(--orange);cursor:pointer;">CSV Genérico</button>
+          <button id="itab-trello" class="import-tab" onclick="switchImportTab('trello')" style="padding:8px 18px;font-size:0.82rem;font-weight:700;border:none;background:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;">Trello → Kanban</button>
+          <button id="itab-avaliacoes" class="import-tab" onclick="switchImportTab('avaliacoes')" style="padding:8px 18px;font-size:0.82rem;font-weight:700;border:none;background:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;">Avaliações Históricas</button>
+        </div>
+
+        <!-- Painel CSV -->
+        <div id="ipanel-csv">
+          <div class="dash-section" style="max-width:600px;">
+            <div class="dash-section-title"><span>Importar CSV de horas</span></div>
+            <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">Selecione um arquivo CSV exportado do Clockify ou Toggl. As colunas esperadas são: user, project, description, start date, start time, end time, duration.</p>
+            <input type="file" id="importFileInput" accept=".csv" style="display:none;" onchange="handleCSVImport(event)">
+            <div id="importZone" class="import-drop-zone" onclick="document.getElementById('importFileInput').click()" style="border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;color:var(--muted);">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;display:block;margin:0 auto 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div style="font-weight:700;font-size:0.88rem;margin-bottom:4px;">Clique para selecionar o arquivo CSV</div>
+              <div style="font-size:0.72rem;">ou arraste e solte aqui</div>
+            </div>
+            <div id="importResults" style="margin-top:16px;font-size:0.82rem;font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+        <!-- Painel Trello -->
+        <div id="ipanel-trello" style="display:none;">
+          <div class="dash-section" style="max-width:700px;">
+            <div class="dash-section-title"><span>Importar do Trello → Kanban</span></div>
+            <!-- Step 1: Upload -->
+            <div id="tpanel-upload">
+              <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px;">Exporte o JSON do seu board Trello (Menu → Mais → Imprimir e exportar → Exportar como JSON) e faça o upload abaixo.</p>
+              <input type="file" id="trelloFileInput" accept=".json" style="display:none;" onchange="handleTrelloFile(event)">
+              <div id="trelloDropZone" onclick="document.getElementById('trelloFileInput').click()" style="border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;color:var(--muted);">
+                <div style="font-weight:700;font-size:0.88rem;margin-bottom:4px;">Clique para selecionar o JSON do Trello</div>
+              </div>
+            </div>
+            <!-- Step 2: Mapping -->
+            <div id="tpanel-map" style="display:none;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+                <div id="trelloListsGrid" style="flex:1;min-width:260px;"></div>
+                <div id="trelloMembersGrid" style="flex:1;min-width:260px;"></div>
+              </div>
+              <div id="trelloWarnSkip" style="display:none;background:var(--warn-bg,#fef3c7);color:#92400E;padding:10px 14px;border-radius:8px;font-size:0.8rem;margin-bottom:12px;"></div>
+              <div style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">Total de cards: <strong id="trelloTotalCount">0</strong></div>
+              <button id="btnStartTrelloImport" class="btn-primary" onclick="startTrelloImport()">▶ Iniciar importação</button>
+            </div>
+            <!-- Step 3: Progress -->
+            <div id="tpanel-progress" style="display:none;">
+              <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;" id="trelloProgressTitle">Importando...</div>
+              <div style="background:var(--surface2);border-radius:100px;height:10px;overflow:hidden;margin-bottom:8px;">
+                <div id="trelloProgressBar" style="height:100%;width:0%;background:var(--orange);transition:width 0.3s;border-radius:100px;"></div>
+              </div>
+              <div style="font-size:0.78rem;color:var(--muted);font-family:var(--mono);" id="trelloProgressLabel">0 / 0</div>
+              <div style="font-size:0.72rem;color:var(--muted);" id="trelloProgressSub"></div>
+              <div style="display:flex;gap:12px;margin-top:8px;font-size:0.75rem;font-family:var(--mono);">
+                <span>✅ <strong id="trelloCntOk">0</strong></span>
+                <span>❌ <strong id="trelloCntErr">0</strong></span>
+                <span>Total: <strong id="trelloCntTotal">0</strong></span>
+              </div>
+              <div id="trelloDoneRow" style="display:none;margin-top:12px;display:flex;gap:8px;">
+                <button class="btn-sm success" onclick="showPage('kanban',null)">Ver Kanban</button>
+                <button class="btn-sm" onclick="resetTrelloImport()">Nova importação</button>
+              </div>
+              <div id="trelloLogArea" style="margin-top:12px;max-height:200px;overflow-y:auto;font-size:0.7rem;font-family:var(--mono);background:var(--surface2);padding:10px;border-radius:8px;"></div>
+            </div>
+            <!-- Painel limpeza (gestora only) -->
+            <div id="trelloCleanPanel" style="display:none;margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:8px;color:var(--danger)">🧹 Limpeza de cards Trello</div>
+              <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">Remove cards importados do Trello que já estão arquivados ou na lixeira.</p>
+              <button id="btnTrelloCleanStep1" class="btn-sm danger" onclick="trelloCleanStep1()">Verificar cards para remover</button>
+              <div id="trelloCleanConfirmWrap" style="display:none;margin-top:10px;">
+                <div style="font-size:0.82rem;margin-bottom:8px;">Encontrados <strong id="trelloCleanCount">0</strong> cards. Digite <code>CONFIRMAR</code> para prosseguir:</div>
+                <input id="trelloCleanConfirmInput" class="filter-select" type="text" placeholder="CONFIRMAR" style="width:160px;margin-right:8px;">
+                <button id="btnTrelloCleanConfirm" class="btn-sm danger" onclick="trelloCleanConfirm()">Remover</button>
+                <button id="btnTrelloCleanCancel" class="btn-sm" onclick="trelloCleanCancel()">Cancelar</button>
+                <div id="trelloCleanStatus" style="font-size:0.75rem;color:var(--muted);margin-top:8px;font-family:var(--mono);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Painel Avaliações Históricas -->
+        <div id="ipanel-avaliacoes" style="display:none;">
+          <div class="dash-section" style="max-width:700px;">
+            <div class="dash-section-title"><span>Importar Avaliações Históricas</span></div>
+            <!-- Step 1: Input -->
+            <div id="avpanel-input">
+              <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">Cole os registros de avaliação no formato texto abaixo (um por linha).</p>
+              <textarea id="avTextoInput" class="filter-select" rows="8" placeholder="Cole os registros aqui..." style="width:100%;resize:vertical;font-family:var(--mono);font-size:0.78rem;padding:10px;"></textarea>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;"><span id="avInputCount"></span></div>
+              <button class="btn-primary" style="margin-top:12px;" onclick="avAnalisar()">Analisar registros</button>
+            </div>
+            <!-- Step 2: Validate -->
+            <div id="avpanel-validar" style="display:none;">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:8px;">Registros analisados: <span id="avValidacaoCount">0</span></div>
+              <div id="avValidacaoList" style="max-height:300px;overflow-y:auto;"></div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <button class="btn-sm success" onclick="avSelecionarExatos()">✅ Selecionar correspondências exatas</button>
+                <button id="btnAvImportar" class="btn-primary" onclick="avImportar()">▶ Importar selecionados</button>
+                <button class="btn-sm" onclick="avGoInput()">← Voltar</button>
+              </div>
+            </div>
+            <!-- Step 3: Progress -->
+            <div id="avpanel-progress" style="display:none;">
+              <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;" id="avProgressTitle">Importando...</div>
+              <div style="background:var(--surface2);border-radius:100px;height:10px;overflow:hidden;margin-bottom:8px;">
+                <div id="avProgressBar" style="height:100%;width:0%;background:var(--success);transition:width 0.3s;border-radius:100px;"></div>
+              </div>
+              <div style="font-size:0.78rem;color:var(--muted);font-family:var(--mono);" id="avProgressLabel">0 / 0</div>
+              <div style="display:flex;gap:12px;margin-top:8px;font-size:0.75rem;font-family:var(--mono);">
+                <span>✅ <strong id="avCntOk">0</strong></span>
+                <span>❌ <strong id="avCntErr">0</strong></span>
+                <span>Total: <strong id="avCntTotal">0</strong></span>
+              </div>
+              <div id="avDoneRow" style="display:none;margin-top:12px;display:flex;gap:8px;">
+                <button class="btn-sm success" onclick="showPage('demandas',null)">Ver Demandas</button>
+                <button class="btn-sm" onclick="avReset()">Nova importação</button>
+              </div>
+              <div id="avLogArea" style="margin-top:12px;max-height:200px;overflow-y:auto;font-size:0.7rem;font-family:var(--mono);background:var(--surface2);padding:10px;border-radius:8px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+</main>
+</div>
+
+<!-- Firebase — config em fonte única (B6) -->
+<script src="firebase-config.js"></script>
+<script type="module" src="index_v2.js?v=1780677452"></script>
+
+
+<script src="theme.js"></script>
+
+<script>
+// Mural toggle
+function toggleMural() {
+  const body = document.getElementById('muralBody');
+  const arrow = document.getElementById('muralArrow');
+  const isOpen = body.classList.toggle('open');
+  arrow.classList.toggle('open', isOpen);
+}
+
+// Sidebar pin
+window.toggleSidebarPin = function() {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.querySelector('.main');
+  const isPinned = sidebar.classList.toggle('pinned');
+  if(main) main.style.marginLeft = isPinned ? '240px' : '56px';
+  try { localStorage.setItem('sidebarPinned', isPinned ? '1' : '0'); } catch(e){}
+};
+
+// Sidebar hover — empurra o main enquanto o mouse estiver sobre ela
+(function(){
+  function initSidebarHover(){
+    const sidebar = document.getElementById('sidebar');
+    const main = document.querySelector('.main');
+    if(!sidebar || !main) return;
+    sidebar.addEventListener('mouseenter', ()=>{
+      if(!sidebar.classList.contains('pinned')) main.style.marginLeft = '240px';
+    });
+    sidebar.addEventListener('mouseleave', ()=>{
+      if(!sidebar.classList.contains('pinned')) main.style.marginLeft = '56px';
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSidebarHover);
+  else initSidebarHover();
+})();
+
+// Restore pin state on load
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const pinned = localStorage.getItem('sidebarPinned') === '1';
+    if(pinned){
+      const sidebar = document.getElementById('sidebar');
+      const main = document.querySelector('.main');
+      if(sidebar) sidebar.classList.add('pinned');
+      if(main) main.style.marginLeft = '240px';
+    }
+  } catch(e){}
+
+  function updateThemeIcon() {
+    if(typeof _updateThemeSvg === 'function') _updateThemeSvg();
+  }
+  const origToggle = window.toggleTheme;
+  if (origToggle) {
+    window.toggleTheme = function() { origToggle(); updateThemeIcon(); };
+  }
+  updateThemeIcon();
+});
+</script>
+
+<script>
+// ── KRONOS DROPDOWN — painel flutuante ativado por clique no select ──────────
+(function(){
+  'use strict';
+  // IDs de select que ficam como nativo
+  const SKIP_IDS = new Set(['collabSelect','mCollab','mCollab']);
+  let panel = null, activeSelect = null;
+
+  function closePanel(){
+    if(panel){ panel.remove(); panel = null; }
+    activeSelect = null;
+  }
+
+  function openPanel(sel){
+    closePanel();
+    activeSelect = sel;
+
+    panel = document.createElement('div');
+    panel.style.cssText = [
+      'position:fixed','z-index:99999',
+      'background:var(--surface)',
+      'border:1px solid var(--border)',
+      'border-radius:12px',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.14),0 2px 8px rgba(0,0,0,0.06)',
+      'padding:6px',
+      'overflow-y:auto',
+      'max-height:300px',
+      'font-family:var(--font)',
+      'animation:kkFadeIn .14s ease'
+    ].join(';');
+
+    Array.from(sel.options).forEach(opt=>{
+      if(opt.disabled){
+        if(!opt.value){
+          const sep = document.createElement('hr');
+          sep.style.cssText = 'border:none;border-top:1px solid var(--border);margin:4px 6px;';
+          panel.appendChild(sep);
+        }
+        return;
+      }
+      const item = document.createElement('div');
+      const isSelected = opt.value === sel.value;
+      item.style.cssText = [
+        'padding:8px 14px',
+        'border-radius:8px',
+        'cursor:pointer',
+        'font-size:0.78rem',
+        'white-space:nowrap',
+        `color:${isSelected ? 'var(--orange)' : 'var(--text)'}`,
+        `background:${isSelected ? 'var(--orange-light)' : 'transparent'}`,
+        `font-weight:${isSelected ? '700' : '400'}`,
+        'transition:background .1s'
+      ].join(';');
+      item.textContent = opt.textContent;
+      item.addEventListener('mouseenter',()=>{ if(!isSelected) item.style.background='var(--surface2)'; });
+      item.addEventListener('mouseleave',()=>{ if(!isSelected) item.style.background='transparent'; });
+      item.addEventListener('mousedown', e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        sel.value = opt.value;
+        sel.dispatchEvent(new Event('change',{bubbles:true}));
+        sel.dispatchEvent(new Event('input',{bubbles:true}));
+        closePanel();
+      });
+      panel.appendChild(item);
+    });
+
+    document.body.appendChild(panel);
+
+    // Posicionar
+    const r = sel.getBoundingClientRect();
+    const w = Math.max(r.width, 180);
+    let left = r.left;
+    let top = r.bottom + 4;
+    if(left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+    if(top + 300 > window.innerHeight) top = r.top - Math.min(300, panel.scrollHeight + 14) - 4;
+    panel.style.left  = left + 'px';
+    panel.style.top   = top  + 'px';
+    panel.style.width = w    + 'px';
+  }
+
+  // Captura clique em qualquer select via delegação no document
+  document.addEventListener('mousedown', e=>{
+    const sel = e.target.closest('select');
+    if(sel && !SKIP_IDS.has(sel.id)){
+      e.preventDefault();
+      if(activeSelect === sel){ closePanel(); return; }
+      openPanel(sel);
+      return;
+    }
+    if(panel && !panel.contains(e.target)) closePanel();
+  }, true);
+
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
+  window.addEventListener('scroll', closePanel, true);
+  window.addEventListener('resize', closePanel);
+
+  // Injetar keyframes de animação
+  const style = document.createElement('style');
+  style.textContent = '@keyframes kkFadeIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}';
+  document.head.appendChild(style);
+})();
+</script>
+
+</body>
+</html>
+
+
+
+
+

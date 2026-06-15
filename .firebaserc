@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "kronoslabtecie",
+    "antigo": "kronos-fdb75",
+    "beta": "kronos-labtecie-beta"
+  },
+  "targets": {},
+  "etags": {}
+}

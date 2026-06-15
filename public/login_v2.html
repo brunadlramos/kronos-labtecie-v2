@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Kronos · Labtecie — Sistema de Gestão de Horas">
+<meta name="robots" content="noindex, nofollow">
+<title>Kronos · Labtecie — Acesso</title>
+<link rel="dns-prefetch" href="//www.gstatic.com">
+<link rel="icon" type="image/svg+xml" href="favicon.png">
+<link rel="shortcut icon" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="login.css">
+</head>
+<body>
+<div class="bg-circles">
+  <div class="bg-circle"></div>
+  <div class="bg-circle"></div>
+  <div class="bg-circle"></div>
+</div>
+
+<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Alternar tema escuro/claro" aria-label="Alternar tema escuro/claro">
+  <svg id="themeBtnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+</button>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="astronaut-logo">
+        <img src="Labtecie.png" alt="Labtecie" onerror="this.style.display='none';document.getElementById('fallbackLogo').style.display='flex'">
+        <div id="fallbackLogo" style="display:none;width:90px;height:90px;background:linear-gradient(135deg,#F15A24,#FF8C42);border-radius:50%;align-items:center;justify-content:center;">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+      </div>
+      <div class="login-title">Kronos <span>·</span> Labtecie</div>
+      <div class="login-subtitle">Sistema de Gestão de Horas <span style="background:rgba(241,90,36,0.12);color:#F15A24;font-size:0.58rem;font-weight:800;padding:2px 8px;border-radius:5px;letter-spacing:0.06em;vertical-align:middle;border:1px solid rgba(241,90,36,0.3);">BETA</span></div>
+    </div>
+
+    <div class="error-msg" id="errorMsg">E-mail ou senha incorretos. Tente novamente.</div>
+
+    <div class="form-field">
+      <label class="form-label" for="emailInput">E-mail</label>
+      <input class="form-input" id="emailInput" type="email" placeholder="seu@labtecie.com" autocomplete="email">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="passwordInput">Senha</label>
+      <div class="password-wrap">
+        <input class="form-input" id="passwordInput" type="password" placeholder="••••••••" autocomplete="current-password">
+        <button class="btn-eye" type="button" id="eyeBtn" onclick="togglePassword()" aria-label="Mostrar senha">
+          <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">
+      <span id="loginBtnText">Entrar</span>
+      <svg id="loginSpinner" style="display:none;animation:spin 0.7s linear infinite;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    </button>
+
+    <div class="login-footer">
+      <img src="BA.tec.png" alt="BA.tec" class="footer-batec-logo" onerror="this.style.display='none'">
+      <div class="footer-copy">© 2026 BA.tec</div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase — config em fonte única (B6) -->
+<script src="firebase-config.js"></script>
+<script type="module" src="login_v2.js"></script>
+
+<!-- Theme -->
+<script>
+function togglePassword(){
+  const inp = document.getElementById('passwordInput');
+  const btn = document.getElementById('eyeBtn');
+  const isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  btn.setAttribute('aria-label', isHidden ? 'Ocultar senha' : 'Mostrar senha');
+  btn.classList.toggle('active', isHidden);
+}
+const SVG_MOON_L = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+const SVG_SUN_L  = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  const icon = document.getElementById('themeBtnIcon');
+  if(icon) icon.innerHTML = document.body.classList.contains('dark') ? SVG_SUN_L : SVG_MOON_L;
+  try { localStorage.setItem('kronos_theme', document.body.classList.contains('dark') ? 'dark' : 'light'); } catch(e){}
+}
+try {
+  if(localStorage.getItem('kronos_theme')==='dark'){
+    document.body.classList.add('dark');
+    const icon = document.getElementById('themeBtnIcon');
+    if(icon) icon.innerHTML = SVG_SUN_L;
+  }
+} catch(e){}
+</script>
+</body>
+</html>

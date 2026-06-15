@@ -1,0 +1,756 @@
+// ── KRONOS · DASHBOARD & CÁLCULOS ────────────────────────────────────────────
+// Helpers de cálculo compartilhados + renders do Dashboard, Online, Meu Dashboard e RH
+
+import { app as state } from './state.js';
+import { ICONS } from './icons.js';
+import {
+  dKey, dateKey, todayKey, getWeekDays, getMonthWeeks,
+  fmtDur, fmtTime, fmtDate, fmtShortDate, escH
+} from './utils.js';
+import { db } from './firebase-refs.js';
+import { ref, get, query, orderByChild, startAt, endAt }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const MS_PER_HOUR = 3600000;
+const MS_PER_DAY  = 86400000;
+const _DOW_KEY    = ['dom','seg','ter','qua','qui','sex','sab'];
+
+function _dkToISO(dk) {
+  const [y,m,d] = dk.split('-').map(Number);
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+// ── isActive ───────────────────────────────────────────────────────────────────
+export function isActive(collabKey) {
+  return state.usersConfig[collabKey]?.active !== false;
+}
+
+// ── calcAmount ─────────────────────────────────────────────────────────────────
+export function calcAmount(proj, ms) {
+  const p = state.PROJECTS[proj];
+  return p ? (ms / 3600000) * p.amountPerHour : 0;
+}
+
+// ── getDailyGoalMs ─────────────────────────────────────────────────────────────
+export function getDailyGoalMs(dateOrDk, collabKey=null) {
+  let dow;
+  let dk;
+  if(typeof dateOrDk === 'string') {
+    dk = dateOrDk;
+    const [y,m,d] = dk.split('-').map(Number);
+    dow = new Date(y,m,d).getDay();
+  } else {
+    dk = dKey(dateOrDk);
+    dow = dateOrDk.getDay();
+  }
+  if(dow===6||dow===0) return 0;
+  if(state.allHolidays?.[_dkToISO(dk)]) return 0;
+  if(collabKey && state.COLLAB_HOURS[collabKey]?.horasDia !== undefined) {
+    return state.COLLAB_HOURS[collabKey].horasDia * MS_PER_HOUR;
+  }
+  const dowKey = _DOW_KEY[dow];
+  if(state._cfgMetasDias && state._cfgMetasDias[dowKey] !== undefined) {
+    return state._cfgMetasDias[dowKey] * MS_PER_HOUR;
+  }
+  if(dow===5) return 8 * MS_PER_HOUR;
+  return state.DAILY_GOAL_MS;
+}
+
+// ── getEntriesArray (cached) ───────────────────────────────────────────────────
+export function getEntriesArray() {
+  if(state._entriesArrayVersion !== state._entriesVersion) {
+    state._entriesArrayCache = Object.entries(state.allEntries);
+    state._entriesArrayVersion = state._entriesVersion;
+  }
+  return state._entriesArrayCache;
+}
+
+// ── getEntriesForDay ───────────────────────────────────────────────────────────
+export function getEntriesForDay(dk, collabFilter=null) {
+  // ✅ FIX: considera também entradas cujos PERÍODOS caem neste dia,
+  // mesmo que o startTime original seja de outro dia (entradas com reinício)
+  const result = [], seen = new Set();
+  getEntriesArray().forEach(([k,e]) => {
+    if(collabFilter && e.collab !== collabFilter) return;
+    if(!e.periods || e.periods.length <= 1) {
+      if(dateKey(e.startTime) === dk && !seen.has(k)) {
+        seen.add(k);
+        result.push({...e, _key:k, _dayDuration: e.duration, _dayAmount: calcAmount(e.project, e.duration)});
+      }
+    } else {
+      const dayPeriods = e.periods.filter(p => dateKey(p.startTime) === dk);
+      if(dayPeriods.length > 0 && !seen.has(k)) {
+        seen.add(k);
+        const dayDuration = dayPeriods.reduce((s,p) => s + (p.duration || (p.endTime - p.startTime)), 0);
+        result.push({
+          ...e, _key: k, _dayDuration: dayDuration,
+          _dayAmount: calcAmount(e.project, dayDuration),
+          _dayPeriods: dayPeriods
+        });
+      }
+    }
+  });
+  return result.sort((a,b) => b.startTime - a.startTime);
+}
+
+// ── calcDay ────────────────────────────────────────────────────────────────────
+export function calcDay(collabKey, dk) {
+  const day = getEntriesForDay(dk, collabKey);
+  const totalMs = day.reduce((s,e) => s + (e._dayDuration ?? e.duration), 0);
+  const goalMs = getDailyGoalMs(dk, collabKey);
+  const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / state.DAILY_GOAL_MS * 100 : 0);
+  const percAmount = day.reduce((s,e) => s + (e._dayAmount ?? calcAmount(e.project, e.duration)), 0);
+  return { totalMs, percTime, percAmount, percTotal: percTime+percAmount, count: day.length, entries: day, goalMs, isSaturday: goalMs===0 };
+}
+
+// ── getCollabAvatar ────────────────────────────────────────────────────────────
+const _AV_HEX = /^#[0-9a-fA-F]{3,8}$/;
+export function getCollabAvatar(key) {
+  const av = state.allAvatars[key];
+  const col = state.COLLABS[key] || {initials:'?', color:'#94A3B8'};
+  // Bug XSS: av.emoji/av.color são graváveis pelo colaborador (avatars/$key sem .validate).
+  // Escapar emoji e validar cor na origem neutraliza todos os pontos de consumo (innerHTML/style).
+  if(av) return {
+    display: escH(av.emoji || col.initials),
+    color: _AV_HEX.test(String(av.color||'')) ? av.color : (col.color || '#94A3B8'),
+    isEmoji: !!av.emoji
+  };
+  return { display: escH(col.initials), color: col.color, isEmoji: false };
+}
+
+// ── chartPalette ───────────────────────────────────────────────────────────────
+export function chartPalette() {
+  const dark = document.body.classList.contains('dark');
+  return {
+    tick:   dark ? '#9090AA' : '#8B7E78',
+    grid:   dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    legend: dark ? '#9090AA' : '#8B7E78',
+  };
+}
+
+// ── getConquistas ──────────────────────────────────────────────────────────────
+export function getConquistas(collabKey, refDate) {
+  const conquistas = [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const viewDay = refDate ? new Date(refDate) : new Date(today);
+  viewDay.setHours(0,0,0,0);
+  let streak = 0;
+  for(let i=1;i<=7;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(calcDay(collabKey,dKey(d)).percTotal>=100)streak++;else break;}
+  if(streak>=3) conquistas.push({cls:'fire',icon:'🔥',label:`Em chamas! ${streak}d`});
+  const todayData = calcDay(collabKey, dKey(today));
+  if(todayData.percTotal>=120) conquistas.push({cls:'lightning',icon:'⚡',label:'Relâmpago!'});
+  const days = getWeekDays(0);
+  const weekTotals = Object.keys(state.COLLABS).filter(k=>isActive(k)).map(k=>({key:k,total:days.reduce((s,d)=>s+calcDay(k,dKey(d)).percTotal,0)}));
+  weekTotals.sort((a,b)=>b.total-a.total);
+  if(weekTotals.length&&weekTotals[0].key===collabKey&&weekTotals[0].total>0) conquistas.push({cls:'crown',icon:'👑',label:'Rei da semana!'});
+  let consistent = 0;
+  for(let i=1;i<=7;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(d.getDay()===0)continue;if(calcDay(collabKey,dKey(d)).percTotal>=80)consistent++;else break;}
+  if(consistent>=5) conquistas.push({cls:'target',icon:'🎯',label:'Consistente!'});
+  // KRN-031: Estrela do dia — usa o dia visualizado no dashboard
+  const todayTotals = Object.keys(state.COLLABS).filter(k=>isActive(k)).map(k=>({key:k,perc:calcDay(k,dKey(viewDay)).percTotal}));
+  todayTotals.sort((a,b)=>b.perc-a.perc);
+  if(todayTotals.length&&todayTotals[0].key===collabKey&&todayTotals[0].perc>0) conquistas.push({cls:'star',icon:'⭐',label:'Estrela do dia!'});
+  return conquistas;
+}
+
+// ── renderConquistasBadges ─────────────────────────────────────────────────────
+export function renderConquistasBadges(collabKey, refDate) {
+  const conquistas = getConquistas(collabKey, refDate);
+  if(!conquistas.length) return '';
+  return `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px;">
+    ${conquistas.map(c=>`<span class="conquista-badge ${c.cls}">${c.icon} ${c.label}</span>`).join('')}
+  </div>`;
+}
+
+// ── updateDateNav ──────────────────────────────────────────────────────────────
+export function updateDateNav() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const label = state.viewDate.getTime()===today.getTime() ? 'Hoje — '+fmtDate(state.viewDate) : fmtDate(state.viewDate);
+  ['dateNavLabel','dateNavLabel2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=label;});
+  const t = state.viewDate.getTime()===today.getTime() ? 'Registros de hoje' : 'Registros do dia';
+  const el = document.getElementById('entriesTitle'); if(el) el.textContent=t;
+}
+
+// ── updateDashDayLabel ─────────────────────────────────────────────────────────
+export function updateDashDayLabel() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.round((state.dashDay - today) / MS_PER_DAY);
+  const lbl = state.dashDay.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  const prefix = diff===0 ? 'Hoje — ' : diff===-1 ? 'Ontem — ' : '';
+  const el = document.getElementById('dashDayLabel'); if(el) el.textContent = prefix+lbl;
+  const pk = document.getElementById('dashDayPicker');
+  if(pk) pk.value = state.dashDay.toISOString().slice(0,10);
+}
+
+// ── updateWeekLabel ────────────────────────────────────────────────────────────
+export function updateWeekLabel() {
+  const days = getWeekDays(state.weekOffset);
+  const s = days[0].toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+  const e = days[5].toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+  const el = document.getElementById('weekNavLabel'); if(el) el.textContent=`Semana de ${s} a ${e}`;
+}
+
+// ── renderDashboardOnline ──────────────────────────────────────────────────────
+export function renderDashboardOnline() {
+  const container = document.getElementById('onlineBodyDash');
+  if(!container) return;
+  const keys = Object.keys(state.activeTimers);
+  if(!keys.length) {
+    container.innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;font-weight:600;border:1.5px dashed var(--border);border-radius:var(--radius-sm);">Nenhum colaborador com timer ativo no momento.</div>`;
+    return;
+  }
+  container.innerHTML = keys.map(k=>{
+    const t = state.activeTimers[k];
+    const av = getCollabAvatar(k);
+    const col = state.COLLABS[k] || {label:k, initials:'?', color:'#94A3B8'};
+    const proj = state.PROJECTS[t.project] || {label:t.project, color:'#94A3B8'};
+    const dk = dKey(new Date(t.startTime));
+    const dayData = calcDay(k, dk);
+    const barW = Math.min(dayData.percTime, 100);
+    const barColor = barW>=100 ? 'var(--success)' : 'var(--orange)';
+    const avContent = av.isEmoji
+      ? `<span style="font-size:1.1rem">${av.display}</span>`
+      : `<span style="font-size:0.68rem;font-weight:800;color:#fff">${av.display}</span>`;
+    return `<div class="online-card">
+      <div class="online-card-header">
+        <div class="online-card-av" style="background:${av.color}">${avContent}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="online-card-name">${escH(col.label)}</div>
+          <div class="online-card-elapsed">${fmtDur(state.elapsed)}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);text-align:right;">
+          <div style="font-weight:700;color:var(--text)">${fmtDur(dayData.totalMs)}</div>
+          <div>hoje</div>
+        </div>
+      </div>
+      <div>
+        <div class="online-card-task">${escH(t.task||'Em andamento')}</div>
+        <div class="online-card-proj" style="color:${proj.color}">${escH(proj.label)}</div>
+      </div>
+      <div class="online-card-bar-wrap">
+        <div class="online-card-bar-label"><span>% do dia</span><span style="color:${barColor};font-weight:700;">${dayData.percTime.toFixed(0)}%</span></div>
+        <div class="online-card-bar-track"><div class="online-card-bar-fill" style="width:${barW}%;background:${barColor};"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  if(!state._onlineAutoRefresh) {
+    state._onlineAutoRefresh = setInterval(()=>{
+      if(document.getElementById('page-dashboard')?.classList.contains('active')){
+        renderDashboardOnline();
+      } else {
+        clearInterval(state._onlineAutoRefresh);
+        state._onlineAutoRefresh = null;
+      }
+    }, 5000);
+  }
+}
+
+// ── renderDashboard ────────────────────────────────────────────────────────────
+export function renderDashboard() {
+  renderDashboardOnline();
+  renderDashCards();
+  renderWeekTable();
+  setupDashTabsVisibility();           // D4: abas Semanal/Destaques/Remoto (coordenador/admin)
+  // Destaques/Remoto NÃO são re-buscados aqui (evita N×get por tick); só na troca
+  // de aba e na navegação de semana.
+  if(document.getElementById('page-dashboard')?.classList.contains('active')) {
+    try { renderDashDemandasWeek(); } catch(e) { console.error('[renderDashDemandasWeek]',e); }
+  }
+}
+
+// ── renderDashCards ────────────────────────────────────────────────────────────
+export function renderDashCards() {
+  const tk = dKey(state.dashDay);
+  const goalMs = getDailyGoalMs(tk);
+  const goalLabel = goalMs > 0 ? `${goalMs/MS_PER_HOUR}h=100%` : 'opcional';
+  const results = Object.keys(state.COLLABS)
+    .filter(k => isActive(k) && !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''))
+    .map(k => ({key:k, ...state.COLLABS[k], ...calcDay(k,tk)}));
+  results.sort((a,b) => b.percTotal - a.percTotal);
+  document.getElementById('cardsGrid').innerHTML = results.map((c,i)=>{
+    const rank = i+1;
+    const rankIcon = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
+    const rankCls = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
+    return `<div class="collab-card">
+      <div class="collab-card-header">
+        <div class="collab-card-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'1.1rem':'0.68rem'}">${getCollabAvatar(c.key).display}</div>
+        <div><div class="collab-card-name">${c.label}</div><div class="collab-card-rank ${rankCls}">${rankIcon} ${rank}º lugar</div></div>
+      </div>
+      <div class="collab-card-stats">
+        <div><div class="ccs-label">% Tempo</div><div class="ccs-value" style="color:var(--text)">${c.percTime.toFixed(1)}%</div></div>
+        <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${c.percAmount.toFixed(1)}%</div></div>
+        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${c.percTotal.toFixed(1)}%</div></div>
+      </div>
+      <div class="bar-label"><span>Meta (${goalLabel})</span><span>${c.percTotal.toFixed(1)}%</span></div>
+      <div class="bar-track"><div class="bar-fill ${c.percTotal>=100?'over':''}" style="width:${Math.min(c.percTotal,100)}%"></div></div>
+      ${renderConquistasBadges(c.key, state.dashDay)}
+    </div>`;
+  }).join('');
+}
+
+// ── renderWeekTable ────────────────────────────────────────────────────────────
+export function renderWeekTable() {
+  const days = getWeekDays(state.weekOffset);
+  const tk = todayKey();
+  const thead = document.getElementById('weekTableHead');
+  const tbody = document.getElementById('weekTableBody');
+  thead.innerHTML = `<tr><th class="name-col">Colaborador</th>${days.map(d=>{const iso=_dkToISO(dKey(d));const hol=state.allHolidays?.[iso];return`<th>${fmtShortDate(d)}${hol?`<br><span style="font-size:0.58rem;color:var(--orange);font-weight:600;">🏖 ${escH(hol.label||'Feriado')}</span>`:''}</th>`;}).join('')}<th>Média</th><th>Rank</th></tr>`;
+  // ✅ Gestora excluída das métricas coletivas
+  const tableData = Object.keys(state.COLLABS)
+    .filter(k => isActive(k) && !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''))
+    .map(k => {
+      const dayData = days.map(d => calcDay(k, dKey(d)));
+      const active = dayData.filter(d=>d.count>0).length;
+      const avg = active>0 ? dayData.reduce((s,d)=>s+d.percTotal,0)/active : 0;
+      return {key:k, ...state.COLLABS[k], dayData, avg, weekTotal: dayData.reduce((s,d)=>s+d.percTotal,0)};
+    });
+  const sorted = [...tableData].sort((a,b)=>b.weekTotal-a.weekTotal);
+  const rankMap = {}; sorted.forEach((c,i)=>rankMap[c.key]=i+1);
+  const daySums = days.map((_,i)=>{
+    const tots = tableData.map(c=>c.dayData[i].percTotal);
+    return tots.length ? tots.reduce((s,v)=>s+v,0)/tots.length : 0;
+  });
+  // ✅ NOVO: ranking diário
+  const dayRankMaps = days.map((_,i)=>{
+    const active = tableData.filter(c=>c.dayData[i].count>0).sort((a,b)=>b.dayData[i].percTotal-a.dayData[i].percTotal);
+    const m = {}; active.forEach((c,r)=>m[c.key]=r+1);
+    return m;
+  });
+  const dayRankIcons = ['🥇','🥈','🥉'];
+  tbody.innerHTML = tableData.map(c=>{
+    const rank = rankMap[c.key];
+    const cells = c.dayData.map((d,i)=>{
+      const isToday = dKey(days[i])===tk;
+      const todayStyle = isToday ? 'outline:2px solid var(--orange);outline-offset:-2px;' : '';
+      if(!d.count) return `<td style="${todayStyle}">&mdash;</td>`;
+      if(d.isSaturday) {
+        return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-total" style="color:var(--muted)">${d.percTotal.toFixed(1)}%</span><span class="cell-sub" style="color:var(--muted)">opcional</span></div></td>`;
+      }
+      const cls = d.percTotal>=100?'cell-over100':d.percTotal>=90?'cell-over90':'cell-low';
+      const color = d.percTotal>=90 ? 'var(--success)' : 'var(--danger)';
+      const dr = dayRankMaps[i][c.key];
+      const drBadge = dr<=3 ? `<span style="font-size:0.65rem;line-height:1;">${dayRankIcons[dr-1]}</span>` : `<span style="font-size:0.6rem;color:var(--muted);font-weight:700">#${dr}</span>`;
+      return `<td class="${cls}" style="${todayStyle}"><div class="cell-multi"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><span class="cell-total" style="color:${color}">${d.percTotal.toFixed(1)}%</span>${drBadge}</div><span class="cell-sub">${d.percTime.toFixed(0)}%t +${d.percAmount.toFixed(0)}%a</span></div></td>`;
+    }).join('');
+    return `<tr><td class="name-col"><div class="cell-collab"><div class="cell-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'0.8rem':'0.52rem'}">${getCollabAvatar(c.key).display}</div><div class="cell-name">${c.label}</div></div></td>${cells}<td><div class="cell-multi"><span class="cell-total" style="color:var(--orange)">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td><td>${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`}</td></tr>`;
+  }).join('') + `<tr class="summary-row"><td class="name-col">Média do time</td>${daySums.map(v=>`<td>${v.toFixed(1)}%</td>`).join('')}<td>${(tableData.length ? tableData.reduce((s,c)=>s+c.avg,0)/tableData.length : 0).toFixed(1)}%</td><td>—</td></tr>`;
+}
+
+// ── MEU DASHBOARD (colaborador individual) ─────────────────────────────────────
+
+export function renderMeuDashboard() {
+  const k = state.currentCollabKey;
+  const col = state.COLLABS[k];
+  if(!col) return;
+
+  const heading = document.getElementById('meuDashHeading');
+  if(heading) heading.textContent = `Dashboard — ${col.label}`;
+
+  const todayDk = todayKey();
+  const todayData = calcDay(k, todayDk);
+  const th = Math.floor(todayData.totalMs/3600000);
+  const tm = Math.floor((todayData.totalMs%3600000)/60000);
+  const hojeEl = document.getElementById('mdHojeTotal');
+  const countEl = document.getElementById('mdHojeCount');
+  const percEl = document.getElementById('mdHojePerc');
+  if(hojeEl) hojeEl.textContent = `${th}h ${String(tm).padStart(2,'0')}m`;
+  if(countEl) countEl.textContent = todayData.count;
+  if(percEl){ percEl.textContent = `${todayData.percTotal.toFixed(1)}%`; percEl.style.color = todayData.percTotal>=90?'var(--success)':'var(--danger)'; }
+
+  const days = getWeekDays(state.mdWeekOffset);
+  const tk = todayKey();
+  const dayLabels = days.map(d => fmtShortDate(d));
+  const dayData = days.map(d => calcDay(k, dKey(d)));
+
+  const wl = document.getElementById('mdWeekLabel');
+  if(wl) {
+    const fmt = d => d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+    wl.textContent = `${fmt(days[0])} – ${fmt(days[days.length-1])}`;
+  }
+
+  const barCtx = document.getElementById('mdChartBar');
+  if(barCtx){
+    if(state.mdCharts.bar) state.mdCharts.bar.destroy();
+    state.mdCharts.bar = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: dayLabels,
+        datasets: [{
+          label: '% Total',
+          data: dayData.map(d => parseFloat(d.percTotal.toFixed(1))),
+          backgroundColor: dayData.map(d => d.percTotal>=90?'rgba(16,185,129,0.7)':'rgba(239,68,68,0.6)'),
+          borderColor: dayData.map(d => d.percTotal>=90?'rgba(16,185,129,1)':'rgba(239,68,68,1)'),
+          borderWidth: 1.5, borderRadius: 6,
+        },{
+          label: 'Meta (100%)',
+          data: days.map(()=>100),
+          type: 'line',
+          borderColor: 'rgba(241,90,36,0.5)',
+          borderDash: [5,4], borderWidth: 1.5, pointRadius: 0, fill: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, max: Math.max(160, ...dayData.map(d=>d.percTotal))+10,
+               grid: { color: chartPalette().grid },
+               ticks: { callback: v => v+'%', color: chartPalette().tick, font: { size: 11 } } },
+          x: { grid: { display: false }, ticks: { color: chartPalette().tick, font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  const pieCtx = document.getElementById('mdChartPie');
+  if(pieCtx){
+    const projMs = {};
+    days.forEach(d => {
+      const entries = getEntriesForDay(dKey(d), k);
+      entries.forEach(e => {
+        const dur = e._dayDuration ?? e.duration;
+        projMs[e.project] = (projMs[e.project]||0) + dur;
+      });
+    });
+    const projKeys = Object.keys(projMs).filter(p => projMs[p]>0);
+    const pieLabels = projKeys.map(p => state.PROJECTS[p]?.label || p);
+    const pieData = projKeys.map(p => parseFloat((projMs[p]/3600000).toFixed(2)));
+    const pieColors = projKeys.map(p => state.PROJECTS[p]?.color || '#94A3B8');
+
+    if(state.mdCharts.pie) state.mdCharts.pie.destroy();
+    if(projKeys.length){
+      state.mdCharts.pie = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: pieColors, borderWidth: 2, borderColor: 'var(--surface)' }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8, color: chartPalette().legend } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(1)}h` } }
+          }
+        }
+      });
+    } else {
+      pieCtx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:0.8rem;">Sem dados esta semana</div>';
+    }
+  }
+
+  const thead = document.getElementById('mdWeekHead');
+  const tbody = document.getElementById('mdWeekBody');
+  if(!thead || !tbody) return;
+
+  thead.innerHTML = `<tr><th style="text-align:left;padding:8px 10px;font-size:0.68rem;font-weight:800;color:var(--muted);text-transform:uppercase;">Dia</th>${days.map(d=>`<th style="padding:8px 6px;font-size:0.68rem;font-weight:800;color:var(--muted);text-transform:uppercase;text-align:center;">${fmtShortDate(d)}</th>`).join('')}<th style="padding:8px 6px;font-size:0.68rem;font-weight:800;color:var(--muted);text-transform:uppercase;text-align:center;">Média</th></tr>`;
+
+  const active = dayData.filter(d=>d.count>0).length;
+  const avg = active>0 ? dayData.reduce((s,d)=>s+d.percTotal,0)/active : 0;
+
+  const cells = dayData.map((d,i)=>{
+    const isToday = dKey(days[i])===tk;
+    const todayStyle = isToday ? 'outline:2px solid var(--orange);outline-offset:-2px;' : '';
+    if(!d.count) return `<td style="text-align:center;padding:8px 4px;font-size:0.78rem;color:var(--muted);${todayStyle}">—</td>`;
+    const color = d.percTotal>=90 ? 'var(--success)' : 'var(--danger)';
+    const cls = d.percTotal>=100?'cell-over100':d.percTotal>=90?'cell-over90':'cell-low';
+    return `<td class="${cls}" style="text-align:center;padding:6px 4px;${todayStyle}">
+      <div style="font-size:0.82rem;font-weight:700;color:${color}">${d.percTotal.toFixed(1)}%</div>
+      <div style="font-size:0.62rem;color:var(--muted)">${fmtDur(d.totalMs)}</div>
+    </td>`;
+  }).join('');
+
+  const av = state.COLLABS[k] ? getCollabAvatar(k) : {display:'?',color:'#94A3B8'};
+  tbody.innerHTML = `<tr>
+    <td style="padding:8px 10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${av.color};display:flex;align-items:center;justify-content:center;font-size:${av.isEmoji?'0.85rem':'0.55rem'};font-weight:800;color:#fff;flex-shrink:0;">${av.display}</div>
+        <span style="font-size:0.82rem;font-weight:700;">${col.label}</span>
+      </div>
+    </td>
+    ${cells}
+    <td style="text-align:center;padding:6px 4px;">
+      <div style="font-size:0.82rem;font-weight:700;color:var(--orange)">${avg.toFixed(1)}%</div>
+      <div style="font-size:0.62rem;color:var(--muted)">${active}d</div>
+    </td>
+  </tr>
+  <tr style="border-top:1.5px solid var(--border);">
+    <td colspan="${days.length+2}" style="padding:8px 10px;font-size:0.72rem;color:var(--muted);">
+      Meta diária: 9h = 100% &nbsp;·&nbsp; Verde ≥ 90% &nbsp;·&nbsp; Vermelho < 90%
+    </td>
+  </tr>`;
+  // D5: indicadores de avaliação (Demanda) individuais do colaborador
+  window.renderMeusIndicadores?.();
+}
+
+// Dashboard RH legado removido (página #page-dashboard-rh inalcançável — sem nav nem
+// case no switch). A visão de coordenador já cobre o caso em renderCoordenadorDashboard.
+
+// ── D4: ABAS DA DASHBOARD DO COORDENADOR (Semanal / Destaques / Trabalho Remoto) ──
+// Destaques e Remoto agregam TODAS as equipes do coordenador — os listeners só
+// cobrem a equipe ativa, então buscamos cada equipe sob demanda com fetchTeamWeek.
+
+const _DOW_K = ['dom','seg','ter','qua','qui','sex','sab'];
+
+// Computa a semana (por colaborador) de uma equipe a partir de get() — não usa o
+// estado global, então funciona para qualquer equipe. Espelha a lógica de calcDay.
+export async function fetchTeamWeek(equipeId, weekOffset = 0){
+  const days = getWeekDays(weekOffset);
+  const startTs = days[0].getTime();
+  const endTs = new Date(days[5].getFullYear(), days[5].getMonth(), days[5].getDate(), 23,59,59,999).getTime();
+  const [cfgSnap, entSnap, holSnap] = await Promise.all([
+    get(ref(db, `equipes/${equipeId}/config`)),
+    get(query(ref(db, `equipes/${equipeId}/entries`), orderByChild('startTime'), startAt(startTs), endAt(endTs))),
+    get(ref(db, `equipes/${equipeId}/holidays`)),
+  ]);
+  const cfg = cfgSnap.val() || {};
+  const entries = Object.values(entSnap.val() || {});
+  const holidays = holSnap.val() || {};
+
+  const projects = {};
+  Object.entries(cfg.projetos || {}).forEach(([k,p]) => { projects[k] = { amountPerHour: p.amountPerHour || 0 }; });
+  const collabs = {};
+  Object.values(cfg.usuarios || {}).forEach(u => {
+    if(u.key && (u.papel === 'colaborador' || u.papel === 'gestora')){
+      collabs[u.key] = { label: u.nome || u.key, color: u.cor || '#94A3B8', active: u.ativo !== false, estilo: u.estiloTrabalho || 'presencial', horasDia: u.horasDia };
+    }
+  });
+  const defaultGoalMs = (cfg.metas?.horasDia || 9) * MS_PER_HOUR;
+  const metasDias = cfg.metas?.metasDias || null;
+
+  const goalFor = (d, c) => {
+    const dow = d.getDay();
+    if(dow === 0 || dow === 6) return 0;
+    const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if(holidays[iso]) return 0;
+    if(c.horasDia !== undefined && c.horasDia !== null) return c.horasDia * MS_PER_HOUR;
+    if(metasDias && metasDias[_DOW_K[dow]] !== undefined) return metasDias[_DOW_K[dow]] * MS_PER_HOUR;
+    if(dow === 5) return 8 * MS_PER_HOUR;
+    return defaultGoalMs;
+  };
+  const dayMs = (e, dk) => {
+    if(!e.periods || e.periods.length <= 1) return dateKey(e.startTime) === dk ? (e.duration || 0) : 0;
+    return e.periods.filter(p => dateKey(p.startTime) === dk).reduce((s,p) => s + (p.duration || (p.endTime - p.startTime) || 0), 0);
+  };
+
+  const rows = Object.entries(collabs).filter(([,c]) => c.active).map(([key,c]) => {
+    const dayData = days.map(d => {
+      const dk = dKey(d);
+      let totalMs = 0, amount = 0, count = 0;
+      entries.forEach(e => {
+        if(e.collab !== key) return;
+        const ms = dayMs(e, dk);
+        if(!ms) return;
+        totalMs += ms; count++;
+        const p = projects[e.project];
+        if(p) amount += (ms / MS_PER_HOUR) * p.amountPerHour;
+      });
+      const goalMs = goalFor(d, c);
+      const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / defaultGoalMs * 100 : 0);
+      return { percTotal: percTime + amount, count };
+    });
+    const activeDays = dayData.filter(d => d.count > 0).length;
+    const avg = activeDays > 0 ? dayData.reduce((s,d) => s + d.percTotal, 0) / activeDays : 0;
+    return { key, label: c.label, color: c.color, estilo: c.estilo, dayData, avg, activeDays, weekTotal: dayData.reduce((s,d) => s + d.percTotal, 0) };
+  });
+  rows.sort((a,b) => b.weekTotal - a.weekTotal);
+  return { days, rows };
+}
+
+function _dashCell(d){
+  if(!d.count) return `<td>&mdash;</td>`;
+  const color = d.percTotal >= 90 ? 'var(--success)' : 'var(--danger)';
+  return `<td><span class="cell-total" style="color:${color}">${d.percTotal.toFixed(1)}%</span></td>`;
+}
+function _dashHead(days, col1, col2){
+  return `<tr><th class="name-col">${col1}</th><th>${col2}</th>${days.map(d => `<th>${fmtShortDate(d)}</th>`).join('')}<th>Média</th></tr>`;
+}
+function _initials(label){ return String(label||'?').trim().slice(0,2).toUpperCase(); }
+function _teamsToShow(){ return state.userEquipes?.length ? state.userEquipes : [state.equipeAtiva].filter(Boolean); }
+
+export async function renderDashDestaques(){
+  const cont = document.getElementById('dashTableDestaques');
+  if(!cont) return;
+  cont.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:0.82rem;">Carregando destaques…</div>`;
+  let days = null; const lines = [];
+  for(const eq of _teamsToShow()){
+    try {
+      const { days: d, rows } = await fetchTeamWeek(eq, state.weekOffset);
+      days = d;
+      const top = rows.find(r => r.activeDays > 0) || rows[0];
+      if(top) lines.push({ eq, top });
+    } catch(e){ console.warn('[destaques]', eq, e); }
+  }
+  if(!days || !lines.length){ cont.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:0.82rem;">Sem dados para esta semana.</div>`; return; }
+  cont.innerHTML = `<div class="table-wrap"><table class="week-table"><thead>${_dashHead(days,'Equipe','Destaque')}</thead><tbody>${
+    lines.map(({eq,top}) => `<tr>
+      <td class="name-col"><div class="cell-name">${escH(state.EQUIPE_LABELS[eq]||eq)}</div></td>
+      <td><div class="cell-collab"><div class="cell-av" style="background:${top.color}">${escH(_initials(top.label))}</div><div class="cell-name">🥇 ${escH(top.label)}</div></div></td>
+      ${top.dayData.map(_dashCell).join('')}
+      <td><span class="cell-total" style="color:var(--orange)">${top.avg.toFixed(1)}%</span></td>
+    </tr>`).join('')
+  }</tbody></table></div>`;
+}
+
+export async function renderDashRemoto(){
+  const cont = document.getElementById('dashTableRemoto');
+  if(!cont) return;
+  cont.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:0.82rem;">Carregando…</div>`;
+  let days = null; const lines = [];
+  for(const eq of _teamsToShow()){
+    try {
+      const { days: d, rows } = await fetchTeamWeek(eq, state.weekOffset);
+      days = d;
+      rows.filter(r => r.estilo === 'remoto').forEach(r => lines.push({ eq, r }));
+    } catch(e){ console.warn('[remoto]', eq, e); }
+  }
+  if(!days){ cont.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:0.82rem;">Sem dados.</div>`; return; }
+  if(!lines.length){ cont.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:0.82rem;">Nenhum colaborador marcado como remoto. Defina em Gestão → Usuários (coluna Estilo).</div>`; return; }
+  cont.innerHTML = `<div class="table-wrap"><table class="week-table"><thead>${_dashHead(days,'Equipe','Colaborador')}</thead><tbody>${
+    lines.map(({eq,r}) => `<tr>
+      <td class="name-col"><div class="cell-name">${escH(state.EQUIPE_LABELS[eq]||eq)}</div></td>
+      <td><div class="cell-collab"><div class="cell-av" style="background:${r.color}">${escH(_initials(r.label))}</div><div class="cell-name">${escH(r.label)}</div></div></td>
+      ${r.dayData.map(_dashCell).join('')}
+      <td><span class="cell-total" style="color:var(--orange)">${r.avg.toFixed(1)}%</span></td>
+    </tr>`).join('')
+  }</tbody></table></div>`;
+}
+
+let _activeDashTable = 'semanal';
+window.switchDashTable = (tab) => {
+  _activeDashTable = tab;
+  document.querySelectorAll('#dashTableTabs .dash-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.dtab === tab));
+  const map = { semanal:'dashTableSemanal', destaques:'dashTableDestaques', remoto:'dashTableRemoto' };
+  Object.entries(map).forEach(([t,id]) => { const el = document.getElementById(id); if(el) el.style.display = t === tab ? '' : 'none'; });
+  if(tab === 'destaques') renderDashDestaques();
+  else if(tab === 'remoto') renderDashRemoto();
+};
+// Re-renderiza a aba ativa (chamado pela navegação de semana via window)
+window._refreshActiveDashTable = () => {
+  if(_activeDashTable === 'destaques') renderDashDestaques();
+  else if(_activeDashTable === 'remoto') renderDashRemoto();
+};
+
+// Mostra as abas Destaques/Remoto só para coordenador (auditor) e admin
+export function setupDashTabsVisibility(){
+  const show = state.isAuditor || state.userPapel === 'admin';
+  ['destaques','remoto'].forEach(t => {
+    const btn = document.querySelector(`#dashTableTabs .dash-tab-btn[data-dtab="${t}"]`);
+    if(btn) btn.style.display = show ? '' : 'none';
+  });
+  if(!show && _activeDashTable !== 'semanal') window.switchDashTable('semanal');
+}
+
+// ── DEMANDAS DA SEMANA DA DASHBOARD ───────────────────────────────────────────
+export function renderDashDemandasWeek() {
+  if(!Object.keys(state.allEntries).length) return;
+  const days = getWeekDays(state.weekOffset);
+  const collabFilter = document.getElementById('dashDemandasCollab')?.value || '';
+  const searchFilter = (document.getElementById('dashDemandasSearch')?.value||'').toLowerCase().trim();
+  renderDemandasSemana('dashDemandasBody', days, collabFilter, searchFilter);
+}
+window.renderDashDemandasWeek = renderDashDemandasWeek;
+
+// ── renderDemandasSemana (reutilizável para gestora e RH) ─────────────────────
+export function renderDemandasSemana(tbodyId, days, collabFilter='', searchFilter='') {
+  const tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
+  const startTs = days[0].getTime();
+  const endTs = new Date(days[days.length-1].getFullYear(), days[days.length-1].getMonth(), days[days.length-1].getDate(), 23,59,59).getTime();
+
+  let data = getEntriesArray().map(([k,e])=>({...e,_key:k})).filter(e=>{
+    if(collabFilter && e.collab !== collabFilter) return false;
+    if(e.startTime >= startTs && e.startTime <= endTs) return true;
+    if(e.periods && e.periods.some(p=>p.startTime>=startTs && p.startTime<=endTs)) return true;
+    return false;
+  }).sort((a,b)=>b.startTime-a.startTime);
+
+  if(searchFilter){
+    data = data.filter(e=>{
+      const task=(e.task||'').toLowerCase();
+      const collab=(state.COLLABS[e.collab]?.label||e.collab||'').toLowerCase();
+      const proj=(state.PROJECTS[e.project]?.label||e.project||'').toLowerCase();
+      return task.includes(searchFilter)||collab.includes(searchFilter)||proj.includes(searchFilter);
+    });
+  }
+
+  if(!data.length){
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:0.82rem;">Nenhum registro nesta semana.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(e=>{
+    const proj = state.PROJECTS[e.project] || {label:escH(e.project||'?'), color:'#94A3B8'};
+    const col  = state.COLLABS[e.collab]  || {label:escH(e.collab||'?'),  initials:'?', color:'#94A3B8'};
+    const amt  = calcAmount(e.project, e.duration);
+    const modBadge = e.modifiedAt ? `<span class="modified-badge" title="Editado por ${escH(e.modifiedBy||'?')}">${ICONS.edit}</span>` : '';
+    const hasPeriods = e.periods && e.periods.length>1;
+    const periodsBadge = hasPeriods ? `<span style="font-size:0.65rem;background:var(--orange-light,#fff3e0);color:var(--orange);border-radius:4px;padding:1px 5px;font-weight:700;margin-left:4px">${e.periods.length}×</span>` : '';
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="mini-av" style="background:${col.color}">${col.initials}</div><strong>${col.label}</strong></div></td>
+      <td style="cursor:pointer" onclick="openEntryDetail('${e._key}')" title="Ver detalhes">
+        <strong>${escH(e.task)}${periodsBadge}</strong>
+        <div style="font-size:0.7rem;color:var(--muted)">${new Date(e.startTime).toLocaleDateString('pt-BR')}</div>
+      </td>
+      <td><span style="color:${proj.color};font-weight:700;font-size:0.78rem">${proj.label}</span></td>
+      <td style="font-family:var(--mono);font-size:0.75rem">${fmtTime(e.startTime)}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem">${fmtTime(e.endTime)}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem">${fmtDur(e.duration)}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem;color:var(--success)">+${amt.toFixed(2)}%</td>
+      <td>${(e.tags||[]).map(t=>`<span class="entry-tag">${escH(t)}</span>`).join('')}</td>
+      <td style="font-size:0.75rem;color:var(--muted);font-style:italic">${escH(e.obs||'—')}</td>
+      <td>
+        <span onclick="openEntryDetail('${e._key}')" style="cursor:pointer" title="Ver detalhes">
+          ${modBadge||'<span style="color:var(--muted);font-size:0.75rem;opacity:0.5">🔍</span>'}
+        </span>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── renderOnline ───────────────────────────────────────────────────────────────
+export function renderOnline() {
+  const container = document.getElementById('onlineBody');
+  if(!container) return;
+  const keys = Object.keys(state.activeTimers);
+  if(!keys.length){
+    container.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted);font-size:0.82rem;font-weight:600;border:1.5px dashed var(--border);border-radius:var(--radius-sm);">Nenhum colaborador com timer ativo no momento.</div>`;
+    return;
+  }
+  container.innerHTML = keys.map(k=>{
+    const t = state.activeTimers[k];
+    const av = getCollabAvatar(k);
+    const col  = state.COLLABS[k]  || {label:k, initials:'?', color:'#94A3B8'};
+    const proj = state.PROJECTS[t.project] || {label:t.project, color:'#94A3B8'};
+    const dk = dKey(new Date(t.startTime));
+    const dayData = calcDay(k, dk);
+    const barW = Math.min(dayData.percTime, 100);
+    const barColor = barW>=100 ? 'var(--success)' : 'var(--orange)';
+    const avContent = av.isEmoji
+      ? `<span style="font-size:1.1rem">${av.display}</span>`
+      : `<span style="font-size:0.68rem;font-weight:800;color:#fff">${av.display}</span>`;
+    return `<div class="online-card">
+      <div class="online-card-header">
+        <div class="online-card-av" style="background:${av.color}">${avContent}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="online-card-name">${escH(col.label)}</div>
+          <div class="online-card-elapsed">${fmtDur(state.elapsed)}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);text-align:right;">
+          <div style="font-weight:700;color:var(--text)">${fmtDur(dayData.totalMs)}</div>
+          <div>hoje</div>
+        </div>
+      </div>
+      <div>
+        <div class="online-card-task">${escH(t.task||'Em andamento')}</div>
+        <div class="online-card-proj" style="color:${proj.color}">${escH(proj.label)}</div>
+      </div>
+      <div class="online-card-bar-wrap">
+        <div class="online-card-bar-label"><span>% do dia</span><span style="color:${barColor};font-weight:700;">${dayData.percTime.toFixed(0)}%</span></div>
+        <div class="online-card-bar-track"><div class="online-card-bar-fill" style="width:${barW}%;background:${barColor};"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  // Bug: agendamento único e auto-limpo (antes acumulava cadeias de setTimeout recursivo)
+  if(!state._onlineRefresh){
+    state._onlineRefresh = setInterval(()=>{
+      if(document.getElementById('page-online')?.classList.contains('active')) renderOnline();
+      else { clearInterval(state._onlineRefresh); state._onlineRefresh = null; }
+    }, 5000);
+  }
+}
