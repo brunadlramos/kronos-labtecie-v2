@@ -9,7 +9,7 @@ import {
 } from './utils.js';
 import {
   db, kanbanRef, entriesRef, approvalRequestsRef, notifsRef,
-  usersRef, avatarsRef, arquivoRef, EQUIPE_ID
+  usersRef, avatarsRef, arquivoRef, activeTimersRef, EQUIPE_ID
 } from './firebase-refs.js';
 import {
   ref, push, set, update, get, remove, child, onValue, query, orderByChild
@@ -27,6 +27,42 @@ export function isCuradora(userKey){
 export function isRecuradora(userKey){
   return state.KANBAN_ROLES.recuradoria.includes(userKey) || isManagerUser();
 }
+
+// ── MÚLTIPLOS RESPONSÁVEIS ────────────────────────────────────────────────────
+// Fonte da verdade: card.assignees[] (array, pode ser vazio = sem responsável).
+// card.assignee continua existindo como "principal" (= assignees[0]) para manter
+// compatível filtros/relatórios/notificações antigos que liam um único responsável.
+export function kCardAssignees(card){
+  if(Array.isArray(card?.assignees) && card.assignees.length) return card.assignees.filter(Boolean);
+  return card?.assignee ? [card.assignee] : [];
+}
+export function kIsAssignee(card, key){
+  return !!key && kCardAssignees(card).includes(key);
+}
+
+// Chips de seleção de responsáveis no modal (substitui o <select> único).
+// _kcAssignees preserva a ORDEM de seleção → o 1º é o responsável principal.
+let _kcAssignees = [];
+function _renderKcAssignees(){
+  const wrap = document.getElementById('kcAssigneeWrap');
+  if(!wrap) return;
+  const entries = Object.entries(state.COLLABS||{})
+    .filter(([,c])=>c.active!==false)
+    .sort((a,b)=>(a[1].label||'').localeCompare(b[1].label||'','pt-BR'));
+  wrap.innerHTML = entries.map(([k,c])=>{
+    const idx = _kcAssignees.indexOf(k);
+    const on  = idx>=0;
+    const order = (on && _kcAssignees.length>1) ? `<span class="kc-assignee-order">${idx+1}</span>` : '';
+    return `<button type="button" class="kc-assignee-chip${on?' on':''}" data-collab="${escH(k)}" aria-pressed="${on}" onclick="toggleKcAssignee('${escH(k)}')"><span class="kc-assignee-av" style="background:${c.color||'#94A3B8'}">${escH(c.initials||'?')}</span>${escH(c.label||k)}${order}</button>`;
+  }).join('') || '<span style="font-size:0.72rem;color:var(--muted);padding:4px;">Nenhum colaborador ativo</span>';
+}
+window.toggleKcAssignee = (k)=>{
+  const i = _kcAssignees.indexOf(k);
+  if(i>=0) _kcAssignees.splice(i,1); else _kcAssignees.push(k);
+  _renderKcAssignees();
+};
+function _setKcAssignees(keys){ _kcAssignees = [...new Set((keys||[]).filter(Boolean))]; _renderKcAssignees(); }
+function _getKcAssignees(){ return [..._kcAssignees]; }
 
 export function _refreshKanbanTypeFilter(){
   const sel = document.getElementById('kanbanFilterType');
@@ -202,8 +238,9 @@ function kGetPrev(colId){ const i=state.K_COLS.findIndex(c=>c.id===colId); retur
 // Retorna botões configurados para a coluna, ou padrão sequencial se não configurado
 function kGetColBotoes(colId){
   const col = state.K_COLS.find(c=>c.id===colId);
-  if(col?.botoes?.length) return col.botoes;
-  // Padrão: timer + avançar + voltar (baseado na posição)
+  if(col?.botoes === 'none') return [];          // coluna configurada explicitamente SEM botões
+  if(Array.isArray(col?.botoes) && col.botoes.length) return col.botoes;
+  // Padrão (só quando a coluna nunca teve botões configurados): timer + avançar + voltar
   const botoes = [];
   if(!['lixeira','concluido'].includes(colId)) botoes.push({tipo:'timer'});
   const prev = kGetPrev(colId);
@@ -304,9 +341,9 @@ export function renderKanban(){
   board.innerHTML = state.K_COLS.map(col=>{
     let colCards = allCards.filter(c=>c.column===col.id);
     if(search) colCards = colCards.filter(c=>(c.name||'').toLowerCase().includes(search));
-    if(fcCollab) colCards = colCards.filter(c=>c.assignee===fcCollab);
+    if(fcCollab) colCards = colCards.filter(c=>kIsAssignee(c,fcCollab));
     if(fcType) colCards = colCards.filter(c=>(c.tags||[]).some(t=>t.includes(fcType)));
-    colCards.sort((a,b)=>(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0));
+    colCards.sort((a,b)=>((b.urgente?1:0)-(a.urgente?1:0)) || ((b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0)));
     const st = state.kColState[col.id]||{};
     const isCollapsed = st.collapsed && !st.pinned;
     const isPinned = st.pinned;
@@ -343,11 +380,21 @@ export function renderKanban(){
 };
 
 function renderKCard(card, botoesMemo){
-  const col = state.COLLABS[card.assignee]||{label:card.assignee||'?',initials:'?',color:'#94A3B8'};
+  const assignees = kCardAssignees(card);
   const timerCol = K_TIMER_COLS[card.column];
   const timerLabel = timerCol?.label || kColLabel(card.column) || 'Iniciar';
   const cycles = card.adjustCycles||0;
-  const canSeeCycles = state.isManager||card.assignee===state.currentCollabKey;
+  const canSeeCycles = state.isManager||kIsAssignee(card,state.currentCollabKey);
+  // Avatares empilhados de todos os responsáveis (+ rótulo do principal ou "+N")
+  const assigneeHtml = assignees.length
+    ? `<div class="k-card-assignee">
+        <div class="k-card-av-stack">${assignees.slice(0,4).map(a=>{
+          const ac = state.COLLABS[a]||{initials:'?',color:'#94A3B8'};
+          return `<div class="k-card-av" style="background:${ac.color}" title="${escH(ac.label||a)}">${escH(ac.initials||'?')}</div>`;
+        }).join('')}</div>
+        <span>${escH((state.COLLABS[assignees[0]]||{label:assignees[0]}).label||assignees[0])}${assignees.length>1?` +${assignees.length-1}`:''}</span>
+      </div>`
+    : `<div class="k-card-assignee" style="color:var(--muted)"><div class="k-card-av" style="background:#94A3B8">—</div>Sem responsável</div>`;
   const modColors = {MOD1:'#7C6AFF',MOD2:'#10B981',MOD3:'#F59E0B',MOD4:'#EF4444'};
   const modBadge = card.module&&card.module!=='none'
     ?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:${modColors[card.module]||'#94A3B8'}22;border:1px solid ${modColors[card.module]||'#94A3B8'}55;color:${modColors[card.module]||'#94A3B8'}">${card.module}</span>`:'';
@@ -378,28 +425,35 @@ function renderKCard(card, botoesMemo){
       return `<button class="k-btn-move" onclick="kMoveToCol('${card._key}','${b.destino}')">${escH(lbl)}</button>`;
     }
     if(b.tipo==='concluir'){
-      if(!state.isManager&&card.assignee!==state.currentCollabKey) return '';
+      if(!state.isManager&&!kIsAssignee(card,state.currentCollabKey)) return '';
       return `<button class="k-btn-move" style="border-color:rgba(34,197,94,0.4);color:var(--success);" onclick="concludeKanbanCard('${card._key}')">${ICONS.check} ${b.label||'Concluir'}</button>`;
     }
     return '';
   }).join('');
 
-  return `<div class="k-card" id="kcard-${card._key}"
+  const canFlag = state.isManager || kIsAssignee(card, state.currentCollabKey);
+  const urgenteBadge = card.urgente
+    ? `<span class="k-card-urgent-badge">🔴 URGENTE</span>` : '';
+  const urgenteBtn = canFlag
+    ? `<button onclick="toggleUrgente('${card._key}',event)" title="${card.urgente?'Remover urgência':'Marcar como urgente'}" aria-label="Alternar urgência" style="background:none;border:none;cursor:pointer;font-size:0.8rem;padding:2px 4px;flex-shrink:0;line-height:1;opacity:${card.urgente?'1':'0.4'};">🔴</button>` : '';
+
+  return `<div class="k-card${card.urgente?' urgent':''}" id="kcard-${card._key}"
     draggable="true"
     ondragstart="kDragStart(event,'${card._key}')"
     ondragend="kDragEnd(event)">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:6px;">
       <div class="k-card-name" onclick="openKanbanDetail('${card._key}')" style="flex:1">${escH(card.name||'Sem título')}</div>
+      ${urgenteBtn}
       <button onclick="openArchiveChoiceModal('${card._key}')" title="Arquivar (escolher: coluna do mês ou lixeira)" aria-label="Arquivar card" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.75rem;padding:2px 4px;flex-shrink:0;line-height:1;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">⤵</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
-      ${modBadge}${labelsHtml}
+      ${urgenteBadge}${modBadge}${labelsHtml}
       ${canSeeCycles&&cycles>0?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--danger)">↩ ${cycles}x ajuste${cycles>1?'s':''}</span>`:''}
     </div>
     ${card.obs?`<div class="k-card-obs">"${escH(card.obs)}"</div>`:''}
     ${linksHtml?`<div class="k-card-links">${linksHtml}</div>`:''}
     <div class="k-card-meta">
-      <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
+      ${assigneeHtml}
       <div style="display:flex;align-items:center;gap:6px;">
         ${commentCount>0?`<span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">💬${commentCount}</span>`:''}
         ${card.hours?`<span class="k-card-hours">${ICONS.clock} ${kFmtHours(card.hours)}</span>`:''}
@@ -519,7 +573,37 @@ window.restoreKanbanTimer = function(){
   const taskEl=document.getElementById('kTimerTask');
   if(taskEl) taskEl.textContent=card?.name||'Em andamento';
   _kTimerStartInterval();
+  _publishKActiveTimer(state.kTimerState, card);   // re-publica em "Em andamento agora" após refresh
 };
+
+// Projeto associado a uma coluna (mesma lógica usada ao parar o timer do Kanban)
+function _kColProject(column){
+  const colCfg = state.K_COLS.find(c=>c.id===column);
+  return colCfg?.project || K_TIMER_COLS[column]?.project || Object.keys(state.PROJECTS||{})[0] || 'trabalho';
+}
+// Publica o timer do Kanban no nó activeTimers → aparece em "Em andamento agora".
+// Marcado com kanban:true para o restore do timer PRINCIPAL ignorá-lo (não sequestra a UI do timer).
+function _publishKActiveTimer(ks, card){
+  if(!ks) return;
+  const collab = ks.collab || state.currentCollabKey;
+  if(!collab) return;
+  set(child(activeTimersRef, collab), {
+    task: card?.name || state.kanbanCards?.[ks.cardKey]?.name || 'Em andamento',
+    project: _kColProject(ks.column),
+    obs: `Kanban: ${kColLabel(ks.column)}`,
+    tags: [],
+    startTime: ks.startTime,
+    collab,
+    kanban: true
+  }).catch(e=>console.error('[kanban activeTimer]', e));
+}
+// Remove o timer do Kanban do activeTimers — só se o timer PRINCIPAL não estiver rodando
+// (ele é dono do mesmo nó por colaborador), evitando apagar a entrada dele.
+function _clearKActiveTimer(collab){
+  const c = collab || state.currentCollabKey;
+  if(!c || state.isRunning) return;
+  remove(child(activeTimersRef, c)).catch(()=>{});
+}
 
 window.startKanbanTimer = async(key)=>{
   const card=state.kanbanCards[key]; if(!card) return;
@@ -544,6 +628,7 @@ window.startKanbanTimer = async(key)=>{
 
   state.kTimerState={cardKey:key,startTime:Date.now(),column:card.column,collab:state.currentCollabKey};
   _saveKTimer();
+  _publishKActiveTimer(state.kTimerState, card);   // ✅ aparece em "Em andamento agora"
   document.getElementById('kTimerWidget').style.display='block';
   document.getElementById('kTimerTask').textContent=card.name||'Em andamento';
   _kTimerStartInterval();
@@ -573,6 +658,7 @@ window.stopKanbanTimer = async()=>{
   clearInterval(state.kTimerInterval);
   state.kTimerState = null;
   _saveKTimer();
+  _clearKActiveTimer(collab);   // remove de "Em andamento agora"
   document.getElementById('kTimerWidget').style.display='none';
 
   const card = state.kanbanCards[cardKey];
@@ -610,8 +696,10 @@ window.stopKanbanTimer = async()=>{
 };
 
 window.cancelKanbanTimer = ()=>{
+  const collab = state.kTimerState?.collab || state.currentCollabKey;
   clearInterval(state.kTimerInterval); state.kTimerState=null;
   _saveKTimer();
+  _clearKActiveTimer(collab);   // remove de "Em andamento agora"
   document.getElementById('kTimerWidget').style.display='none';
   renderKanban();
 };
@@ -629,8 +717,35 @@ window.concludeKanbanCard = async(key)=>{
   // ✅ AUDIT: modifiedBy registrado ao concluir
   await set(child(kanbanRef, key),{...card,column:'concluido',concludedAt:now,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
   showToast('Disciplina concluída!','Card movido para Concluído.');
-  if(card.assignee && card.assignee!==state.currentCollabKey)
-    push(notifsRef,{to:card.assignee,title:'Disciplina concluída',msg:'"'+(card.name||'').slice(0,30)+'" foi liberada!',from:state.currentCollabKey,ts:now,read:false});
+  // Notifica todos os responsáveis (exceto quem concluiu)
+  kCardAssignees(card)
+    .filter(a=>a && a!==state.currentCollabKey)
+    .forEach(a=>push(notifsRef,{to:a,title:'Disciplina concluída',msg:'"'+(card.name||'').slice(0,30)+'" foi liberada!',from:state.currentCollabKey,ts:now,read:false}));
+};
+
+// Marca/desmarca um card como URGENTE (gestora ou responsável). Disponível para toda equipe.
+window.toggleUrgente = async(key, ev)=>{
+  if(ev) ev.stopPropagation();
+  const card = state.kanbanCards[key]; if(!card) return;
+  if(!state.isManager && !kIsAssignee(card, state.currentCollabKey)){
+    showToast('Sem permissão','Apenas a gestora ou um responsável pode marcar como urgente.');
+    return;
+  }
+  const novo = !card.urgente;
+  const now = Date.now();
+  try{
+    await update(child(kanbanRef, key), {
+      urgente: novo,
+      updatedAt: now,
+      modifiedBy: state.currentUser?.email||'desconhecido'
+    });
+    if(state.kanbanCards[key]){ state.kanbanCards[key].urgente = novo; state.kanbanCards[key].updatedAt = now; }
+    showToast(novo?'🔴 Marcado como urgente':'Urgência removida', `"${(card.name||'').slice(0,30)}"`);
+    renderKanban();
+  }catch(e){
+    showToast('Erro','Não foi possível atualizar a urgência.');
+    console.error('[toggleUrgente]', e);
+  }
 };
 
 ;
@@ -730,9 +845,9 @@ function getPendingCards(){
       if(card.column==='lixeira'||card.column==='concluido') return false;
     // finalizacao: só owner, gestor ou curadora veem
       if(card.column==='em_curadoria') return isCuradora(state.currentCollabKey);
-      if(card.column==='aguardando_ajustes') return card.assignee===state.currentCollabKey;
+      if(card.column==='aguardando_ajustes') return kIsAssignee(card,state.currentCollabKey);
       if(card.column==='recuradoria') return state.isManager;
-      if(card.column==='liberacao') return state.isManager||card.assignee===state.currentCollabKey;
+      if(card.column==='liberacao') return state.isManager||kIsAssignee(card,state.currentCollabKey);
       return false;
     });
 }
@@ -810,7 +925,7 @@ window.openKanbanCardModal = (key)=>{
   if(key){
     const c=state.kanbanCards[key]; if(!c) return;
     document.getElementById('kcName').value=c.name||'';
-    document.getElementById('kcAssignee').value=c.assignee||state.currentCollabKey;
+    _setKcAssignees(kCardAssignees(c));
     document.getElementById('kcColumn').value=c.column||'standby';
     document.getElementById('kcObs').value=c.obs||'';
     const km=document.getElementById('kcModule');if(km)km.value=c.module||'none';
@@ -818,9 +933,10 @@ window.openKanbanCardModal = (key)=>{
     (c.links||[]).forEach(l=>addKcLink(l));
   } else {
     document.getElementById('kcName').value='';
+    // Pré-seleciona o próprio usuário como responsável (mas é opcional: pode desmarcar)
     const defaultAssignee = state.currentCollabKey
       || Object.keys(state.COLLABS||{}).find(k=>isActive(k)) || '';
-    document.getElementById('kcAssignee').value = defaultAssignee;
+    _setKcAssignees(defaultAssignee ? [defaultAssignee] : []);
     const defaultCol = (state.K_COLS||[]).find(c=>!['lixeira','concluido'].includes(c.id));
     document.getElementById('kcColumn').value = defaultCol?.id || (state.K_COLS?.[0]?.id || '');
     document.getElementById('kcObs').value='';
@@ -850,7 +966,8 @@ window.saveKanbanCard = async () => {
     return;
   }
 
-  const assignee = document.getElementById('kcAssignee').value;
+  const assignees = _getKcAssignees();          // [] = sem responsável (opcional)
+  const assignee  = assignees[0] || '';         // principal = 1º selecionado
   const column = document.getElementById('kcColumn').value;
   const module = document.getElementById('kcModule')?.value || 'none';
   const obs = document.getElementById('kcObs').value.trim();
@@ -876,6 +993,7 @@ window.saveKanbanCard = async () => {
   const cardData = {
     name,
     assignee,
+    assignees,
     column,
     module,
     obs: obs || '',
@@ -955,10 +1073,15 @@ window.openKanbanDetail=(key)=>{
   const card=state.kanbanCards[key] || state.arquivoCards?.[key] || window._arquivoCards?.[key];
   if(!card) return;
   const isArchived = !!(card.archived || state.arquivoCards?.[key] || window._arquivoCards?.[key]);
-  const col=state.COLLABS[card.assignee]||{label:card.assignee||'?',initials:'?',color:'#94A3B8'};
+  const _kdAssignees = kCardAssignees(card);
   document.getElementById('kdName').textContent=card.name||'Sem título';
   document.getElementById('kdLabels').innerHTML=(card.tags||[]).map(t=>{const lc=kLabelColor(t);return`<span class="k-card-label" style="background:${lc.bg};border:1px solid ${lc.border};color:${lc.color}">${escH(t)}</span>`;}).join('');
-  document.getElementById('kdAssignee').innerHTML=`<div style="display:flex;align-items:center;gap:6px"><div style="width:22px;height:22px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff">${col.initials}</div><strong>${col.label}</strong></div>`;
+  document.getElementById('kdAssignee').innerHTML = _kdAssignees.length
+    ? _kdAssignees.map((a,i)=>{
+        const ac=state.COLLABS[a]||{label:a||'?',initials:'?',color:'#94A3B8'};
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:${i<_kdAssignees.length-1?'4px':'0'}"><div style="width:22px;height:22px;border-radius:50%;background:${ac.color};display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff">${escH(ac.initials)}</div><strong>${escH(ac.label)}</strong>${i===0&&_kdAssignees.length>1?'<span style="font-size:0.6rem;color:var(--muted);font-weight:700">principal</span>':''}</div>`;
+      }).join('')
+    : `<div style="color:var(--muted);font-size:0.8rem">Sem responsável</div>`;
   // Para cards arquivados mostra o módulo do Arquivo Morto, não a coluna do kanban
   const modLabel = isArchived ? (state.MODS.find(m=>m.id===card.module)?.label||'Arquivo Morto') : kColLabel(card.column);
   document.getElementById('kdColumn').textContent = isArchived ? `📦 ${modLabel}` : modLabel;
@@ -985,7 +1108,9 @@ window.openKanbanDetail=(key)=>{
     : '<span style="font-size:0.75rem;color:var(--muted)">Nenhum registro ainda</span>';
   window._detailCardKey = key;
   renderKanbanComments(card);
-  kdRenderAvaliacao(card);
+  // ✅ BUG nota da demanda: precisa do _key, senão as estrelas geram saveAjuste('undefined',...)
+  // e a nota é gravada numa chave inexistente (aparecia "salvo" mas não persistia no card).
+  kdRenderAvaliacao({...card, _key:key});
   const _kdm = document.getElementById('kanbanDetailModal'); _kdm?.classList.add('open'); if(_kdm) trapFocus(_kdm);
   // ✅ FIX: listeners adicionados após abrir — evita problema de onclick em módulos ES
 
@@ -1074,7 +1199,7 @@ function kdRenderAvaliacao(card){
   // Lê avaliação do estado live (garante dados frescos mesmo que card passado esteja desatualizado)
   const liveCard = (card._key && (state.kanbanCards[card._key] || window._arquivoCards?.[card._key])) || card;
 
-  const isOwner = liveCard.assignee === state.currentCollabKey;
+  const isOwner = kIsAssignee(liveCard, state.currentCollabKey);
   const isCuradoraUser = isCuradora(state.currentCollabKey);
   const canSeeAny = state.isManager || isOwner || isCuradoraUser;
   section.style.display = canSeeAny ? '' : 'none';
@@ -1341,7 +1466,7 @@ window.renderIndicadores = ()=>{
       return new Date(ts).toISOString().slice(0,7)===mesF;
     });
   }
-  if(colabF) cards = cards.filter(c=>c.assignee===colabF);
+  if(colabF) cards = cards.filter(c=>kIsAssignee(c,colabF));
 
   // Avaliados vs pendentes
   const avaliados = cards.filter(c=>c[field]);
@@ -1675,7 +1800,7 @@ window.addEntryToKanban = (entryKey)=>{
   window.clearTags(document.getElementById('kcTagsWrap'));
   document.getElementById('kcLinksList').innerHTML = '';
   document.getElementById('kcName').value = entry.task || '';
-  document.getElementById('kcAssignee').value = entry.collab || state.currentCollabKey;
+  _setKcAssignees(entry.collab ? [entry.collab] : (state.currentCollabKey ? [state.currentCollabKey] : []));
   // Usa a primeira coluna de trabalho da equipe ativa (não lixeira, não concluido)
   const firstCol = (state.K_COLS||[]).find(c=>!['lixeira','concluido'].includes(c.id));
   document.getElementById('kcColumn').value = firstCol?.id || (state.K_COLS?.[0]?.id || '');
@@ -1952,7 +2077,7 @@ window.renderArquivo = ()=>{
     } else {
       cards = all.filter(c=>c.module===mod.id && c.importedFrom!=='trello');
     }
-    if(collabFilter) cards = cards.filter(c=>c.assignee===collabFilter);
+    if(collabFilter) cards = cards.filter(c=>kIsAssignee(c,collabFilter));
     if(typeFilter) cards = cards.filter(c=>(c.tags||[]).some(t=>t.includes(typeFilter)));
     if(search) cards = cards.filter(c=>(c.name||'').toLowerCase().includes(search));
     cards.sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));

@@ -291,7 +291,7 @@ window.cfgDelProjeto = async function(k){
 // Reconstrói todos os selects de colaborador a partir do state.COLLABS carregado
 export function _refreshCollabSelects(){
   const ids = ['mCollab','collabSelect','dashDemandasCollab','filterCollabD',
-                'kanbanFilterCollab','arquivoCollabFilter','kanbanFilterAssignee','kcAssignee'];
+                'kanbanFilterCollab','arquivoCollabFilter','kanbanFilterAssignee'];
   const collabEntries = Object.entries(state.COLLABS)
     .filter(([,c])=>c.active!==false)
     .sort((a,b)=>(a[1].label||'').localeCompare(b[1].label||'','pt-BR'));
@@ -554,7 +554,7 @@ async function renderCfgColunas(){
       <div style="border-top:1px solid var(--border);padding-top:10px;">
         <div style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Botões do card</div>
         <div id="botoes_${k}">
-          ${(c.botoes||[]).map((b,idx)=>_botaoRow(k,b,idx)).join('')}
+          ${(Array.isArray(c.botoes)?c.botoes:[]).map((b,idx)=>_botaoRow(k,b,idx)).join('')}
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
           <button class="btn-sm" onclick="cfgAddBotao('${k}','timer')" style="font-size:0.72rem;">▶ + Timer</button>
@@ -567,10 +567,18 @@ async function renderCfgColunas(){
 }
 
 // ── Funções de edição de botões ────────────────────────────────────────────────
+// Atualiza state.K_COLS localmente + re-renderiza o board (config não tem listener live).
+// `botoes` pode ser um array OU a string 'none' (marcador de "sem botões"): o Firebase
+// descarta arrays vazios, então sem o marcador o kGetColBotoes voltaria aos botões padrão.
+function _syncKColBotoes(colId, botoes){
+  const col = (state.K_COLS||[]).find(c=>c.id===colId);
+  if(col) col.botoes = botoes;
+  window.renderKanban?.();
+}
 window.cfgAddBotao = async(colId, tipo)=>{
   const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}`));
   const col = snap.val()||{};
-  const botoes = col.botoes||[];
+  const botoes = Array.isArray(col.botoes) ? col.botoes : [];   // 'none'/ausente → []
   // Impede duplicata de timer/concluir
   if((tipo==='timer'||tipo==='concluir') && botoes.some(b=>b.tipo===tipo)){
     showToast('Já existe', `Botão "${tipo}" já adicionado nesta coluna.`); return;
@@ -578,6 +586,7 @@ window.cfgAddBotao = async(colId, tipo)=>{
   const novo = tipo==='mover' ? {tipo:'mover',label:'',destino:''} : {tipo};
   botoes.push(novo);
   await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}/botoes`), botoes);
+  _syncKColBotoes(colId, botoes);
   showToast('Botão adicionado','Configure o destino e salve.');
   renderCfgColunas();
 };
@@ -585,16 +594,19 @@ window.cfgAddBotao = async(colId, tipo)=>{
 window.cfgRemoveBotao = async(colId, idx)=>{
   const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}`));
   const col = snap.val()||{};
-  const botoes = col.botoes||[];
+  const botoes = Array.isArray(col.botoes) ? col.botoes : [];
   botoes.splice(idx,1);
-  await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}/botoes`), botoes);
+  // Lista vazia vira marcador 'none' (Firebase descarta [] → voltaria aos botões padrão)
+  const toSave = botoes.length ? botoes : 'none';
+  await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}/botoes`), toSave);
+  _syncKColBotoes(colId, toSave);
   renderCfgColunas();
 };
 
 window.cfgSaveBotao = async(colId, idx, tipo)=>{
   const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}`));
   const col = snap.val()||{};
-  const botoes = col.botoes||[];
+  const botoes = Array.isArray(col.botoes) ? col.botoes : [];
   const label = document.getElementById(`blbl_${colId}_${idx}`)?.value?.trim()||'';
   if(tipo==='mover'){
     const destino = document.getElementById(`bdst_${colId}_${idx}`)?.value||'';
@@ -604,6 +616,7 @@ window.cfgSaveBotao = async(colId, idx, tipo)=>{
     botoes[idx] = {tipo:'concluir', label:label||'Concluir'};
   }
   await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${colId}/botoes`), botoes);
+  _syncKColBotoes(colId, botoes);
   showToast('Salvo','Botão atualizado.');
   renderCfgColunas();
 };
@@ -613,7 +626,7 @@ async function _reloadKCols(){
   const data = snap.val()||{};
   state.K_COLS = Object.entries(data)
     .sort((a,b)=>(a[1].ordem||0)-(b[1].ordem||0))
-    .map(([id,c])=>({id,label:c.label||id,color:c.color||'#94A3B8'}));
+    .map(([id,c])=>({id,label:c.label||id,color:c.color||'#94A3B8', botoes:c.botoes||null, project:c.project||null}));
   if(document.getElementById('page-kanban')?.classList.contains('active')) window.renderKanban?.();
 }
 
@@ -693,6 +706,26 @@ async function _ensureArquivoCols(){
     await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo`), defaultCols);
     state.MODS = Object.entries(defaultCols).sort((a,b)=>a[1].ordem-b[1].ordem).map(([id,m])=>({id,...m}));
   }
+}
+
+// Re-sincroniza state.MODS a partir do Firebase e atualiza o board + filtro do Arquivo Morto.
+// Sem isso, criar/editar/remover/mover coluna só aparecia após recarregar a página (não havia
+// listener live em colunas_arquivo — ele é lido 1x na inicialização).
+async function _syncMODSFromFirebase(){
+  const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo`));
+  const data = snap.val()||{};
+  state.MODS = Object.entries(data)
+    .sort((a,b)=>(a[1].ordem||0)-(b[1].ordem||0))
+    .map(([id,m])=>({ id, label:m.label||id, color:m.color||'#94A3B8', months:m.months||null }));
+  // Repopula o filtro de módulos (preserva a 1ª opção "Todos"); o combobox re-sincroniza via MutationObserver
+  const sel = document.getElementById('arquivoModFilter');
+  if(sel){
+    const cur = sel.value; const first = sel.options[0];
+    sel.innerHTML=''; if(first) sel.appendChild(first);
+    state.MODS.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.label; sel.appendChild(o); });
+    if(cur && sel.querySelector(`option[value="${cur}"]`)) sel.value=cur;
+  }
+  window.renderArquivo?.();
 }
 
 // F8: alterna o estado "mostrar cards antigos" (controle movido p/ dentro da config)
@@ -868,7 +901,9 @@ window.cfgAddArquivoCol = async function(){
   if(!id){ showToast('Erro','Não foi possível gerar um identificador a partir desse nome.'); return; }
   const ordem = Object.keys(existing).length;
   await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo/${id}`),{label:nome.trim(),color:'#94A3B8',ordem,months:null});
+  await _syncMODSFromFirebase();        // ✅ aparece no board sem precisar recarregar
   await _renderArquivoColsInModal();
+  showToast('Coluna criada',`"${nome.trim()}" adicionada ao Arquivo Morto.`);
 };
 
 window.cfgSaveArquivoCol = async function(k, ordem){
@@ -883,9 +918,7 @@ window.cfgSaveArquivoCol = async function(k, ordem){
     if(!months.length) months = null; // se nenhum mês marcado, trata como especial
   }
   await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo/${k}`),{label,color,ordem,months});
-  const idx = state.MODS.findIndex(m=>m.id===k);
-  if(idx>=0) state.MODS[idx]={...state.MODS[idx],label,color,months};
-  else state.MODS.push({id:k,label,color,months});
+  await _syncMODSFromFirebase();        // re-sincroniza board + filtro
   showToast('Salvo',`Coluna "${label}" atualizada.`);
   await _renderArquivoColsInModal();
 };
@@ -902,13 +935,14 @@ window.cfgMoveArquivoCol = async function(k, dir){
   const updates = {};
   sorted.forEach(([id],i)=>{ updates[`${id}/ordem`] = i; });
   await update(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo`), updates);
+  await _syncMODSFromFirebase();        // reordena no board sem recarregar
   await _renderArquivoColsInModal();
 };
 
 window.cfgDelArquivoCol = async function(k){
   if(!confirm(`Remover coluna "${k}"? Os cards arquivados nela não serão apagados.`)) return;
   await remove(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo/${k}`));
-  state.MODS = state.MODS.filter(m=>m.id!==k);
+  await _syncMODSFromFirebase();        // some do board sem recarregar
   showToast('Removido',`Coluna "${k}" removida.`);
   await _renderArquivoColsInModal();
 };

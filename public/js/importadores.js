@@ -15,6 +15,7 @@ import {
 import {
   calcAmount, getEntriesArray, getEntriesForDay
 } from './dashboard.js';
+import { kIsAssignee } from './kanban.js';
 import { showToast, setSyncStatus } from './ui.js';
 
 // ── A5: RESOLVEDORES DINÂMICOS POR EQUIPE ────────────────────────────────────
@@ -618,7 +619,7 @@ function _avBuscarCard(nomeBusca, colabKey){
   // 2. Match com assignee correto + nome contém
   found = allCards.find(c=>
     _avNormStr(c.name).includes(normBusca) &&
-    (colabKey ? c.assignee===colabKey : true)
+    (colabKey ? kIsAssignee(c, colabKey) : true)
   );
   if(found) return {card:found, tipo:'parcial'};
 

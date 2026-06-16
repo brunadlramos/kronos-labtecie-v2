@@ -187,6 +187,9 @@ export function restoreTimerFromFirebase(timers) {
   const collab = (savedCollab && timers[savedCollab]) ? savedCollab : fallback;
   const active = timers[collab];
   if (!active || !active.startTime) return;
+  // Timer do Kanban: aparece em "Em andamento agora", mas NÃO deve restaurar a UI
+  // do timer principal (ele tem seu próprio restore via localStorage no kanban.js).
+  if (active.kanban) return;
   // Gestor: re-seleciona o colaborador do timer para que o stop/sync escrevam no lugar certo
   if (state.isManager) {
     const cs = document.getElementById('collabSelect');

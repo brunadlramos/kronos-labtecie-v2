@@ -216,7 +216,7 @@ export function renderDashboardOnline() {
         <div class="online-card-av" style="background:${av.color}">${avContent}</div>
         <div style="flex:1;min-width:0;">
           <div class="online-card-name">${escH(col.label)}</div>
-          <div class="online-card-elapsed">${fmtDur(state.elapsed)}</div>
+          <div class="online-card-elapsed">${fmtDur(Math.max(0, Date.now() - t.startTime))}</div>
         </div>
         <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);text-align:right;">
           <div style="font-weight:700;color:var(--text)">${fmtDur(dayData.totalMs)}</div>
@@ -224,7 +224,7 @@ export function renderDashboardOnline() {
         </div>
       </div>
       <div>
-        <div class="online-card-task">${escH(t.task||'Em andamento')}</div>
+        <div class="online-card-task">${escH(t.task||'Em andamento')}${t.kanban?' <span style="font-size:0.52rem;font-weight:800;color:var(--orange);border:1px solid var(--orange-border);border-radius:4px;padding:1px 4px;vertical-align:middle;">KANBAN</span>':''}</div>
         <div class="online-card-proj" style="color:${proj.color}">${escH(proj.label)}</div>
       </div>
       <div class="online-card-bar-wrap">
@@ -729,7 +729,7 @@ export function renderOnline() {
         <div class="online-card-av" style="background:${av.color}">${avContent}</div>
         <div style="flex:1;min-width:0;">
           <div class="online-card-name">${escH(col.label)}</div>
-          <div class="online-card-elapsed">${fmtDur(state.elapsed)}</div>
+          <div class="online-card-elapsed">${fmtDur(Math.max(0, Date.now() - t.startTime))}</div>
         </div>
         <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);text-align:right;">
           <div style="font-weight:700;color:var(--text)">${fmtDur(dayData.totalMs)}</div>
@@ -737,7 +737,7 @@ export function renderOnline() {
         </div>
       </div>
       <div>
-        <div class="online-card-task">${escH(t.task||'Em andamento')}</div>
+        <div class="online-card-task">${escH(t.task||'Em andamento')}${t.kanban?' <span style="font-size:0.52rem;font-weight:800;color:var(--orange);border:1px solid var(--orange-border);border-radius:4px;padding:1px 4px;vertical-align:middle;">KANBAN</span>':''}</div>
         <div class="online-card-proj" style="color:${proj.color}">${escH(proj.label)}</div>
       </div>
       <div class="online-card-bar-wrap">

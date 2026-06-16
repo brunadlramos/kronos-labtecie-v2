@@ -622,6 +622,8 @@ function _projComboOpen(open){
   if(!list) return;
   list.classList.toggle('open', open);
   inp?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // Lista é position:fixed (não cortada pelo container .content rolável) → posiciona via JS
+  if(open && inp) window._placePopover(list, inp);
   if(!open) _projComboActive = -1;
 }
 // Reconstrói a lista a partir de state.PROJECTS, filtrando por substring (case-insensitive).
@@ -685,10 +687,15 @@ window._initProjectCombo = function(){
   const list = document.getElementById('projectComboList');
   if(!inp || !list || inp._comboInit) return;
   inp._comboInit = true;
+  // Move a lista para o <body>: como é position:fixed, dentro do card (ancestral posicionado)
+  // ela ficava desalinhada/longe do campo. No body, o fixed referencia a viewport e alinha certo.
+  document.body.appendChild(list);
   // Ao focar/clicar: mostra TODOS os projetos (não filtra pelo valor atual) e seleciona o texto
   const openAll = ()=>{ _renderProjectCombo(''); _projComboOpen(true); inp.select(); };
   inp.addEventListener('focus', openAll);
   inp.addEventListener('click', openAll);
+  // BUG: faltava ligar o filtro ao digitar — sem isto a lista não busca/abre ao digitar
+  inp.addEventListener('input', ()=>window.onProjectSearchInput?.());
   inp.addEventListener('keydown', e=>{
     const items = _projComboItems();
     if(e.key==='ArrowDown'){ e.preventDefault(); if(!list.classList.contains('open')) openAll();
@@ -700,11 +707,36 @@ window._initProjectCombo = function(){
     items.forEach((el,i)=>{ el.classList.toggle('active', i===_projComboActive); });
     if(items[_projComboActive]) items[_projComboActive].scrollIntoView({block:'nearest'});
   });
-  // Clique fora fecha
+  // Clique fora fecha (lista agora vive no body, então também checa list.contains)
   document.addEventListener('mousedown', e=>{
     const combo = document.getElementById('projectCombo');
-    if(combo && !combo.contains(e.target)) _projComboOpen(false);
+    if(combo && !combo.contains(e.target) && !list.contains(e.target)) _projComboOpen(false);
   });
+  // Reposiciona a lista (fixed) ao rolar/redimensionar enquanto aberta, sem fechar
+  const reposition = ()=>{ if(list.classList.contains('open')) window._placePopover(list, inp); };
+  window.addEventListener('scroll', e=>{ if(e.target!==list && !list.contains(e.target)) reposition(); }, true);
+  window.addEventListener('resize', reposition);
+};
+
+// Posiciona um popover fixed ancorado a um campo: abre para baixo e, se não couber,
+// abre para cima; sempre limita a altura ao espaço disponível (lista rola por dentro).
+window._placePopover = function(pop, anchor){
+  if(!pop || !anchor) return;
+  const r = anchor.getBoundingClientRect();
+  const margin = 8;
+  const spaceBelow = window.innerHeight - r.bottom - margin;
+  const spaceAbove = r.top - margin;
+  pop.style.left = r.left + 'px';
+  pop.style.minWidth = r.width + 'px';
+  if(spaceBelow < 200 && spaceAbove > spaceBelow){
+    pop.style.top = '';
+    pop.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+    pop.style.maxHeight = Math.max(140, Math.min(280, spaceAbove)) + 'px';
+  } else {
+    pop.style.bottom = '';
+    pop.style.top = (r.bottom + 4) + 'px';
+    pop.style.maxHeight = Math.max(140, Math.min(280, spaceBelow)) + 'px';
+  }
 };
 
 // ── Combobox GENÉRICO: transforma um <select> nativo em campo digitável + lista rolável ──
@@ -748,7 +780,7 @@ window.enhanceSelectToCombo = function(sel){
   const optList = ()=> [...sel.options].filter(o=>!o.disabled).map(o=>({value:o.value,label:(o.textContent||'').trim()}));
   const syncInput = ()=>{ const o=sel.options[sel.selectedIndex]; input.value = o ? (o.textContent||'').trim() : ''; };
   const close = ()=>{ pop.classList.remove('open'); active=-1; input.setAttribute('aria-expanded','false'); };
-  const place = ()=>{ const r=input.getBoundingClientRect(); pop.style.left=r.left+'px'; pop.style.top=(r.bottom+4)+'px'; pop.style.minWidth=r.width+'px'; };
+  const place = ()=>{ window._placePopover(pop, input); };
   const render = (filter='')=>{
     const f=String(filter||'').trim().toLowerCase();
     const items=optList().filter(o=>!f || o.label.toLowerCase().includes(f));
@@ -1154,11 +1186,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('projectSearch')?.addEventListener('input',syncTimerDebounced);
   window._initProjectCombo?.();   // dropdown próprio do seletor de projeto (rolável + busca)
   // Converte os <select> (registro manual, card do Kanban e filtros) em comboboxes digitáveis/roláveis
-  ['mProject','mCollab','kcAssignee','kcColumn','kcModule',
+  ['mProject','mCollab','kcColumn','kcModule','collabSelect','archChoiceModSelect',
    'kanbanFilterCollab','kanbanFilterType',
    'filterCollabD','filterProjD','dashDemandasCollab',
    'arquivoModFilter','arquivoCollabFilter','arquivoTypeFilter',
-   'indColabFilter','indTipoFilter'].forEach(id=>{
+   'indMesFilter','indColabFilter','indTipoFilter'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) window.enhanceSelectToCombo?.(el);
   });

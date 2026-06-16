@@ -949,6 +949,10 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .k-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:grab;transition:all 0.18s;animation:kCardIn 0.2s ease;position:relative;}
 .k-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .k-card.dragging{opacity:0.45;cursor:grabbing;}
+/* Card urgente: borda e faixa vermelhas */
+.k-card.urgent{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger) inset;}
+.k-card.urgent::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:var(--radius-sm) 0 0 var(--radius-sm);background:var(--danger);}
+.k-card-urgent-badge{font-size:0.55rem;font-weight:800;padding:2px 6px;border-radius:4px;background:var(--danger-bg,rgba(239,68,68,0.12));border:1px solid var(--danger);color:var(--danger);letter-spacing:0.03em;}
 @keyframes kCardIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .k-card-name{font-size:0.8rem;font-weight:800;line-height:1.3;margin-bottom:7px;cursor:pointer;}
 .k-card-name:hover{color:var(--orange);}
@@ -957,6 +961,17 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .k-card-meta{display:flex;align-items:center;justify-content:space-between;margin-top:5px;}
 .k-card-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff;flex-shrink:0;}
 .k-card-assignee{display:flex;align-items:center;gap:5px;font-size:0.68rem;font-weight:700;color:var(--muted);}
+/* Avatares empilhados (vários responsáveis) */
+.k-card-av-stack{display:inline-flex;flex-shrink:0;}
+.k-card-av-stack .k-card-av{margin-left:-6px;border:1.5px solid var(--surface);box-shadow:0 0 0 1px rgba(0,0,0,0.04);}
+.k-card-av-stack .k-card-av:first-child{margin-left:0;}
+/* Chips de seleção de responsáveis no modal */
+.kc-assignee-wrap{display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;}
+.kc-assignee-chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--font);font-size:0.72rem;font-weight:700;padding:4px 9px 4px 4px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.kc-assignee-chip:hover{border-color:var(--orange-border);color:var(--text);}
+.kc-assignee-chip.on{border-color:var(--orange);background:var(--orange-light);color:var(--orange);}
+.kc-assignee-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff;flex-shrink:0;}
+.kc-assignee-order{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:999px;background:var(--orange);color:#fff;font-family:var(--mono);font-size:0.55rem;font-weight:800;}
 .k-card-hours{font-family:var(--mono);font-size:0.58rem;color:var(--success);background:var(--success-bg);border:1px solid var(--success-border);padding:2px 6px;border-radius:4px;}
 .k-card-links{margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;}
 .k-card-link{font-size:0.58rem;font-family:var(--mono);color:var(--info);background:var(--info-bg);border:1px solid var(--info-border);padding:2px 6px;border-radius:4px;text-decoration:none;white-space:nowrap;overflow:hidden;max-width:190px;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;transition:background 0.15s;}
@@ -1082,7 +1097,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 /* Dropdown próprio do seletor de projeto do Timer (rolável, com busca) */
 .proj-combo{ position:relative; }
 .proj-combo-list{
-  display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:300;
+  display:none; position:fixed; z-index:100001;
   min-width:220px; max-width:320px; max-height:280px; overflow-y:auto;
   background:var(--surface); border:1px solid var(--border); border-radius:10px;
   box-shadow:0 8px 28px rgba(0,0,0,0.16); padding:4px;

@@ -189,11 +189,9 @@
         <label class="modal-label" for="kcName">Nome da disciplina</label>
         <input class="modal-input" id="kcName" type="text" placeholder="Ex: CARTOGRAFIA">
       </div>
-      <div class="modal-field">
-        <label class="modal-label" for="kcAssignee">Responsável</label>
-        <select class="modal-select" id="kcAssignee">
-          
-        </select>
+      <div class="modal-field full">
+        <label class="modal-label">Responsáveis <span style="font-weight:500;color:var(--muted)">(opcional — pode marcar mais de um)</span></label>
+        <div class="kc-assignee-wrap" id="kcAssigneeWrap"></div>
       </div>
       <div class="modal-field">
         <label class="modal-label" for="kcColumn">Coluna</label>
@@ -917,13 +915,8 @@
         <div class="section-sub">Acompanhe e gerencie o fluxo de disciplinas da equipe</div>
         <div class="equipe-filter-bar" id="equipe-filter-kanban" aria-label="Selecionar equipe"></div>
         <div class="kanban-search-bar" style="justify-content:space-between;">
-          <!-- F7: ícones outline (Arquivo Morto + Config) isolados à esquerda -->
-          <div style="display:flex;align-items:center;gap:4px;">
-            <button class="btn-icon-tool" onclick="showPage('arquivo',null)" title="Arquivo Morto" aria-label="Arquivo Morto"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></button>
-            <button class="btn-icon-tool" onclick="openKanbanColsModal()" title="Configurar colunas do Kanban" aria-label="Configurar colunas do Kanban" id="btnKanbanCols" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-          </div>
-          <!-- F7: ações/filtros à direita na ordem: Buscar, Nova Disciplina, Colaboradores, Tipos, X -->
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex:1;">
+          <!-- Ações/filtros à ESQUERDA na ordem: Buscar, Nova Disciplina, Colaboradores, Tipos, X -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-start;flex:1;">
             <div class="kanban-search-wrap">
               <input class="kanban-search kanban-search-compact" id="kanbanSearch" type="text" placeholder="Buscar disciplina..." autocomplete="off"
                 oninput="_debouncedRenderKanban(); window._updateArquivoDropdown?.(this.value)"
@@ -938,7 +931,12 @@
             <select class="filter-select" id="kanbanFilterType" onchange="renderKanban()">
               <option value="">Todos os tipos</option>
             </select>
-            <button class="btn-sm" onclick="clearKanbanFilters()" title="Limpar filtros" aria-label="Limpar filtros">✕</button>
+            <button class="btn-icon-tool" onclick="clearKanbanFilters()" title="Limpar filtros" aria-label="Limpar filtros" style="font-size:1rem;">✕</button>
+          </div>
+          <!-- Ícones de ferramenta (Arquivo Morto + Config) isolados à DIREITA -->
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+            <button class="btn-icon-tool" onclick="showPage('arquivo',null)" title="Arquivo Morto" aria-label="Arquivo Morto"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></button>
+            <button class="btn-icon-tool" onclick="openKanbanColsModal()" title="Configurar colunas do Kanban" aria-label="Configurar colunas do Kanban" id="btnKanbanCols" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
           </div>
         </div>
         <div class="kanban-board-wrap">
@@ -1181,12 +1179,9 @@
           </div>
         </div>
         <div class="equipe-filter-bar" id="equipe-filter-arquivo" aria-label="Selecionar equipe"></div>
-        <!-- F8: engrenagem outline isolada à esquerda (mesmo padrão do Fluxo de Demandas) -->
+        <!-- Filtros à ESQUERDA; engrenagem isolada à DIREITA (mesmo padrão do Fluxo de Demandas) -->
         <div class="kanban-search-bar" style="justify-content:space-between;margin:16px 0 12px;">
-          <div style="display:flex;align-items:center;gap:4px;">
-            <button class="btn-icon-tool" id="btnArquivoCols" onclick="openArquivoColsModal()" title="Configurar Arquivo Morto" aria-label="Configurar Arquivo Morto" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;flex:1;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-start;flex:1;">
             <select id="arquivoModFilter" class="filter-select" onchange="window.renderArquivo()" style="min-width:160px;">
               <option value="">Todos os módulos</option>
             </select>
@@ -1198,6 +1193,10 @@
             </select>
             <input class="kanban-search kanban-search-compact" id="arquivoSearch" type="text" placeholder="Buscar disciplina..." oninput="window._debouncedRenderArquivo()" style="min-width:160px;">
             <button id="btnArquivarTrello" class="btn-sm success" onclick="window.checkArquivoMigration?.()" style="display:none;">📦 Arquivar concluídos do Trello</button>
+          </div>
+          <!-- Engrenagem de configuração isolada à DIREITA -->
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+            <button class="btn-icon-tool" id="btnArquivoCols" onclick="openArquivoColsModal()" title="Configurar Arquivo Morto" aria-label="Configurar Arquivo Morto" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
           </div>
         </div>
         <!-- F8: estado de "mostrar cards antigos" — controle agora vive dentro da config (engrenagem) -->
