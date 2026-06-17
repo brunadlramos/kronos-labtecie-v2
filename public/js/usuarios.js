@@ -16,7 +16,7 @@ import {
   ref, push, set, update, get, remove, child, onValue
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {
-  calcDay, calcAmount, getEntriesArray, getEntriesForDay, isActive
+  calcDay, calcAmount, getEntriesArray, getEntriesForDay, isActive, getCollabAvatar, avatarInner
 } from './dashboard.js';
 import { renderCfgColaboradores } from './config.js';
 import { showToast, setSyncStatus } from './ui.js';
@@ -98,7 +98,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID){
 
     return `<div class="user-mgmt-card${active?'':' inactive'}">
       <div class="user-mgmt-card-header">
-        <div class="user-mgmt-av" style="background:${color};${active?'':'filter:grayscale(0.5);opacity:0.7'}">${escH(initials)}</div>
+        <div class="user-mgmt-av" style="background:${color};overflow:hidden;${active?'':'filter:grayscale(0.5);opacity:0.7'}">${(()=>{const _p=getCollabAvatar(key).photo;return _p?`<img src="${_p}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`:escH(initials);})()}</div>
         <div style="flex:1;min-width:0;">
           <div class="user-mgmt-name">${escH(u.nome||key)}</div>
           <div class="user-mgmt-email">${escH(u.email||'')}</div>

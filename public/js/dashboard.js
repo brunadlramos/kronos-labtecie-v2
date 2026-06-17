@@ -32,6 +32,14 @@ export function calcAmount(proj, ms) {
 }
 
 // ── getDailyGoalMs ─────────────────────────────────────────────────────────────
+// Duração (ms) de uma janela de ausência "HH:MM"→"HH:MM" (0 se inválida/negativa)
+function _ausDurMs(ini, fim){
+  const p = s => { const m=/^(\d{1,2}):(\d{2})$/.exec(String(s||'').trim()); return m ? (+m[1])*60 + (+m[2]) : null; };
+  const a = p(ini), b = p(fim);
+  if(a===null || b===null) return 0;
+  return Math.max(0, (b - a)) * 60000;
+}
+
 export function getDailyGoalMs(dateOrDk, collabKey=null) {
   let dow;
   let dk;
@@ -45,15 +53,28 @@ export function getDailyGoalMs(dateOrDk, collabKey=null) {
   }
   if(dow===6||dow===0) return 0;
   if(state.allHolidays?.[_dkToISO(dk)]) return 0;
+
+  let base;
   if(collabKey && state.COLLAB_HOURS[collabKey]?.horasDia !== undefined) {
-    return state.COLLAB_HOURS[collabKey].horasDia * MS_PER_HOUR;
+    base = state.COLLAB_HOURS[collabKey].horasDia * MS_PER_HOUR;
+  } else {
+    const dowKey = _DOW_KEY[dow];
+    if(state._cfgMetasDias && state._cfgMetasDias[dowKey] !== undefined) base = state._cfgMetasDias[dowKey] * MS_PER_HOUR;
+    else if(dow===5) base = 8 * MS_PER_HOUR;
+    else base = state.DAILY_GOAL_MS;
   }
-  const dowKey = _DOW_KEY[dow];
-  if(state._cfgMetasDias && state._cfgMetasDias[dowKey] !== undefined) {
-    return state._cfgMetasDias[dowKey] * MS_PER_HOUR;
+
+  // Ausências recorrentes (ex.: estágio) reduzem a meta do dia automaticamente,
+  // para o colaborador não precisar registrar nem ser penalizado no % do dia.
+  if(collabKey){
+    const aus = state.COLLAB_HOURS[collabKey]?.ausencias;
+    if(Array.isArray(aus)){
+      let absMs = 0;
+      aus.forEach(a=>{ if(a && Number(a.dow)===dow) absMs += _ausDurMs(a.ini, a.fim); });
+      base = Math.max(0, base - absMs);
+    }
   }
-  if(dow===5) return 8 * MS_PER_HOUR;
-  return state.DAILY_GOAL_MS;
+  return base;
 }
 
 // ── getEntriesArray (cached) ───────────────────────────────────────────────────
@@ -105,17 +126,31 @@ export function calcDay(collabKey, dk) {
 
 // ── getCollabAvatar ────────────────────────────────────────────────────────────
 const _AV_HEX = /^#[0-9a-fA-F]{3,8}$/;
+const _AV_PHOTO = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
 export function getCollabAvatar(key) {
   const av = state.allAvatars[key];
   const col = state.COLLABS[key] || {initials:'?', color:'#94A3B8'};
   // Bug XSS: av.emoji/av.color são graváveis pelo colaborador (avatars/$key sem .validate).
   // Escapar emoji e validar cor na origem neutraliza todos os pontos de consumo (innerHTML/style).
-  if(av) return {
-    display: escH(av.emoji || col.initials),
-    color: _AV_HEX.test(String(av.color||'')) ? av.color : (col.color || '#94A3B8'),
-    isEmoji: !!av.emoji
-  };
-  return { display: escH(col.initials), color: col.color, isEmoji: false };
+  if(av) {
+    const photo = (typeof av.foto === 'string' && _AV_PHOTO.test(av.foto)) ? av.foto : null;
+    return {
+      display: escH(av.emoji || col.initials),
+      color: _AV_HEX.test(String(av.color||'')) ? av.color : (col.color || '#94A3B8'),
+      isEmoji: !!av.emoji && !photo,
+      photo
+    };
+  }
+  return { display: escH(col.initials), color: col.color, isEmoji: false, photo: null };
+}
+
+// HTML interno de um avatar circular: foto (img) tem prioridade; senão emoji/iniciais.
+// Use dentro de um container redondo (border-radius:50%) já com cor de fundo.
+export function avatarInner(av){
+  if(av && av.photo) return `<img src="${av.photo}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`;
+  return av && av.isEmoji
+    ? `<span style="font-size:1.1rem">${av.display}</span>`
+    : `<span style="font-weight:800;color:#fff">${av && av.display || '?'}</span>`;
 }
 
 // ── chartPalette ───────────────────────────────────────────────────────────────
@@ -208,9 +243,7 @@ export function renderDashboardOnline() {
     const dayData = calcDay(k, dk);
     const barW = Math.min(dayData.percTime, 100);
     const barColor = barW>=100 ? 'var(--success)' : 'var(--orange)';
-    const avContent = av.isEmoji
-      ? `<span style="font-size:1.1rem">${av.display}</span>`
-      : `<span style="font-size:0.68rem;font-weight:800;color:#fff">${av.display}</span>`;
+    const avContent = avatarInner(av);
     return `<div class="online-card">
       <div class="online-card-header">
         <div class="online-card-av" style="background:${av.color}">${avContent}</div>
@@ -273,7 +306,7 @@ export function renderDashCards() {
     const rankCls = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     return `<div class="collab-card">
       <div class="collab-card-header">
-        <div class="collab-card-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'1.1rem':'0.68rem'}">${getCollabAvatar(c.key).display}</div>
+        <div class="collab-card-av" style="background:${getCollabAvatar(c.key).color};overflow:hidden;">${avatarInner(getCollabAvatar(c.key))}</div>
         <div><div class="collab-card-name">${c.label}</div><div class="collab-card-rank ${rankCls}">${rankIcon} ${rank}º lugar</div></div>
       </div>
       <div class="collab-card-stats">
@@ -460,7 +493,7 @@ export function renderMeuDashboard() {
   tbody.innerHTML = `<tr>
     <td style="padding:8px 10px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="width:28px;height:28px;border-radius:50%;background:${av.color};display:flex;align-items:center;justify-content:center;font-size:${av.isEmoji?'0.85rem':'0.55rem'};font-weight:800;color:#fff;flex-shrink:0;">${av.display}</div>
+        <div style="width:28px;height:28px;border-radius:50%;background:${av.color};display:flex;align-items:center;justify-content:center;font-size:${av.isEmoji?'0.85rem':'0.55rem'};font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">${avatarInner(av)}</div>
         <span style="font-size:0.82rem;font-weight:700;">${col.label}</span>
       </div>
     </td>
@@ -721,9 +754,7 @@ export function renderOnline() {
     const dayData = calcDay(k, dk);
     const barW = Math.min(dayData.percTime, 100);
     const barColor = barW>=100 ? 'var(--success)' : 'var(--orange)';
-    const avContent = av.isEmoji
-      ? `<span style="font-size:1.1rem">${av.display}</span>`
-      : `<span style="font-size:0.68rem;font-weight:800;color:#fff">${av.display}</span>`;
+    const avContent = avatarInner(av);
     return `<div class="online-card">
       <div class="online-card-header">
         <div class="online-card-av" style="background:${av.color}">${avContent}</div>

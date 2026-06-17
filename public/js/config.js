@@ -4,10 +4,10 @@
 
 import { app as state } from './state.js';
 import { ICONS }        from './icons.js';
-import { escH, fmtDur, fmtShortDate, dKey, getWeekDays } from './utils.js';
+import { escH, fmtDur, fmtShortDate, dKey, getWeekDays, resizeImageToDataURL } from './utils.js';
 import {
   db, auth, kanbanRef, customTagsRef, removedTagsRef,
-  customProjectsRef, usersRef, notifsRef, EQUIPE_ID
+  customProjectsRef, usersRef, notifsRef, avatarsRef, EQUIPE_ID
 } from './firebase-refs.js';
 import { sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
@@ -91,6 +91,8 @@ export async function renderCfgColaboradores(targetEl){
           <td style="text-align:center"><input type="checkbox" ${u.curadora?'checked':''} id="ucr_${uid}"></td>
           <td style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-sm" onclick="cfgSaveColaborador('${uid}')">${ICONS.save} Salvar</button>
+            <button class="btn-sm" onclick="openAusenciasModal('${uid}')" title="Ausências recorrentes (ex.: estágio)" style="font-size:0.7rem;">⏰ Ausências${Array.isArray(u.ausencias)&&u.ausencias.length?` (${u.ausencias.length})`:''}</button>
+            <label class="btn-sm" style="cursor:pointer;font-size:0.7rem;" title="Foto do colaborador">📷 Foto<input type="file" accept="image/*" onchange="cfgUploadColabFoto('${escH(u.key||uid)}', this)" style="display:none;"></label>
             ${u.email?`<button class="btn-sm" onclick="cfgResetPassword('${escH(u.email)}')" title="Redefinir senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
           </td>
         </tr>`).join('')}
@@ -139,6 +141,108 @@ window.cfgSaveColaborador = async function(uid){
   if(horasDia !== null)   state.COLLAB_HOURS[key] = {...(state.COLLAB_HOURS[key]||{}), horasDia};
   if(horasSemana !== null) state.COLLAB_HOURS[key] = {...(state.COLLAB_HOURS[key]||{}), horasSemana};
   showToast('Salvo',`${nome} atualizado.`);
+};
+
+// Gestão define a foto de um colaborador (base64 reduzido, sem Storage)
+window.cfgUploadColabFoto = async (key, input)=>{
+  const file = input.files && input.files[0];
+  if(!file){ return; }
+  try{
+    const dataUrl = await resizeImageToDataURL(file, 128, 0.72);
+    if(dataUrl.length > 60000){ showToast('Imagem muito pesada','Tente uma foto menor/mais simples.'); return; }
+    await update(child(avatarsRef, key), { foto: dataUrl });   // só o campo foto (preserva emoji/cor/nome)
+    state.allAvatars[key] = { ...(state.allAvatars[key]||{}), foto: dataUrl };
+    registrarLog('usuario','Atualizou foto do colaborador', key);
+    showToast('Foto atualizada','A foto do colaborador foi salva.');
+    try { window.renderDashboard?.(); } catch(e){}
+  }catch(e){
+    showToast('Erro','Não foi possível salvar a foto.');
+    console.error('[cfgUploadColabFoto]', e);
+  } finally { input.value=''; }
+};
+
+// ── AUSÊNCIAS RECORRENTES (ex.: estágio) ──────────────────────────────────────
+// Janelas fixas por dia da semana que reduzem a meta do dia automaticamente.
+const _DOW_LABELS = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+window.openAusenciasModal = async function(uid){
+  const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/usuarios/${uid}`));
+  const u = snap.val()||{};
+  window._ausUid  = uid;
+  window._ausKey  = u.key || uid;
+  window._ausNome = u.nome || u.key || uid;
+  window._ausList = Array.isArray(u.ausencias) ? u.ausencias.map(a=>({...a})) : [];
+  let modal = document.getElementById('ausenciasModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'ausenciasModal';
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    document.body.appendChild(modal);
+  }
+  _renderAusenciasModal();
+  modal.classList.add('open');
+};
+window.closeAusenciasModal = ()=>{ document.getElementById('ausenciasModal')?.classList.remove('open'); };
+function _renderAusenciasModal(){
+  const modal = document.getElementById('ausenciasModal'); if(!modal) return;
+  const list = window._ausList||[];
+  const linhas = list.length ? list.map((a,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
+      <div style="flex:1;font-size:0.78rem;"><strong>${escH(_DOW_LABELS[a.dow]||'?')}</strong> · ${escH(a.ini||'')}–${escH(a.fim||'')}${a.motivo?` · <span style="color:var(--muted)">${escH(a.motivo)}</span>`:''}</div>
+      <button class="btn-sm danger" onclick="removeAusencia(${i})" style="font-size:0.7rem;" aria-label="Remover">${ICONS.trash}</button>
+    </div>`).join('') : `<div style="font-size:0.78rem;color:var(--muted);padding:6px 0;">Nenhuma ausência cadastrada.</div>`;
+  modal.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <div class="modal-title">Ausências de ${escH(window._ausNome||'')}</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin:-6px 0 14px;line-height:1.5;">Janelas fixas por dia da semana (ex.: estágio). A meta do dia é reduzida automaticamente nesse período — o colaborador não precisa registrar.</div>
+      <div style="margin-bottom:12px;">${linhas}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--border);padding-top:12px;">
+        <div><label class="modal-label" for="ausDow">Dia</label>
+          <select class="modal-select" id="ausDow" style="width:120px;">
+            ${[1,2,3,4,5].map(d=>`<option value="${d}">${_DOW_LABELS[d]}</option>`).join('')}
+          </select></div>
+        <div><label class="modal-label" for="ausIni">Início</label>
+          <input class="modal-input" type="time" id="ausIni" style="width:110px;" value="13:00"></div>
+        <div><label class="modal-label" for="ausFim">Fim</label>
+          <input class="modal-input" type="time" id="ausFim" style="width:110px;" value="15:00"></div>
+        <div style="flex:1;min-width:120px;"><label class="modal-label" for="ausMotivo">Motivo</label>
+          <input class="modal-input" type="text" id="ausMotivo" placeholder="Ex.: estágio" maxlength="60"></div>
+        <button class="btn-sm" onclick="addAusencia()" style="height:var(--ctrl-h);">+ Adicionar</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAusenciasModal()">Cancelar</button>
+        <button class="btn-save" onclick="saveAusencias()">Salvar</button>
+      </div>
+    </div>`;
+}
+window.addAusencia = ()=>{
+  const dow = parseInt(document.getElementById('ausDow')?.value,10);
+  const ini = document.getElementById('ausIni')?.value||'';
+  const fim = document.getElementById('ausFim')?.value||'';
+  const motivo = (document.getElementById('ausMotivo')?.value||'').trim().slice(0,60);
+  if(!ini || !fim){ showToast('⚠️ Atenção','Informe início e fim.'); return; }
+  if(fim <= ini){ showToast('⚠️ Atenção','O fim deve ser depois do início.'); return; }
+  window._ausList = window._ausList||[];
+  window._ausList.push({dow, ini, fim, motivo});
+  _renderAusenciasModal();
+};
+window.removeAusencia = (i)=>{ (window._ausList||[]).splice(i,1); _renderAusenciasModal(); };
+window.saveAusencias = async ()=>{
+  const uid = window._ausUid, key = window._ausKey;
+  const list = window._ausList||[];
+  try{
+    await update(ref(db,`equipes/${EQUIPE_ID}/config/usuarios/${uid}`), { ausencias: list.length ? list : null });
+    state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), ausencias: list.length ? list : undefined };
+    registrarLog('config','Atualizou ausências', `${window._ausNome} (${list.length})`);
+    showToast('Salvo','Ausências atualizadas. A meta do dia será ajustada automaticamente.');
+    closeAusenciasModal();
+    try { window.renderDashboard?.(); } catch(e){}
+    await renderCfgColaboradores(document.getElementById('usuariosConfigArea')||document.getElementById('cfgContent'));
+  }catch(e){
+    showToast('Erro','Não foi possível salvar as ausências.');
+    console.error('[saveAusencias]', e);
+  }
 };
 
 // ── CFG: GERAL ───────────────────────────────────────────────────────────────

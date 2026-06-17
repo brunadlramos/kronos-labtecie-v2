@@ -5,7 +5,7 @@ import { app as state } from './state.js';
 import { ICONS }        from './icons.js';
 import {
   escH, dKey, fmtDur, fmtTime, fmtDate, fmtShortDate,
-  todayKey, getWeekDays, sanitizeUrl
+  todayKey, getWeekDays, sanitizeUrl, resizeImageToDataURL
 } from './utils.js';
 import {
   db, kanbanRef, entriesRef, approvalRequestsRef, notifsRef,
@@ -1930,9 +1930,16 @@ export function initAvatarsListener() {
 function updateSidebarAvatar(av){
   const el = document.getElementById('sidebarAv');
   if(el){
-    el.textContent = av.emoji||state.COLLABS[state.currentCollabKey]?.initials||'?';
-    el.style.background = av.color||state.COLLABS[state.currentCollabKey]?.color||'#F15A24';
-    el.style.fontSize = av.emoji ? '1.1rem' : '0.7rem';
+    const photo = (typeof av.foto==='string' && /^data:image\//.test(av.foto)) ? av.foto : null;
+    if(photo){
+      el.innerHTML = `<img src="${av.foto}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`;
+      el.style.overflow = 'hidden';
+    } else {
+      el.innerHTML = '';
+      el.textContent = av.emoji||state.COLLABS[state.currentCollabKey]?.initials||'?';
+      el.style.background = av.color||state.COLLABS[state.currentCollabKey]?.color||'#F15A24';
+      el.style.fontSize = av.emoji ? '1.1rem' : '0.7rem';
+    }
   }
   // D8: nome de exibição na sidebar
   const nameEl = document.getElementById('sidebarName');
@@ -1983,15 +1990,42 @@ window.selectColorWheel = (color)=>{
 function updateAvatarPreview(){
   const p = document.getElementById('avatarPreview');
   if(!p) return;
-  p.textContent = avatarState.emoji||'😊';
-  p.style.background = avatarState.color||'#F15A24';
+  const rm = document.getElementById('avatarRemovePhotoBtn');
+  if(avatarState.foto && /^data:image\//.test(avatarState.foto)){
+    p.innerHTML = `<img src="${avatarState.foto}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`;
+    if(rm) rm.style.display = '';
+  } else {
+    p.innerHTML = '';
+    p.textContent = avatarState.emoji||'😊';
+    p.style.background = avatarState.color||'#F15A24';
+    if(rm) rm.style.display = 'none';
+  }
 }
+window.handleAvatarPhoto = async (input)=>{
+  const file = input.files && input.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await resizeImageToDataURL(file, 128, 0.72);
+    // Guarda de tamanho: evita estourar o banco (foto deve ser pequena)
+    if(dataUrl.length > 60000){
+      showToast('Imagem muito pesada','Tente uma foto menor/mais simples.'); return;
+    }
+    avatarState.foto = dataUrl;
+    updateAvatarPreview();
+  }catch(e){
+    showToast('Erro','Não foi possível processar a imagem.');
+    console.error('[handleAvatarPhoto]', e);
+  } finally { input.value=''; }
+};
+window.removeAvatarPhoto = ()=>{ avatarState.foto = null; updateAvatarPreview(); };
 window.saveAvatar = async()=>{
   // D8: salva emoji, cor e nome de exibição (campos explícitos — evita lixo do estado)
   // SEC: remove <> — o nome vai para state.COLLABS[].label, usado em templates sem escH
   const nome = (document.getElementById('avatarNameInput')?.value||'').trim().replace(/[<>]/g,'').slice(0,40);
   const toSave = { emoji: avatarState.emoji||'😊', color: avatarState.color||'#F15A24' };
   if(nome) toSave.nome = nome;
+  // set() sobrescreve o nó: incluir foto quando houver; omitir = remover a foto
+  if(avatarState.foto && /^data:image\//.test(avatarState.foto)) toSave.foto = avatarState.foto;
   await set(child(avatarsRef, state.currentCollabKey), toSave);
   if(nome && state.COLLABS[state.currentCollabKey]) state.COLLABS[state.currentCollabKey].label = nome;
   avatarState = toSave;

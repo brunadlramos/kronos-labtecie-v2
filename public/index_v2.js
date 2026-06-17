@@ -211,6 +211,8 @@ function _applyConfig(cfg){
         // Metas individuais de jornada
         if(u.horasDia  !== undefined) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), horasDia:  u.horasDia  };
         if(u.horasSemana !== undefined) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), horasSemana: u.horasSemana };
+        // Ausências recorrentes (ex.: estágio) — reduzem a meta do dia automaticamente
+        if(Array.isArray(u.ausencias) && u.ausencias.length) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), ausencias: u.ausencias };
       } else if(u.papel === 'rh' || u.papel === 'auditor' || u.papel === 'coordenador'){
         if(em) state.AUDITOR_EMAILS.push(em);
         if(em) state.MANAGER_PROFILES[em] = { label:_clean(u.nome||em), initials:_clean(u.iniciais||'??'), color:_color(u.cor), role:'Coordenador' };

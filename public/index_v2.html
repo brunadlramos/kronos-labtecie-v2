@@ -107,8 +107,15 @@
   <div class="avatar-modal">
     <div class="modal-title" id="avatarModalTitle">✏️ Personalizar Perfil</div>
     <div style="text-align:center;margin-bottom:16px;">
-      <div class="avatar-preview" id="avatarPreview">😊</div>
+      <div class="avatar-preview" id="avatarPreview" style="overflow:hidden;">😊</div>
       <div style="font-size:0.75rem;color:var(--muted);font-weight:600;">Prévia do seu avatar</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+        <label class="btn-sm" style="cursor:pointer;font-weight:700;">📷 Enviar foto
+          <input type="file" accept="image/*" onchange="handleAvatarPhoto(this)" style="display:none;">
+        </label>
+        <button class="btn-sm" id="avatarRemovePhotoBtn" onclick="removeAvatarPhoto()" style="display:none;">Remover foto</button>
+      </div>
+      <div style="font-size:0.66rem;color:var(--muted);margin-top:6px;">A foto é reduzida e salva pequena (sem custo). Se houver foto, ela tem prioridade sobre o emoji.</div>
     </div>
     <label class="modal-label" style="margin-bottom:6px;display:block;" for="avatarNameInput">Seu nome de exibição</label>
     <input class="modal-input" id="avatarNameInput" type="text" maxlength="40" placeholder="Como seu nome aparece para a equipe" style="width:100%;margin-bottom:16px;">

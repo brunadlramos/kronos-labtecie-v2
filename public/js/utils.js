@@ -94,3 +94,29 @@ export function getMonthWeeks(year, month){
   }
   return weeks;
 }
+
+// Redimensiona/comprime uma imagem (File) p/ um quadrado pequeno e devolve um data URL JPEG.
+// Usado nas fotos de colaborador (base64 no banco — sem Firebase Storage/custo).
+// max = lado máximo em px; quality = compressão JPEG (0–1).
+export function resizeImageToDataURL(file, max = 128, quality = 0.72){
+  return new Promise((resolve, reject) => {
+    if(!file || !/^image\//.test(file.type)) { reject(new Error('Arquivo não é uma imagem.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Imagem inválida.'));
+      img.onload = () => {
+        const side = Math.min(img.width, img.height);           // recorte central quadrado
+        const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = max; canvas.height = max;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, max, max);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
