@@ -89,6 +89,23 @@
 
         "users": {
           ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))"
+        },
+
+        "logs": {
+          ".read": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'",
+          ".indexOn": ["ts"],
+          "$logId": {
+            ".write": "auth != null && ((!data.exists() && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)) || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin')",
+            ".validate": "newData.hasChildren(['ts','action']) && newData.child('ts').isNumber() && newData.child('action').isString() && newData.child('action').val().length <= 200 && (!newData.child('detail').exists() || (newData.child('detail').isString() && newData.child('detail').val().length <= 400))"
+          }
+        },
+
+        "indicadoresManuais": {
+          ".indexOn": ["ajuste_avaliado_em"],
+          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
+          "$id": {
+            ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 120 && (!newData.child('assignee').exists() || newData.child('assignee').isString()) && (!newData.child('curador').exists() || newData.child('curador').isString()))"
+          }
         }
 
       }

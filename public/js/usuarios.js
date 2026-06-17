@@ -20,6 +20,7 @@ import {
 } from './dashboard.js';
 import { renderCfgColaboradores } from './config.js';
 import { showToast, setSyncStatus } from './ui.js';
+import { registrarLog } from './log.js';
 
 // ── USER MANAGEMENT ──────────────────────────────────────────────────────────
 
@@ -42,9 +43,9 @@ export async function renderUsuarios(){
   const grid = document.getElementById('usuariosGrid');
   if(!grid) return;
 
-  // Admin: visão consolidada de TODAS as equipes
+  // Admin: visão consolidada de TODAS as equipes (com edição)
   if(state.userPapel === 'admin'){
-    await _renderUsuariosAdmin(grid);
+    await _renderUsuariosAdmin(grid, true);
     return;
   }
 
@@ -58,6 +59,14 @@ export async function renderUsuarios(){
     }
   }
 
+  // Coordenação (coordenador/auditor/rh): vê TODOS os colaboradores de TODAS as equipes,
+  // igual ao admin, porém somente leitura (edição segue restrita a gestora/admin).
+  if(state.isAuditor){
+    await _renderUsuariosAdmin(grid, false);
+    return;
+  }
+
+  // Gestora: somente a própria equipe
   const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/usuarios`));
   const data = snap.val()||{};
   grid.innerHTML = _buildUserCards(Object.entries(data), state.isManager);
@@ -105,7 +114,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID){
   }).join('');
 }
 
-async function _renderUsuariosAdmin(grid){
+async function _renderUsuariosAdmin(grid, canEdit = true){
   const equipes = state.userEquipes?.length ? state.userEquipes : ['diagramacao','revisao','audiovisual','insercao'];
   grid.innerHTML = `<div style="color:var(--muted);font-size:0.78rem;padding:8px 0;">Carregando todas as equipes...</div>`;
 
@@ -134,7 +143,7 @@ async function _renderUsuariosAdmin(grid){
         <span style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">${escH(eqLabel)}</span>
         <span style="font-size:0.65rem;color:var(--muted);margin-left:6px;">${count} usuário${count!==1?'s':''}</span>
       </div>
-      ${_buildUserCards(entries, true, eqId)}`;
+      ${_buildUserCards(entries, canEdit, eqId)}`;
   }).join('');
 }
 
@@ -417,6 +426,7 @@ window.saveNovoColab = async function(){
 
     document.getElementById('editColabModal').style.display='none';
     showToast('Colaborador criado',`${nome} foi adicionado. Já pode fazer login com o e-mail e senha informados.`);
+    registrarLog('usuario','Criou colaborador', `${nome} (${email})`);
     const cfgArea=document.getElementById('usuariosConfigArea');
     if(cfgArea) cfgArea.removeAttribute('data-loaded');
     await renderUsuarios();
@@ -483,6 +493,7 @@ window.saveEditColab = async function(uid){
     ? `${nome} movido para ${EQUIPE_LABELS[eqIdNova]||eqIdNova}.`
     : `${nome} atualizado.`;
   showToast('Salvo', msg);
+  registrarLog('usuario','Editou colaborador', msg);
   renderUsuarios();
 };
 

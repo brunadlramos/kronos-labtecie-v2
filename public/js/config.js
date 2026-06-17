@@ -15,6 +15,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { _refreshKColSelect, _initKColState } from './kanban.js';
 import { showToast, setSyncStatus } from './ui.js';
+import { registrarLog } from './log.js';
 
 // Gera um ID a partir do NOME (sem acentos, minúsculo, _). O gestor só digita o nome.
 function _slugify(nome){
@@ -174,6 +175,7 @@ window.cfgSaveGeral = async function(){
   const ttl = document.getElementById('topbarTeamName');
   if(ttl) ttl.textContent = nome;
   showToast('Salvo','Nome da equipe atualizado.');
+  registrarLog('config','Alterou configurações gerais', nome);
 };
 
 // ── V2: SCRIPT DE INICIALIZAÇÃO ──────────────────────────────────────────────
@@ -264,6 +266,7 @@ window.cfgAddProjeto = async function(){
   const id = _uniqueId(_slugify(nome), existing);
   if(!id){ showToast('Erro','Não foi possível gerar um identificador a partir desse nome.'); return; }
   await set(ref(db,`equipes/${EQUIPE_ID}/config/projetos/${id}`),{label:nome.trim(),color:'#94A3B8',amountPerHour:0});
+  registrarLog('config','Criou projeto', nome.trim());
   _refreshProjectSelects();
   await renderCfgProjetos();
 };
@@ -286,6 +289,7 @@ window.cfgDelProjeto = async function(k){
   _refreshProjectSelects();
   await renderCfgProjetos();
   showToast('Removido',`Projeto "${k}" removido.`);
+  registrarLog('config','Removeu projeto', k);
 };
 
 // Reconstrói todos os selects de colaborador a partir do state.COLLABS carregado
@@ -639,6 +643,7 @@ window.cfgAddColuna = async function(fromModal=false){
   if(!id){ showToast('Erro','Não foi possível gerar um identificador a partir desse nome.'); return; }
   const ordem = Object.keys(existing).length;
   await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${id}`),{label:nome.trim(),color:'#94A3B8',ordem});
+  registrarLog('config','Criou coluna do Kanban', nome.trim());
   await _reloadKCols();
   await renderCfgColunas();
 };
@@ -654,6 +659,7 @@ window.cfgSaveColuna = async function(k, ordem, fromModal=false){
   if(botoes) data.botoes = botoes;
   await set(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${k}`), data);
   await _reloadKCols();
+  registrarLog('config','Editou coluna do Kanban', label);
   showToast('Salvo',`Coluna "${label}" atualizada.`);
   await renderCfgColunas();
 };
@@ -679,6 +685,7 @@ window.cfgMoveColuna = async function(k, dir, fromModal=false){
 window.cfgDelColuna = async function(k, fromModal=false){
   if(!confirm(`Remover coluna "${k}"? Cards existentes precisarão ser movidos.`)) return;
   await remove(ref(db,`equipes/${EQUIPE_ID}/config/colunas/${k}`));
+  registrarLog('config','Removeu coluna do Kanban', k);
   await _reloadKCols();
   await renderCfgColunas();
 };
@@ -904,6 +911,7 @@ window.cfgAddArquivoCol = async function(){
   await _syncMODSFromFirebase();        // ✅ aparece no board sem precisar recarregar
   await _renderArquivoColsInModal();
   showToast('Coluna criada',`"${nome.trim()}" adicionada ao Arquivo Morto.`);
+  registrarLog('config','Criou coluna do Arquivo Morto', nome.trim());
 };
 
 window.cfgSaveArquivoCol = async function(k, ordem){
@@ -944,6 +952,7 @@ window.cfgDelArquivoCol = async function(k){
   await remove(ref(db,`equipes/${EQUIPE_ID}/config/colunas_arquivo/${k}`));
   await _syncMODSFromFirebase();        // some do board sem recarregar
   showToast('Removido',`Coluna "${k}" removida.`);
+  registrarLog('config','Removeu coluna do Arquivo Morto', k);
   await _renderArquivoColsInModal();
 };
 

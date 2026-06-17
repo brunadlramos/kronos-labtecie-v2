@@ -9,7 +9,7 @@ import {
 } from './utils.js';
 import {
   db, kanbanRef, entriesRef, approvalRequestsRef, notifsRef,
-  usersRef, avatarsRef, arquivoRef, activeTimersRef, EQUIPE_ID
+  usersRef, avatarsRef, arquivoRef, activeTimersRef, indicadoresManuaisRef, EQUIPE_ID
 } from './firebase-refs.js';
 import {
   ref, push, set, update, get, remove, child, onValue, query, orderByChild
@@ -17,6 +17,7 @@ import {
 import { isActive, calcDay, getCollabAvatar, getDailyGoalMs, renderDashCards } from './dashboard.js';
 import { showToast, setSyncStatus, trapFocus, releaseFocus, renderDebounced } from './ui.js';
 import { stopTimer }                 from './timer.js';
+import { registrarLog }              from './log.js';
 
 export function isManagerUser(){
   return state.currentUser && (state.userPapel === 'gestora' || state.userPapel === 'admin');
@@ -204,6 +205,8 @@ function kFmtDate(ts){ return new Date(ts).toLocaleDateString('pt-BR',{day:'2-di
 // uma ação de curadoria no histórico do card; senão, quem mais logou tempo nele.
 // Retorna null quando não há como identificar (exibido como "—").
 function _getCuradoraForCard(card){
+  // 0) Curador explícito (ex.: demanda manual permite escolher o curador)
+  if(card.curador && state.COLLABS[card.curador]) return card.curador;
   // 1) Quem atuou na curadoria deste card, pelo histórico do próprio card
   if(Array.isArray(card.history)){
     const ev = [...card.history].reverse()
@@ -266,6 +269,7 @@ window.kMoveToCol = async(key, destColId)=>{
   try{
     await set(child(kanbanRef,key),{...card,column:destColId,history:hist,updatedAt:now,modifiedBy:state.currentUser?.email||'desconhecido'});
     showToast('Card movido',`→ ${kColLabel(destColId)}`);
+    registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(destColId)}`);
   }catch(err){
     showToast('Erro','Falha ao mover card. Tente novamente.');
     console.error('[kMoveToCol]',err);
@@ -519,6 +523,7 @@ window.kDrop = async (e, colId) => {
     // ✅ AUDIT: updatedAt e modifiedBy registrados em toda movimentação
     await set(child(kanbanRef, droppedKey), { ...card, column: colId, history: hist, updatedAt: now_drop, modifiedBy: state.currentUser?.email||'desconhecido' });
     showToast('Card movido', `→ ${kColLabel(colId)}`);
+    registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(colId)}`);
   } catch (err) {
     console.error('Kanban move error:', err);
     showToast('Erro', 'Falha ao mover card. Tente novamente.');
@@ -717,6 +722,7 @@ window.concludeKanbanCard = async(key)=>{
   // ✅ AUDIT: modifiedBy registrado ao concluir
   await set(child(kanbanRef, key),{...card,column:'concluido',concludedAt:now,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
   showToast('Disciplina concluída!','Card movido para Concluído.');
+  registrarLog('concluir', `Concluiu "${(card.name||'').slice(0,40)}"`);
   // Notifica todos os responsáveis (exceto quem concluiu)
   kCardAssignees(card)
     .filter(a=>a && a!==state.currentCollabKey)
@@ -741,6 +747,7 @@ window.toggleUrgente = async(key, ev)=>{
     });
     if(state.kanbanCards[key]){ state.kanbanCards[key].urgente = novo; state.kanbanCards[key].updatedAt = now; }
     showToast(novo?'🔴 Marcado como urgente':'Urgência removida', `"${(card.name||'').slice(0,30)}"`);
+    registrarLog('urgente', `${novo?'Marcou':'Removeu'} urgência`, (card.name||'').slice(0,40));
     renderKanban();
   }catch(e){
     showToast('Erro','Não foi possível atualizar a urgência.');
@@ -1040,6 +1047,7 @@ window.saveKanbanCard = async () => {
         modifiedBy: state.currentUser?.email||'desconhecido'
       });
       showToast('✅ Atualizado', `"${name.slice(0, 30)}..."`);
+      registrarLog('editar', 'Editou disciplina', name);
 
     } else {
       // ✅ FIX BUG 3: state.currentCollabKey em vez de state.currentUser
@@ -1051,6 +1059,7 @@ window.saveKanbanCard = async () => {
 
       await push(kanbanRef, cardData);
       showToast('✅ Criado', `"${name.slice(0, 30)}..." adicionado ao Kanban`);
+      registrarLog('criar', 'Criou disciplina', name);
     }
 
     closeKanbanCardModal();
@@ -1333,6 +1342,7 @@ window.saveAjuste = async(key, field, value)=>{
 
     const estrelas = '★'.repeat(lv?.stars||0) + '☆'.repeat(5-(lv?.stars||0));
     showToast('✅ Avaliação salva', `${estrelas} ${lv?.label||'—'} · nota ${lv?.nota||'?'}`);
+    registrarLog('avaliar', `Avaliou ${field==='ajuste_curadoria'?'curadoria':'demanda'}`, `${(state.kanbanCards[key]?.name||window._arquivoCards?.[key]?.name||'').slice(0,40)} · ${lv?.label||'—'}`);
 
   } catch(e){
     showToast('❌ Erro','Falha ao salvar avaliação. Verifique a conexão.');
@@ -1367,7 +1377,9 @@ function _indGetAllCards(){
   // Merge: se o card existe no kanban E no arquivo, usa o do kanban (mais fresco)
   const kanbanKeys = new Set(kCards.map(c=>c._key));
   const aFiltered  = aCards.filter(c=>!kanbanKeys.has(c._key));
-  return [...kCards,...aFiltered];
+  // Demandas manuais: existem SÓ nos Indicadores (não no Kanban/Arquivo). _key prefixado + flag.
+  const mCards = Object.entries(state.indicadoresManuais||{}).map(([k,c])=>({...c, _key:'manual_'+k, _manualKey:k, manual:true}));
+  return [...kCards,...aFiltered,...mCards];
 }
 
 // D5: indicadores de avaliação individuais — o colaborador vê só as PRÓPRIAS
@@ -1471,6 +1483,7 @@ window.renderIndicadores = ()=>{
   // Avaliados vs pendentes
   const avaliados = cards.filter(c=>c[field]);
   const pendentes = cards.filter(c=>{
+    if(c.manual) return false;   // demanda manual já entra avaliada — nunca é "pendente"
     if(!c[field] || !c.assignee) return false;
     const email = Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===c.assignee)||'';
     return !state.MANAGER_EMAILS.includes(email);
@@ -1544,14 +1557,15 @@ window.renderIndicadores = ()=>{
     avaliados.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
     tbody.innerHTML = avaliados.map(c=>{
       const lv  = ajusteLabel(c[field]);
-      // Resolve colaborador: tenta assignee, senão tenta criador pelo histórico
-      const assigneeId = c.assignee || (c.history||[]).find(h=>h.action==='Criado')?.by || '';
+      // Resolve colaborador conforme a visão: Demanda→responsável; Curadoria→curador.
+      const baseKey = (tipoF==='curadoria') ? (c.curador || _getCuradoraForCard(c)) : c.assignee;
+      const assigneeId = baseKey || c.assignee || (c.history||[]).find(h=>h.action==='Criado')?.by || '';
       const col = state.COLLABS[assigneeId]||state.COLLABS[c.assignee]||{label:c.assignee||'Não atribuído',initials:'—',color:'#94A3B8'};
       const badgeDiag = ajusteLabel(c.ajuste_diagramacao);
       const badgeCur  = ajusteLabel(c.ajuste_curadoria);
       const ts = c.ajuste_avaliado_em||c.updatedAt||0;
       return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:9px 14px;font-size:0.78rem;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="openKanbanDetail('${c._key}')" title="Abrir card">${escH(c.name||c.title||'Sem nome')}</td>
+        <td style="padding:9px 14px;font-size:0.78rem;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${c.manual?'':'cursor:pointer;'}" ${c.manual?'':`onclick="openKanbanDetail('${c._key}')"`} title="${c.manual?escH('Adicionada manualmente'+(c.motivo?': '+c.motivo:'')):'Abrir card'}">${escH(c.name||c.title||'Sem nome')}${c.manual?' <span class="ind-manual-tag">✋ manual</span>':''}</td>
         <td style="padding:9px 14px;">
           <div style="display:flex;align-items:center;gap:5px;">
             <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${col.initials}</div>
@@ -1588,6 +1602,65 @@ window.renderIndicadores = ()=>{
         <div style="font-size:0.65rem;font-family:var(--mono);color:var(--muted);">${kColLabel(c.column)||'Arquivo'}</div>
       </div>`;
     }).join('') || '<div style="font-size:0.78rem;color:var(--muted);">✅ Todos os cards avaliados!</div>';
+  }
+};
+
+// ── DEMANDA MANUAL (existe só nos Indicadores; não vai p/ Kanban nem demandas gerais) ──
+function _dmCollabOptions(placeholder){
+  return `<option value="">${escH(placeholder)}</option>` +
+    Object.entries(state.COLLABS||{}).filter(([,c])=>c.active!==false)
+      .sort((a,b)=>(a[1].label||'').localeCompare(b[1].label||'','pt-BR'))
+      .map(([k,c])=>`<option value="${escH(k)}">${escH(c.label||k)}</option>`).join('');
+}
+function _dmNivelOptions(){
+  return `<option value="">— não avaliar —</option>` +
+    AJUSTE_LEVELS.map(lv=>`<option value="${lv.id}">${escH(lv.label)} (nota ${lv.nota})</option>`).join('');
+}
+window.openDemandaManualModal = ()=>{
+  if(!state.isManager && !state.isAuditor){ showToast('Sem permissão','Apenas gestão/coordenação pode adicionar.'); return; }
+  const a = document.getElementById('dmAssignee'); if(a) a.innerHTML = _dmCollabOptions('Selecione o responsável…');
+  const cu = document.getElementById('dmCurador');  if(cu) cu.innerHTML = _dmCollabOptions('Selecione o curador…');
+  const nv = document.getElementById('dmNivel');     if(nv) nv.innerHTML = _dmNivelOptions();
+  const nc = document.getElementById('dmNivelCur');  if(nc) nc.innerHTML = _dmNivelOptions();
+  const nome=document.getElementById('dmNome'); if(nome) nome.value='';
+  const mot=document.getElementById('dmMotivo'); if(mot) mot.value='';
+  const m = document.getElementById('demandaManualModal'); m?.classList.add('open'); if(m) trapFocus(m);
+};
+window.closeDemandaManualModal = ()=>{ releaseFocus(); document.getElementById('demandaManualModal')?.classList.remove('open'); };
+window.saveDemandaManual = async()=>{
+  if(!state.isManager && !state.isAuditor){ showToast('Sem permissão',''); return; }
+  const nome     = document.getElementById('dmNome')?.value.trim()||'';
+  const assignee = document.getElementById('dmAssignee')?.value||'';
+  const nivel    = document.getElementById('dmNivel')?.value||'';
+  const curador  = document.getElementById('dmCurador')?.value||'';
+  const nivelCur = document.getElementById('dmNivelCur')?.value||'';
+  const motivo   = document.getElementById('dmMotivo')?.value.trim()||'';
+  if(!nome){ showToast('⚠️ Atenção','Informe o nome da demanda.'); return; }
+  if(!motivo){ showToast('⚠️ Atenção','Informe o motivo da adição manual.'); return; }
+  // Pelo menos uma das duas avaliações; cada avaliação preenchida exige seu colaborador.
+  if(!nivel && !nivelCur){ showToast('⚠️ Atenção','Preencha ao menos uma avaliação (Demanda ou Curadoria).'); return; }
+  if(nivel && !assignee){ showToast('⚠️ Atenção','Selecione o responsável pela Demanda.'); return; }
+  if(nivelCur && !curador){ showToast('⚠️ Atenção','Selecione o curador da Curadoria.'); return; }
+  const now = Date.now();
+  const reg = {
+    name: nome.slice(0,120),
+    motivo: motivo.slice(0,300),
+    manual: true,
+    ajuste_avaliado_em: now,
+    createdAt: now,
+    createdBy: state.currentUser?.email || 'desconhecido'
+  };
+  if(nivel){ reg.assignee = assignee; reg.ajuste_diagramacao = nivel; reg.ajuste_diagramacao_obs = motivo.slice(0,300); }
+  if(nivelCur){ reg.curador = curador; reg.ajuste_curadoria = nivelCur; reg.ajuste_curadoria_obs = motivo.slice(0,300); }
+  try{
+    await push(indicadoresManuaisRef, reg);
+    registrarLog('avaliar','Adicionou demanda manual', `${nome}${nivel?` · Demanda ${ajusteLabel(nivel)?.label||nivel}`:''}${nivelCur?` · Curadoria ${ajusteLabel(nivelCur)?.label||nivelCur}`:''}`);
+    showToast('✅ Demanda manual adicionada','Aparece somente nos Indicadores.');
+    closeDemandaManualModal();
+    renderIndicadores();
+  }catch(e){
+    showToast('Erro','Não foi possível salvar a demanda manual.');
+    console.error('[saveDemandaManual]', e);
   }
 };
 

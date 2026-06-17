@@ -1132,6 +1132,16 @@ body.dark .combo-input{ background:var(--surface2); border-color:var(--border); 
 .combo-opt:hover, .combo-opt.active{ background:var(--orange-light); color:var(--orange); }
 .combo-empty{ padding:8px 12px; font-size:0.78rem; color:var(--muted); }
 body.dark .combo-pop{ background:var(--surface2); border-color:var(--border); }
+/* Banco de Log */
+.log-row{ display:flex; gap:10px; align-items:flex-start; padding:9px 10px; border-bottom:1px solid var(--border); }
+.log-row:hover{ background:var(--surface2); }
+.log-row-icon{ flex-shrink:0; font-size:0.95rem; line-height:1.3; width:20px; text-align:center; }
+.log-row-body{ flex:1; min-width:0; }
+.log-row-action{ font-size:0.8rem; font-weight:700; color:var(--text); }
+.log-row-detail{ font-weight:500; color:var(--muted); }
+.log-row-meta{ font-size:0.66rem; color:var(--muted); margin-top:2px; font-family:var(--mono); }
+/* Tag de demanda manual nos Indicadores */
+.ind-manual-tag{ font-size:0.55rem; font-weight:800; color:var(--orange); background:var(--orange-light); border:1px solid var(--orange-border); border-radius:4px; padding:1px 5px; vertical-align:middle; white-space:nowrap; }
 .btn-add-proj{
   width:26px;height:26px;
   border-radius:var(--ctrl-r);

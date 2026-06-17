@@ -54,6 +54,7 @@ export const app = {
   muralPosts:       {},
   allAvatars:       {},
   usersConfig:      {},            // {collabKey: {active: bool}}
+  indicadoresManuais: {},          // demandas adicionadas manualmente (só Indicadores)
 
   // ── Memoização de entries ─────────────────────────────────────────────────
   _entriesVersion:      0,

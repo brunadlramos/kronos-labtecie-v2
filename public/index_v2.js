@@ -40,7 +40,7 @@ import {
   EQUIPE_ID,
   entriesRef, kanbanRef, customTagsRef, removedTagsRef, customProjectsRef,
   muralRef, desafioRef, usersRef, notifsRef, avatarsRef, arquivoRef,
-  approvalRequestsRef, activeTimersRef, holidaysRef,
+  approvalRequestsRef, activeTimersRef, holidaysRef, indicadoresManuaisRef,
   _buildRefs, _getSecondaryAuth,
   createUserWithEmailAndPassword, signOut, logEvent
 } from './js/firebase-refs.js';
@@ -101,6 +101,7 @@ import {
 import {
   renderUsuarios, renderApprovals, initUsersListener
 } from './js/usuarios.js';
+import { registrarLog } from './js/log.js';
 import './js/importadores.js'; // side-effects only: registers window.* functions
 
 // ── Constantes globais ────────────────────────────────────────────────────────
@@ -343,6 +344,12 @@ function startDataListeners(){
     renderDebounced();
   },(err)=>console.warn('[V2] activeTimers:', err));
 
+  if(_unsubIndManuais) _unsubIndManuais();
+  _unsubIndManuais = onValue(indicadoresManuaisRef,(snap)=>{
+    state.indicadoresManuais = snap.val()||{};
+    if(document.getElementById('page-indicadores')?.classList.contains('active') && typeof window.renderIndicadores==='function') window.renderIndicadores();
+  },(err)=>console.warn('[V2] indicadoresManuais:', err));
+
   if(_unsubNotifs) _unsubNotifs();
   const _notifsQuery = query(notifsRef, orderByChild('to'), equalTo(state.currentCollabKey));
   _unsubNotifs = onValue(_notifsQuery,(snap)=>{
@@ -402,7 +409,7 @@ let _unsubEntries = null, _unsubKanban = null, _unsubActiveTimers = null;
 let _unsubNotifs = null, _unsubCustomTags = null, _unsubCustomProjects = null;
 let _unsubMural = null, _unsubDesafio = null, _unsubUsers = null;
 let _unsubKanban2 = null, _unsubNotifs2 = null, _unsubAvatars = null, _unsubArquivo = null;
-let _unsubApprovals = null, _unsubHolidays = null;
+let _unsubApprovals = null, _unsubHolidays = null, _unsubIndManuais = null;
 
 // ── ENTRIES ARRAY MEMOIZATION ─────────────────────────────────────────────────
 
@@ -456,12 +463,13 @@ onAuthStateChanged(auth, async user => {
   if(isAdmin){
     // ADMIN — acesso total + seletor de equipe
     show('navDashboard'); show('navGestora'); show('navFerramentas');
-    show('navConfiguracoes'); show('navIndicadores','');
+    show('ferrConfig'); show('navIndicadores','');
     show('navKanban','flex'); show('navTimer','flex'); show('navMeuHistorico','flex');
     show('desafioTopBtn'); show('mCollabField','flex');
     show('btnManageTags','inline-flex'); show('btnNovoColab');
     show('btnKanbanCols',''); show('btnArquivoMortoCols',''); show('btnArquivoCols','');
     show('ferrFeriados');
+    show('ferrLog');                 // Banco de Log: exclusivo do admin
     hide('collabWrap');
     if(state.userEquipes.length > 1) renderEquipeSelector(state.userEquipes, state.equipeAtiva);
     setTimeout(()=>showPage('dashboard', document.querySelector('[onclick*="\'dashboard\'"]')), 100);
@@ -470,7 +478,7 @@ onAuthStateChanged(auth, async user => {
     // GESTORA — acesso total à equipe (sem seletor multi-equipe, sem dash individual)
     show('navTimer','flex'); show('navMeuHistorico','flex');
     show('navDashboard'); show('navGestora'); show('navFerramentas');
-    show('navConfiguracoes'); show('navIndicadores','');
+    show('ferrConfig'); show('navIndicadores','');
     show('navKanban','flex'); show('desafioTopBtn');
     show('mCollabField','flex'); show('btnManageTags','inline-flex');
     show('btnNovoColab'); show('btnKanbanCols',''); show('btnArquivoMortoCols',''); show('btnArquivoCols','');
@@ -478,11 +486,13 @@ onAuthStateChanged(auth, async user => {
     hide('collabWrap'); hide('navMeuDashboard');
 
   } else if(state.isAuditor){
-    // COORDENADOR — acesso igual ao admin, sem Timer / Meus Registros / Fluxo de Demandas
-    hide('navTimer'); hide('navMeuHistorico'); hide('navKanban');
+    // COORDENADOR — acesso igual ao admin, sem Timer / Meus Registros
+    // (Fluxo de Demandas/Kanban habilitado: vê o quadro de cada equipe via seletor de equipe)
+    hide('navTimer'); hide('navMeuHistorico');
     hide('collabWrap'); hide('desafioTopBtn');
+    show('navKanban','flex');
     show('navDashboard'); show('navGestora'); show('navFerramentas');
-    show('navConfiguracoes'); show('navIndicadores','');
+    show('ferrConfig'); show('navIndicadores','');
     show('mCollabField','flex'); show('btnManageTags','inline-flex');
     show('btnNovoColab'); show('btnKanbanCols',''); show('btnArquivoMortoCols',''); show('btnArquivoCols','');
     if(state.userEquipes.length > 1) renderEquipeSelector(state.userEquipes, state.equipeAtiva);
@@ -501,6 +511,9 @@ onAuthStateChanged(auth, async user => {
 
   // Iniciar listeners de dados
   startDataListeners();
+
+  // Log de login (1x por carregamento, após refs/papel definidos)
+  if(!window._loginLogged){ window._loginLogged = true; try { registrarLog('login','Entrou no sistema', state.userPapel||''); } catch(e){} }
 
   resetNoActivityTimer();
 
@@ -528,7 +541,7 @@ onAuthStateChanged(auth, async user => {
 window.doLogout = () => {
   [_unsubEntries, _unsubKanban, _unsubActiveTimers, _unsubNotifs, _unsubCustomTags,
    _unsubCustomProjects, _unsubMural, _unsubDesafio, _unsubUsers,
-   _unsubKanban2, _unsubNotifs2, _unsubAvatars, _unsubArquivo, _unsubApprovals, _unsubHolidays].forEach(fn => fn?.());
+   _unsubKanban2, _unsubNotifs2, _unsubAvatars, _unsubArquivo, _unsubApprovals, _unsubHolidays, _unsubIndManuais].forEach(fn => fn?.());
   if(state.intervalId) clearInterval(state.intervalId);
   if(state.noActivityTimer) clearTimeout(state.noActivityTimer);
   if(state._onlineAutoRefresh){ clearInterval(state._onlineAutoRefresh); state._onlineAutoRefresh=null; }
