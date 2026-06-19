@@ -1142,6 +1142,17 @@ body.dark .combo-pop{ background:var(--surface2); border-color:var(--border); }
 .log-row-meta{ font-size:0.66rem; color:var(--muted); margin-top:2px; font-family:var(--mono); }
 /* Tag de demanda manual nos Indicadores */
 .ind-manual-tag{ font-size:0.55rem; font-weight:800; color:var(--orange); background:var(--orange-light); border:1px solid var(--orange-border); border-radius:4px; padding:1px 5px; vertical-align:middle; white-space:nowrap; }
+/* Meus Registros agrupado por data */
+.entry-group{ margin-bottom:10px; }
+.entry-group-header{ width:100%; display:flex; align-items:center; gap:10px; background:var(--surface2); border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; cursor:pointer; font-family:var(--font); color:var(--text); transition:border-color 0.15s; text-align:left; }
+.entry-group-header:hover{ border-color:var(--orange-border); }
+.entry-group-caret{ font-size:0.7rem; color:var(--muted); width:12px; flex-shrink:0; }
+.entry-group-date{ font-size:0.82rem; font-weight:800; text-transform:capitalize; }
+.entry-group-count{ font-size:0.66rem; color:var(--muted); font-family:var(--mono); }
+.entry-group-stats{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+.entry-group-time{ font-family:var(--mono); font-size:0.74rem; font-weight:700; color:var(--text); }
+.entry-group-perc{ font-family:var(--mono); font-size:0.74rem; font-weight:800; color:var(--orange); background:var(--orange-light); border:1px solid var(--orange-border); border-radius:5px; padding:1px 8px; }
+.entry-group-body{ padding-top:7px; display:flex; flex-direction:column; gap:7px; }
 .btn-add-proj{
   width:26px;height:26px;
   border-radius:var(--ctrl-r);

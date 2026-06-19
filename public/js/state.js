@@ -16,6 +16,11 @@ export const app = {
     audiovisual: 'Audiovisual',
     insercao:    'Inserção',
   },
+  // Coordenações (departamentos) que agrupam equipes — carregadas de /coordenacoes.
+  // Vazio = bootstrap legado (as 4 equipes acima formam a coordenação implícita).
+  COORDENACOES:     {},            // {coordId: {nome, ordem, equipes:{equipeId:label}}}
+  EQUIPE_COORD:     {},            // {equipeId: coordId} — a qual coordenação cada equipe pertence
+  coordenacaoAtiva: null,          // departamento selecionado (admin) / coordenação do coordenador
 
   // ── Config da equipe (carregada do Firebase) ──────────────────────────────
   PROJECTS:         {},

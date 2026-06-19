@@ -7,7 +7,7 @@ import { ICONS }        from './icons.js';
 import { escH, fmtDur, fmtShortDate, dKey, getWeekDays, resizeImageToDataURL } from './utils.js';
 import {
   db, auth, kanbanRef, customTagsRef, removedTagsRef,
-  customProjectsRef, usersRef, notifsRef, avatarsRef, EQUIPE_ID
+  customProjectsRef, usersRef, notifsRef, avatarsRef, entriesRef, EQUIPE_ID
 } from './firebase-refs.js';
 import { sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
@@ -380,10 +380,72 @@ window.cfgSaveProjeto = async function(k){
   const color = document.getElementById(`pcl_${k}`)?.value;
   const amountPerHour = parseFloat(document.getElementById(`pah_${k}`)?.value)||0;
   if(!label){ showToast('Erro','Nome não pode ser vazio.'); return; }
+  const oldW = Number(state.PROJECTS[k]?.amountPerHour ?? 0);
   await set(ref(db,`equipes/${EQUIPE_ID}/config/projetos/${k}`),{label,color,amountPerHour});
   state.PROJECTS[k]={label,color,amountPerHour};
   _refreshProjectSelects();
-  showToast('Salvo',`Projeto "${label}" atualizado.`);
+  registrarLog('config','Editou projeto', label);
+  // Se o PESO mudou e o usuário pode escrever registros (gestora/admin), pergunta o escopo
+  if(amountPerHour !== oldW && (state.isManager || state.userPapel === 'admin')){
+    _abrirDecisaoPesoProjeto(k, label, oldW, amountPerHour);
+  } else {
+    showToast('Salvo',`Projeto "${label}" atualizado.`);
+  }
+};
+
+// Decisão ao mudar o peso: aplicar a TODOS (recalcula histórico ao vivo) ou SÓ FUTUROS
+// (congela o peso antigo nos registros existentes daquele projeto via snapshot e.peso).
+function _abrirDecisaoPesoProjeto(k, label, oldW, newW){
+  let modal = document.getElementById('pesoDecisaoModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'pesoDecisaoModal';
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-title">Peso do projeto alterado</div>
+      <div style="font-size:0.8rem;color:var(--muted);line-height:1.6;margin-bottom:16px;">
+        O peso de "<strong>${escH(label)}</strong>" mudou de <strong>${oldW}</strong> para <strong>${newW}</strong>.
+        Como aplicar isso aos registros de horas?
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn-sm" onclick="aplicarPesoProjeto('${escH(k)}',${oldW},'futuros')" style="text-align:left;padding:12px;line-height:1.4;">
+          <strong>Aplicar só aos FUTUROS</strong><br><span style="font-size:0.7rem;color:var(--muted)">Mantém os registros já existentes no peso anterior (${oldW}). O novo peso vale só daqui pra frente.</span>
+        </button>
+        <button class="btn-sm" onclick="aplicarPesoProjeto('${escH(k)}',${oldW},'todos')" style="text-align:left;padding:12px;line-height:1.4;">
+          <strong>Aplicar a TODOS os registros</strong><br><span style="font-size:0.7rem;color:var(--muted)">Recalcula todo o histórico (passado e futuro) com o novo peso.</span>
+        </button>
+      </div>
+      <div class="modal-actions"><button class="btn-cancel" onclick="closePesoDecisao()">Fechar (mantém "todos")</button></div>
+    </div>`;
+  modal.classList.add('open');
+}
+window.closePesoDecisao = ()=>document.getElementById('pesoDecisaoModal')?.classList.remove('open');
+window.aplicarPesoProjeto = async (k, oldW, modo)=>{
+  const updates = {}; let n = 0;
+  Object.entries(state.allEntries||{}).forEach(([id,e])=>{
+    if(e.project !== k) return;
+    if(modo === 'futuros'){
+      if(e.peso === undefined || e.peso === null){ updates[`${id}/peso`] = oldW; n++; }   // congela no peso antigo
+    } else {
+      if(e.peso !== undefined && e.peso !== null){ updates[`${id}/peso`] = null; n++; }     // libera p/ usar o peso atual
+    }
+  });
+  try{
+    if(n) await update(entriesRef, updates);
+    registrarLog('config', modo==='futuros'?'Peso do projeto: só futuros (congelou antigos)':'Peso do projeto: aplicou a todos', `${k} · ${n} registro(s)`);
+    showToast(modo==='futuros'?'✅ Só futuros':'✅ Aplicado a todos',
+      modo==='futuros' ? `${n} registro(s) mantido(s) no peso anterior.` : (n?`${n} registro(s) liberado(s) p/ o novo peso.`:'Histórico recalculado com o novo peso.'));
+    closePesoDecisao();
+    try{ window.renderDashboard?.(); }catch(e){}
+  }catch(e){
+    showToast('Erro','Não foi possível atualizar os registros.');
+    console.error('[aplicarPesoProjeto]', e);
+  }
 };
 
 window.cfgDelProjeto = async function(k){

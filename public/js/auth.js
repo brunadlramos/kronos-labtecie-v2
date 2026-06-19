@@ -6,15 +6,39 @@
 
 import { get, ref } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { db, EQUIPE_ID, _buildRefs } from './firebase-refs.js';
+import { app as state } from './state.js';
 import { escH } from './utils.js';
 
-// ── Nomes de exibição das equipes ─────────────────────────────────────────────
+// ── Nomes de exibição das equipes (bootstrap/legado) ──────────────────────────
+// Fonte da verdade em runtime é state.EQUIPE_LABELS, montado de /coordenacoes.
+// Este mapa fixo só vale como fallback quando ainda não há coordenações no banco.
 export const EQUIPE_LABELS = {
   revisao:     'Revisão',
   diagramacao: 'Diagramação',
   audiovisual: 'Audiovisual',
   insercao:    'Inserção',
 };
+
+// Carrega /coordenacoes e monta state.COORDENACOES + state.EQUIPE_LABELS + state.EQUIPE_COORD.
+// Retorna true se havia coordenações no banco (senão mantém o fallback legado).
+export async function loadCoordenacoes(){
+  let coords = {};
+  try { const snap = await get(ref(db, 'coordenacoes')); coords = snap.val() || {}; }
+  catch(e){ console.warn('[loadCoordenacoes]', e); }
+  state.COORDENACOES = coords;
+  const ids = Object.keys(coords);
+  if(!ids.length){ state.EQUIPE_COORD = {}; return false; }   // bootstrap: usa EQUIPE_LABELS fixo
+  const labels = {}, equipeCoord = {};
+  ids.sort((a,b)=>(coords[a].ordem||0)-(coords[b].ordem||0)).forEach(cid=>{
+    Object.entries(coords[cid].equipes||{}).forEach(([eid,lbl])=>{
+      labels[eid] = (typeof lbl === 'string' && lbl) ? lbl : eid;
+      equipeCoord[eid] = cid;
+    });
+  });
+  state.EQUIPE_LABELS = labels;
+  state.EQUIPE_COORD  = equipeCoord;
+  return true;
+}
 
 // ── bootV2 ────────────────────────────────────────────────────────────────────
 // Lê perfil do usuário, carrega config da equipe, monta seletor de equipe.
@@ -28,17 +52,36 @@ export async function bootV2(user, { applyConfig, initDefaultConfig, showEquipeS
   let userEquipes = [];
   let equipeAtiva = null;
 
+  let coordenacaoAtiva = null;
   try {
     const snap = await get(ref(db, `usuarios/${user.uid}`));
     const profile = snap.val();
     if (profile) {
-      userPapel   = profile.papel   || 'colaborador';
-      userEquipes = profile.equipes || [];
-      // Coordenadores/auditores sem equipes definidas recebem acesso a todas por padrão
-      if(userEquipes.length === 0 && (userPapel === 'coordenador' || userPapel === 'auditor' || userPapel === 'rh')) {
-        userEquipes = Object.keys(EQUIPE_LABELS);
+      userPapel = profile.papel || 'colaborador';
+      await loadCoordenacoes();
+      const hasCoords = Object.keys(state.COORDENACOES).length > 0;
+      const allTeams  = Object.keys(state.EQUIPE_LABELS);
+      coordenacaoAtiva = profile.coordenacaoId || null;
+
+      if (userPapel === 'admin') {
+        // Admin vê todas as equipes; o departamento (coordenação) é escolhido na UI
+        userEquipes = hasCoords ? allTeams : (profile.equipes?.length ? profile.equipes : allTeams);
+        if (!coordenacaoAtiva && hasCoords) coordenacaoAtiva = Object.keys(state.COORDENACOES)[0];
+      } else if (userPapel === 'coordenador' || userPapel === 'auditor' || userPapel === 'rh') {
+        // Coordenador vê SÓ as equipes da sua coordenação
+        if (coordenacaoAtiva && state.COORDENACOES[coordenacaoAtiva]) {
+          userEquipes = Object.keys(state.COORDENACOES[coordenacaoAtiva].equipes || {});
+        } else if (profile.equipes?.length) {
+          userEquipes = profile.equipes;
+        } else {
+          userEquipes = allTeams;   // legado: sem coordenação definida → todas (bootstrap)
+        }
+      } else {
+        // gestora / colaborador: equipe única
+        userEquipes = profile.equipes?.length ? profile.equipes : (profile.equipeId ? [profile.equipeId] : []);
       }
-      equipeAtiva = profile.equipeId || userEquipes[0] || 'diagramacao';
+      equipeAtiva = profile.equipeId || userEquipes[0] || allTeams[0] || 'diagramacao';
+      state.coordenacaoAtiva = coordenacaoAtiva;
       _buildRefs(equipeAtiva);
     }
   } catch(e) {
@@ -59,7 +102,7 @@ export async function bootV2(user, { applyConfig, initDefaultConfig, showEquipeS
         `<span style="font-size:0.65rem;opacity:0.6">Crie /usuarios/${user.uid} no Firebase Console.</span>`;
     }
     console.warn('[bootV2] Perfil ausente. Email:', user.email, '| UID:', user.uid);
-    return { booted: false, userPapel: null, userEquipes: [], equipeAtiva: null };
+    return { booted: false, userPapel: null, userEquipes: [], equipeAtiva: null, coordenacaoAtiva: null };
   }
 
   // 2. Carregar config da equipe
@@ -76,7 +119,7 @@ export async function bootV2(user, { applyConfig, initDefaultConfig, showEquipeS
     showEquipeSelector(userEquipes, equipeAtiva);
   }
 
-  return { booted: true, userPapel, userEquipes, equipeAtiva };
+  return { booted: true, userPapel, userEquipes, equipeAtiva, coordenacaoAtiva };
 }
 
 // ── bootV2Config ──────────────────────────────────────────────────────────────
@@ -109,7 +152,7 @@ function _renderEquipePills(equipes, equipeAtiva){
     if(!bar) return;
     bar.classList.add('visible');
     bar.innerHTML = equipes.map(eq => {
-      const label = EQUIPE_LABELS[eq] || eq.charAt(0).toUpperCase()+eq.slice(1);
+      const label = state.EQUIPE_LABELS[eq] || EQUIPE_LABELS[eq] || eq.charAt(0).toUpperCase()+eq.slice(1);
       const active = eq === equipeAtiva;
       return `<button class="equipe-pill${active?' active':''}"
         onclick="window._doEquipeSwitch('${eq}')"

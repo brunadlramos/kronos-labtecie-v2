@@ -59,7 +59,7 @@ export function renderMyHistory(){
       return task.includes(searchFilter)||proj.includes(searchFilter)||obs.includes(searchFilter);
     });
   }
-  renderEntriesList('entriesList2', entries);
+  renderEntriesGrouped('entriesList2', entries, collabKey);
 };
 
 // ── ENTRIES LIST ──────────────────────────────────────────────────────────────
@@ -77,25 +77,25 @@ export function skeletonEntries(count=3){
     </div>`).join('');
 }
 
-export function renderEntriesList(listId,day){
-  const list=document.getElementById(listId);if(!list)return;
-  if(!day.length){list.innerHTML=`<div class="empty-state">
+const _EMPTY_ENTRIES = `<div class="empty-state">
     <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
     <div class="empty-title">Sem registros</div>
     <div class="empty-text">Inicie o timer ou adicione um registro manualmente.</div>
-  </div>`;return;}
-  list.innerHTML=day.map(e=>{
-    // ✅ SEC: fallbacks escapados — valores podem vir corrompidos do Firebase
-    const proj=state.PROJECTS[e.project]||{label:escH(e.project||'?'),color:'#94A3B8'};
-    const col=state.COLLABS[e.collab]||{label:escH(e.collab||'?'),initials:'?',color:'#94A3B8'};
-    const amt=calcAmount(e.project,e.duration);
-    const tagsHtml=(e.tags||[]).map(t=>`<span class="entry-tag">${escH(t)}</span>`).join('');
-    // ✅ AUDIT: modifiedBy exibido no badge de edição
-    const modBadge=e.modifiedAt?`<span class="modified-badge">${ICONS.edit} editado ${fmtTime(e.modifiedAt)}${e.modifiedBy?' por '+escH(e.modifiedBy):''}</span>`:'';
-    const canEdit=state.isManager||e.collab===state.currentCollabKey;
-    // ✅ FIX BUG 6: verificação segura com fallback para objeto vazio
-    const isInKanban = Object.values(state.kanbanCards||{}).some(c => c.fromEntryKey === e._key);
-    return`<div class="entry-item">
+  </div>`;
+
+// HTML de UM registro (reutilizado pela lista plana e pela agrupada por data)
+function _entryItemHTML(e){
+  // ✅ SEC: fallbacks escapados — valores podem vir corrompidos do Firebase
+  const proj=state.PROJECTS[e.project]||{label:escH(e.project||'?'),color:'#94A3B8'};
+  const col=state.COLLABS[e.collab]||{label:escH(e.collab||'?'),initials:'?',color:'#94A3B8'};
+  const amt=calcAmount(e.project,e.duration,e.peso);
+  const tagsHtml=(e.tags||[]).map(t=>`<span class="entry-tag">${escH(t)}</span>`).join('');
+  // ✅ AUDIT: modifiedBy exibido no badge de edição
+  const modBadge=e.modifiedAt?`<span class="modified-badge">${ICONS.edit} editado ${fmtTime(e.modifiedAt)}${e.modifiedBy?' por '+escH(e.modifiedBy):''}</span>`:'';
+  const canEdit=state.isManager||e.collab===state.currentCollabKey;
+  // ✅ FIX BUG 6: verificação segura com fallback para objeto vazio
+  const isInKanban = Object.values(state.kanbanCards||{}).some(c => c.fromEntryKey === e._key);
+  return`<div class="entry-item">
       <div class="entry-dot" style="background:${proj.color}"></div>
       <div class="entry-main">
         <div class="entry-task" onclick="openEntryDetail('${e._key}')" style="cursor:pointer" title="Ver detalhes do registro">${escH(e.task)}</div>
@@ -133,8 +133,54 @@ export function renderEntriesList(listId,day){
         </div>
       </div>
     </div>`;
+}
+
+export function renderEntriesList(listId,day){
+  const list=document.getElementById(listId);if(!list)return;
+  if(!day.length){list.innerHTML=_EMPTY_ENTRIES;return;}
+  list.innerHTML=day.map(_entryItemHTML).join('');
+}
+
+// Lista AGRUPADA por data (Meus Registros): cabeçalho recolhível com % e tempo total do dia.
+export function renderEntriesGrouped(listId, entries, collabKey){
+  const list=document.getElementById(listId);if(!list)return;
+  if(!entries.length){list.innerHTML=_EMPTY_ENTRIES;return;}
+  // Agrupa preservando a ordem (entries já vêm ordenados do mais recente p/ o mais antigo)
+  const order=[]; const groups={};
+  for(const e of entries){
+    const dk=dKey(new Date(e.startTime));
+    if(!groups[dk]){ groups[dk]=[]; order.push(dk); }
+    groups[dk].push(e);
+  }
+  list.innerHTML=order.map(dk=>{
+    const day=calcDay(collabKey, dk);
+    const [y,m,d]=dk.split('-').map(Number);
+    // dKey usa getMonth() (0-indexado), então o mês já é 0-base — NÃO subtrair de novo
+    const label=new Date(y,m,d).toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    const bodyId='egrp_'+dk;
+    return `<div class="entry-group">
+      <button class="entry-group-header" type="button" onclick="window._toggleEntryGroup('${bodyId}')" aria-expanded="true" aria-controls="${bodyId}">
+        <span class="entry-group-caret" id="${bodyId}_caret">▾</span>
+        <span class="entry-group-date">${label}</span>
+        <span class="entry-group-count">${groups[dk].length} registro${groups[dk].length!==1?'s':''}</span>
+        <span class="entry-group-stats">
+          <span class="entry-group-time">${fmtDur(day.totalMs)}</span>
+          <span class="entry-group-perc">${day.percTotal.toFixed(1)}%</span>
+        </span>
+      </button>
+      <div class="entry-group-body" id="${bodyId}">${groups[dk].map(_entryItemHTML).join('')}</div>
+    </div>`;
   }).join('');
 }
+window._toggleEntryGroup=(id)=>{
+  const body=document.getElementById(id); if(!body) return;
+  const caret=document.getElementById(id+'_caret');
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'';
+  if(caret) caret.textContent=open?'▸':'▾';
+  const header=body.previousElementSibling;
+  if(header) header.setAttribute('aria-expanded', open?'false':'true');
+};
 
 // ── PAGE: DASHBOARD ───────────────────────────────────────────────────────────
 // renderDashboardOnline → js/dashboard.js
@@ -229,7 +275,7 @@ export function renderDemandas(resetPage=false){
   tbody.innerHTML=pageData.map(e=>{
     const proj=state.PROJECTS[e.project]||{label:escH(e.project||'?'),color:'#94A3B8'};
     const col=state.COLLABS[e.collab]||{label:escH(e.collab||'?'),initials:'?',color:'#94A3B8'};
-    const amt=calcAmount(e.project,e.duration);
+    const amt=calcAmount(e.project,e.duration,e.peso);
     const modBadge=e.modifiedAt?`<span class="modified-badge" title="Editado por ${escH(e.modifiedBy||'?')} às ${fmtTime(e.modifiedAt)}">${ICONS.edit}</span>`:'';
     const hasPeriods=e.periods&&e.periods.length>1;
     const periodsBadge=hasPeriods?`<span style="font-size:0.65rem;background:var(--orange-light,#fff3e0);color:var(--orange);border-radius:4px;padding:1px 5px;font-weight:700;margin-left:4px">${e.periods.length}×</span>`:'';

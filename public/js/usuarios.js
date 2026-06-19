@@ -11,7 +11,7 @@ import {
   db, usersRef, entriesRef, approvalRequestsRef, notifsRef,
   EQUIPE_ID, _getSecondaryAuth, createUserWithEmailAndPassword, signOut
 } from './firebase-refs.js';
-import { EQUIPE_LABELS } from './auth.js';
+import { EQUIPE_LABELS, loadCoordenacoes } from './auth.js';
 import {
   ref, push, set, update, get, remove, child, onValue
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
@@ -115,7 +115,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID){
 }
 
 async function _renderUsuariosAdmin(grid, canEdit = true){
-  const equipes = state.userEquipes?.length ? state.userEquipes : ['diagramacao','revisao','audiovisual','insercao'];
+  const equipes = state.userEquipes?.length ? state.userEquipes : Object.keys(state.EQUIPE_LABELS);
   grid.innerHTML = `<div style="color:var(--muted);font-size:0.78rem;padding:8px 0;">Carregando todas as equipes...</div>`;
 
   const results = await Promise.all(equipes.map(async eqId => {
@@ -136,7 +136,7 @@ async function _renderUsuariosAdmin(grid, canEdit = true){
   grid.innerHTML = results.map(({ eqId, data })=>{
     const entries = Object.entries(data).filter(([,u])=>u.papel!=='auditor');
     if(!entries.length) return '';
-    const eqLabel = EQUIPE_LABELS[eqId] || eqId;
+    const eqLabel = state.EQUIPE_LABELS[eqId] || eqId;
     const count = entries.length;
     return `
       <div style="grid-column:1/-1;margin-top:16px;margin-bottom:4px;">
@@ -276,7 +276,7 @@ window.openEditColabModal = async function(key, equipeId = EQUIPE_ID){
       <label class="modal-label">Equipe
         <select class="filter-select" id="editColabNovaEquipe" style="width:100%;margin-top:4px;">
           <option value="all"${equipeId==='all'?' selected':''}>Todas as equipes (acesso global)</option>
-          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===equipeId?' selected':''}>${EQUIPE_LABELS[eq]||eq}</option>`).join('')}
+          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===equipeId?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabNovaEquipe" value="${equipeId}">`}
       <label class="modal-label">Papel
@@ -341,7 +341,7 @@ window.openNovoColabModal = function(){
       <label class="modal-label">Equipe
         <select class="modal-input" id="editColabEquipe" style="width:100%;margin-top:4px;">
           <option value="all">Todas as equipes (acesso global)</option>
-          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===EQUIPE_ID?' selected':''}>${EQUIPE_LABELS[eq]||eq}</option>`).join('')}
+          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===EQUIPE_ID?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabEquipe" value="${EQUIPE_ID}">`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -406,7 +406,7 @@ window.saveNovoColab = async function(){
       .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
     const iniciais = nome.split(' ').map(p=>p[0]?.toUpperCase()||'').slice(0,2).join('');
     const userData = {key,nome,email,papel,cor,curadora,ativo:true,iniciais};
-    const todasEquipes = state.userEquipes?.length ? state.userEquipes : ['diagramacao','revisao','audiovisual','insercao'];
+    const todasEquipes = state.userEquipes?.length ? state.userEquipes : Object.keys(state.EQUIPE_LABELS);
     const equipeDefault = todasEquipes[0] || 'diagramacao';
 
     const isCoord = papel === 'coordenador' || papel === 'auditor' || papel === 'rh';
@@ -457,7 +457,7 @@ window.saveEditColab = async function(uid){
   if(!nome) return;
 
   const equipeChanged = eqIdNova !== eqIdOrig;
-  const todasEquipes  = state.userEquipes?.length ? state.userEquipes : ['diagramacao','revisao','audiovisual','insercao'];
+  const todasEquipes  = state.userEquipes?.length ? state.userEquipes : Object.keys(state.EQUIPE_LABELS);
   const equipeDefault = todasEquipes[0] || 'diagramacao';
 
   const isCoord = papel === 'coordenador' || papel === 'auditor' || papel === 'rh';
@@ -490,7 +490,7 @@ window.saveEditColab = async function(uid){
   const msg = eqIdNova === 'all'
     ? `${nome} agora tem acesso a todas as equipes.`
     : equipeChanged
-    ? `${nome} movido para ${EQUIPE_LABELS[eqIdNova]||eqIdNova}.`
+    ? `${nome} movido para ${state.EQUIPE_LABELS[eqIdNova]||eqIdNova}.`
     : `${nome} atualizado.`;
   showToast('Salvo', msg);
   registrarLog('usuario','Editou colaborador', msg);
@@ -509,7 +509,7 @@ window.exportDemandasCSV = ()=>{
   }
   if(collabFilter)data=data.filter(e=>e.collab===collabFilter);
   const header='Data,Colaborador,Tarefa,Projeto,Início,Fim,Duração,% Amount,Tags,Observação';
-  const lines=data.map(e=>{const col=state.COLLABS[e.collab]||{label:e.collab};const proj=state.PROJECTS[e.project]||{label:e.project};return[new Date(e.startTime).toLocaleDateString('pt-BR'),col.label,`"${(e.task||'').replace(/"/g,'""')}"`,proj.label,fmtTime(e.startTime),fmtTime(e.endTime),fmtDur(e.duration),calcAmount(e.project,e.duration).toFixed(2)+'%',`"${(e.tags||[]).join('; ')}"`,`"${(e.obs||'').replace(/"/g,'""')}"`].join(',');});
+  const lines=data.map(e=>{const col=state.COLLABS[e.collab]||{label:e.collab};const proj=state.PROJECTS[e.project]||{label:e.project};return[new Date(e.startTime).toLocaleDateString('pt-BR'),col.label,`"${(e.task||'').replace(/"/g,'""')}"`,proj.label,fmtTime(e.startTime),fmtTime(e.endTime),fmtDur(e.duration),calcAmount(e.project,e.duration,e.peso).toFixed(2)+'%',`"${(e.tags||[]).join('; ')}"`,`"${(e.obs||'').replace(/"/g,'""')}"`].join(',');});
   dlCSV([header,...lines].join('\n'),`kronos_demandas_${new Date().toISOString().slice(0,10)}.csv`);
 };
 
@@ -517,4 +517,159 @@ function dlCSV(content,filename){
   const blob=new Blob(['\uFEFF'+content],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);
+}
+
+// \u2550\u2550 ADMIN: COORDENA\u00C7\u00D5ES & EQUIPES \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// Permite criar coordena\u00E7\u00F5es (departamentos), equipes dentro delas e coordenadores
+// \u2014 sem c\u00F3digo. S\u00F3 admin. A cria\u00E7\u00E3o da 1\u00AA coordena\u00E7\u00E3o faz as regras "fecharem":
+// por isso o fluxo vincula o coordenador na mesma hora.
+function _slugify40(nome){
+  return (nome||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036F]/g,'')
+    .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,40);
+}
+function _defaultTeamConfig(nome){
+  return {
+    geral:{ nome, janelaEdicao:5, avaliacaoAtiva:false },
+    metas:{ horasDia:9, threshold:90, janelaEdicao:5 },
+    projetos:{ trabalho:{label:'Trabalho',color:'#F15A24',amountPerHour:1}, reuniao:{label:'Reuni\u00E3o',color:'#A78BFA',amountPerHour:0}, formacao:{label:'Forma\u00E7\u00E3o',color:'#34D399',amountPerHour:0}, ausencia:{label:'Aus\u00EAncia',color:'#EF4444',amountPerHour:0} },
+    colunas:{ a_fazer:{label:'A Fazer',color:'#94A3B8',ordem:0}, em_andamento:{label:'Em Andamento',color:'#F59E0B',ordem:1}, revisao:{label:'Em Revis\u00E3o',color:'#8B5CF6',ordem:2}, concluido:{label:'Conclu\u00EDdo',color:'#22C55E',ordem:3} },
+    colunas_arquivo:{ arquivo_geral:{label:'Arquivo Geral',color:'#94A3B8',ordem:0,months:null} },
+    usuarios:{}
+  };
+}
+async function _reloadCoordsAndRender(){ await loadCoordenacoes(); _renderCoordPanel(); }
+
+window.openCoordenacoesAdmin = function(){
+  if(state.userPapel!=='admin'){ showToast('Sem permiss\u00E3o','Apenas o admin gerencia coordena\u00E7\u00F5es.'); return; }
+  let panel=document.getElementById('coordPanel');
+  if(!panel){
+    const overlay=document.createElement('div');
+    overlay.id='coordPanelOverlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:699;display:none;';
+    overlay.onclick=window.closeCoordPanel;
+    document.body.appendChild(overlay);
+    panel=document.createElement('div');
+    panel.id='coordPanel';
+    panel.style.cssText='position:fixed;top:0;right:0;width:min(640px,96vw);height:100vh;background:var(--surface);border-left:1.5px solid var(--border);box-shadow:-4px 0 24px rgba(0,0,0,0.12);z-index:700;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;';
+    panel.setAttribute('role','dialog'); panel.setAttribute('aria-modal','true'); panel.setAttribute('aria-label','Coordena\u00E7\u00F5es e Equipes');
+    panel.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1.5px solid var(--border);">
+        <div style="font-size:0.95rem;font-weight:800;">\uD83C\uDFE2 Coordena\u00E7\u00F5es &amp; Equipes</div>
+        <button class="btn-sm" onclick="closeCoordPanel()" aria-label="Fechar">\u2715</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px 20px;" id="coordPanelContent"></div>`;
+    document.body.appendChild(panel);
+  }
+  document.getElementById('coordPanelOverlay').style.display='block';
+  panel.style.transform='translateX(0)';
+  loadCoordenacoes().then(_renderCoordPanel);
+};
+window.closeCoordPanel=()=>{
+  const p=document.getElementById('coordPanel'); const o=document.getElementById('coordPanelOverlay');
+  if(p) p.style.transform='translateX(100%)'; if(o) o.style.display='none';
+};
+function _renderCoordPanel(){
+  const el=document.getElementById('coordPanelContent'); if(!el) return;
+  const coords=state.COORDENACOES||{};
+  const ids=Object.keys(coords).sort((a,b)=>(coords[a].ordem||0)-(coords[b].ordem||0));
+  // Equipes ainda sem coordena\u00E7\u00E3o (para o bot\u00E3o "importar")
+  const soltas=Object.keys(state.EQUIPE_LABELS||{}).filter(eid=>!state.EQUIPE_COORD?.[eid]);
+  const aviso = !ids.length
+    ? `<div style="background:var(--orange-light);border:1px solid var(--orange-border);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:0.78rem;line-height:1.5;">Nenhuma coordena\u00E7\u00E3o criada ainda. As <strong>${soltas.length}</strong> equipes atuais est\u00E3o soltas. Crie a coordena\u00E7\u00E3o <strong>"Produ\u00E7\u00E3o de Materiais"</strong> e clique em <strong>Importar equipes atuais</strong> para agrup\u00E1-las; depois crie a <strong>TV Unifatecie</strong>.<br><strong>\u26A0\uFE0F Ao criar a 1\u00AA coordena\u00E7\u00E3o, vincule o coordenador na mesma hora</strong> (o Luiz), sen\u00E3o ele fica sem acesso.</div>`
+    : (soltas.length ? `<div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">Equipes ainda sem coordena\u00E7\u00E3o: ${soltas.map(e=>escH(state.EQUIPE_LABELS[e])).join(', ')}</div>` : '');
+  el.innerHTML = aviso + ids.map(cid=>{
+    const c=coords[cid]; const teams=Object.entries(c.equipes||{});
+    return `<div style="border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:0.9rem;font-weight:800;margin-bottom:4px;">${escH(c.nome||cid)} <span style="font-size:0.62rem;color:var(--muted);font-family:var(--mono)">${escH(cid)}</span></div>
+      <div style="font-size:0.74rem;color:var(--muted);margin-bottom:10px;">Equipes: ${teams.length?teams.map(([eid,lbl])=>`<span class="badge" style="margin-right:4px;">${escH(typeof lbl==='string'?lbl:eid)}</span>`).join(''):'<em>nenhuma</em>'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-sm" onclick="cfgNovaEquipe('${escH(cid)}')">+ Equipe</button>
+        ${soltas.length?`<button class="btn-sm" onclick="cfgImportarEquipesParaCoord('${escH(cid)}')">Importar equipes atuais</button>`:''}
+        <button class="btn-sm" onclick="cfgCriarCoordenador('${escH(cid)}')">+ Criar coordenador</button>
+        <button class="btn-sm" onclick="cfgVincularCoordenador('${escH(cid)}')">Vincular coordenador existente</button>
+      </div>
+    </div>`;
+  }).join('') + `<button class="btn-save" onclick="cfgNovaCoordenacao()" style="margin-top:6px;">+ Nova coordena\u00E7\u00E3o</button>`;
+}
+window.cfgNovaCoordenacao = async()=>{
+  const nome=prompt('Nome da coordena\u00E7\u00E3o (ex.: Produ\u00E7\u00E3o de Materiais):'); if(!nome||!nome.trim()) return;
+  const id=_slugify40(nome); if(!id){ showToast('Erro','Nome inv\u00E1lido.'); return; }
+  // SEGURAN\u00C7A: checa o banco \u2014 recriar uma coordena\u00E7\u00E3o existente apagaria as equipes dela
+  const jaExiste = await get(ref(db,`coordenacoes/${id}`));
+  if(jaExiste.exists()){ showToast('J\u00E1 existe','J\u00E1 h\u00E1 uma coordena\u00E7\u00E3o com esse nome.'); return; }
+  const ordem=Object.keys(state.COORDENACOES||{}).length;
+  try{
+    await set(ref(db,`coordenacoes/${id}`),{nome:nome.trim(),ordem,equipes:{}});
+    registrarLog('config','Criou coordena\u00E7\u00E3o', nome.trim());
+    showToast('Coordena\u00E7\u00E3o criada',nome.trim());
+    await _reloadCoordsAndRender();
+  }catch(e){ showToast('Erro','N\u00E3o foi poss\u00EDvel criar.'); console.error('[cfgNovaCoordenacao]',e); }
+};
+window.cfgNovaEquipe = async(coordId)=>{
+  const nome=prompt('Nome da nova equipe:'); if(!nome||!nome.trim()) return;
+  const id=_slugify40(nome); if(!id){ showToast('Erro','Nome inv\u00E1lido.'); return; }
+  // SEGURAN\u00C7A: checa o BANCO (n\u00E3o s\u00F3 o estado em mem\u00F3ria, que pode estar vazio) \u2014
+  // criar uma equipe com id j\u00E1 existente sobrescreveria a config dela. Nunca sobrescrever.
+  const existente = await get(ref(db,`equipes/${id}/config`));
+  if(existente.exists()){
+    showToast('Equipe j\u00E1 existe', `"${nome.trim()}" j\u00E1 existe \u2014 use "Importar equipes atuais" para agrup\u00E1-la, n\u00E3o recrie (isso apagaria a config dela).`);
+    return;
+  }
+  try{
+    await set(ref(db,`equipes/${id}/config`),_defaultTeamConfig(nome.trim()));
+    await set(ref(db,`coordenacoes/${coordId}/equipes/${id}`),nome.trim());
+    registrarLog('config','Criou equipe', `${nome.trim()} (${coordId})`);
+    showToast('Equipe criada',`"${nome.trim()}" adicionada \u00E0 coordena\u00E7\u00E3o.`);
+    await _reloadCoordsAndRender();
+  }catch(e){ showToast('Erro','N\u00E3o foi poss\u00EDvel criar a equipe.'); console.error('[cfgNovaEquipe]',e); }
+};
+window.cfgImportarEquipesParaCoord = async(coordId)=>{
+  const soltas=Object.keys(state.EQUIPE_LABELS||{}).filter(eid=>!state.EQUIPE_COORD?.[eid]);
+  if(!soltas.length){ showToast('Nada a importar','Todas as equipes j\u00E1 t\u00EAm coordena\u00E7\u00E3o.'); return; }
+  if(!confirm(`Importar ${soltas.length} equipe(s) atual(is) para esta coordena\u00E7\u00E3o?\n\n${soltas.map(e=>state.EQUIPE_LABELS[e]).join(', ')}`)) return;
+  try{
+    const updates={};
+    soltas.forEach(eid=>{ updates[eid]=state.EQUIPE_LABELS[eid]; });
+    await update(ref(db,`coordenacoes/${coordId}/equipes`),updates);
+    registrarLog('config','Importou equipes para coordena\u00E7\u00E3o', `${coordId}: ${soltas.join(',')}`);
+    showToast('Equipes importadas',`${soltas.length} equipe(s) agrupada(s).`);
+    await _reloadCoordsAndRender();
+  }catch(e){ showToast('Erro','N\u00E3o foi poss\u00EDvel importar.'); console.error('[cfgImportarEquipes]',e); }
+};
+async function _setCoordenadorProfile(uid, dados, coordId){
+  const teams=Object.keys(state.COORDENACOES[coordId]?.equipes||{});
+  await set(ref(db,`usuarios/${uid}`),{
+    nome:dados.nome, email:dados.email, papel:'coordenador',
+    coordenacaoId:coordId, equipeId: teams[0]||'', equipes: teams
+  });
+}
+window.cfgCriarCoordenador = async(coordId)=>{
+  const nome=prompt('Nome do coordenador:'); if(!nome||!nome.trim()) return;
+  const email=(prompt('E-mail do coordenador:')||'').trim().toLowerCase(); if(!email.includes('@')){ showToast('Erro','E-mail inv\u00E1lido.'); return; }
+  const senha=prompt('Senha inicial (m\u00EDn. 6 caracteres):','0123456'); if(!senha||senha.length<6){ showToast('Erro','Senha muito curta.'); return; }
+  try{
+    const secAuth=_getSecondaryAuth();
+    const cred=await createUserWithEmailAndPassword(secAuth,email,senha);
+    const uid=cred.user.uid;
+    await signOut(secAuth);
+    await _setCoordenadorProfile(uid,{nome:nome.trim(),email},coordId);
+    registrarLog('usuario','Criou coordenador', `${nome.trim()} (${email}) \u2192 ${coordId}`);
+    showToast('Coordenador criado',`${nome.trim()} j\u00E1 acessa a coordena\u00E7\u00E3o com o e-mail e senha informados.`);
+  }catch(err){
+    const msg = err?.code==='auth/email-already-in-use' ? 'Esse e-mail j\u00E1 tem conta \u2014 use "Vincular coordenador existente".' : (err?.message||'Falha ao criar.');
+    showToast('Erro', msg); console.error('[cfgCriarCoordenador]',err);
+  }
+};
+window.cfgVincularCoordenador = async(coordId)=>{
+  const email=(prompt('E-mail do coordenador J\u00C1 existente para vincular a esta coordena\u00E7\u00E3o:')||'').trim().toLowerCase();
+  if(!email.includes('@')){ showToast('Erro','E-mail inv\u00E1lido.'); return; }
+  try{
+    const snap=await get(ref(db,'usuarios'));
+    const users=snap.val()||{};
+    const hit=Object.entries(users).find(([,u])=>(u.email||'').toLowerCase()===email);
+    if(!hit){ showToast('N\u00E3o encontrado','Nenhum usu\u00E1rio com esse e-mail. Crie pelo "+ Criar coordenador".'); return; }
+    const [uid,u]=hit;
+    await _setCoordenadorProfile(uid,{nome:u.nome||email,email},coordId);
+    registrarLog('usuario','Vinculou coordenador', `${email} \u2192 ${coordId}`);
+    showToast('Vinculado',`${u.nome||email} agora coordena esta coordena\u00E7\u00E3o.`);
+  }catch(e){ showToast('Erro','N\u00E3o foi poss\u00EDvel vincular (precisa ser admin).'); console.error('[cfgVincularCoordenador]',e); }
 }

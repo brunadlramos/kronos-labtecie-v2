@@ -161,7 +161,7 @@ async function bootV2(user){
         _buildRefs(eqId);
         await _bootV2ConfigModule(eqId, { applyConfig: _applyConfig, initKColState: _initKColState });
         const ttl = document.getElementById('topbarTeamName');
-        if(ttl) ttl.textContent = '· ' + (state.EQUIPE_NOME || EQUIPE_LABELS[eqId] || eqId);
+        if(ttl) ttl.textContent = '· ' + (state.EQUIPE_NOME || state.EQUIPE_LABELS[eqId] || EQUIPE_LABELS[eqId] || eqId);
         const cfgArea = document.getElementById('usuariosConfigArea');
         if(cfgArea) delete cfgArea.dataset.loaded;
         updateEquipePills(eqId);
@@ -175,6 +175,7 @@ async function bootV2(user){
   state.userPapel   = result.userPapel;
   state.userEquipes = result.userEquipes;
   state.equipeAtiva = result.equipeAtiva;
+  state.coordenacaoAtiva = result.coordenacaoAtiva || null;
   return true;
 }
 function _applyConfig(cfg){
@@ -268,7 +269,7 @@ function _applyConfig(cfg){
 async function _initDefaultConfig(){
   // Config inicial genérica — sem dados específicos de equipe
   // A gestora configura projetos, colunas e colaboradores pelas Configurações
-  const equipeNome = EQUIPE_LABELS[EQUIPE_ID] || EQUIPE_ID.charAt(0).toUpperCase()+EQUIPE_ID.slice(1);
+  const equipeNome = state.EQUIPE_LABELS[EQUIPE_ID] || EQUIPE_LABELS[EQUIPE_ID] || EQUIPE_ID.charAt(0).toUpperCase()+EQUIPE_ID.slice(1);
   const defaultConfig = {
     geral: { nome: equipeNome, janelaEdicao: 5, avaliacaoAtiva: false },
     metas: { horasDia: 9, threshold: 90, janelaEdicao: 5 },
@@ -447,7 +448,12 @@ onAuthStateChanged(auth, async user => {
     : { label: user.displayName || user.email.split('@')[0], initials: (user.displayName||user.email).slice(0,2).toUpperCase(), color: '#94A3B8' };
 
   const roleLabels = { admin:'Administração', gestora:'Gestão', coordenador:'Coordenação', auditor:'Coordenação', rh:'Coordenação', colaborador:'Colaboração' };
-  if(!state.currentCollabKey && (state.isManager||state.isAuditor)) state.currentCollabKey = col.label.toLowerCase().replace(/\s+/g,'_');
+  // Chave sintética p/ gestor/coordenador (não estão em config/usuarios). Sanitizada:
+  // o Firebase proíbe . # $ [ ] / em chaves de caminho (ex.: e-mail "carlos.moraes" → "carlosmoraes").
+  if(!state.currentCollabKey && (state.isManager||state.isAuditor)){
+    state.currentCollabKey = (col.label||'user').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') || 'user';
+  }
 
   document.getElementById('sidebarAv').textContent = col.initials;
   document.getElementById('sidebarAv').style.background = col.color;
@@ -472,6 +478,7 @@ onAuthStateChanged(auth, async user => {
     show('btnKanbanCols',''); show('btnArquivoMortoCols',''); show('btnArquivoCols','');
     show('ferrFeriados');
     show('ferrLog');                 // Banco de Log: exclusivo do admin
+    show('ferrCoord');               // Coordenações & Equipes: exclusivo do admin
     hide('collabWrap');
     if(state.userEquipes.length > 1) renderEquipeSelector(state.userEquipes, state.equipeAtiva);
     setTimeout(()=>showPage('dashboard', document.querySelector('[onclick*="\'dashboard\'"]')), 100);
@@ -1410,7 +1417,7 @@ window.exportCSV = ()=>{
   const lines=rows.map(e=>{
     const proj=state.PROJECTS[e.project]||{label:e.project};const col=state.COLLABS[e.collab]||{label:e.collab};
     const durH=(e.duration/3600000).toFixed(4);const dayGoal=getDailyGoalMs(dk)||state.DAILY_GOAL_MS;const pt=(e.duration/dayGoal*100).toFixed(2);
-    const pa=calcAmount(e.project,e.duration).toFixed(2);const tot=(+pt+ +pa).toFixed(2);
+    const pa=calcAmount(e.project,e.duration,e.peso).toFixed(2);const tot=(+pt+ +pa).toFixed(2);
     return[new Date(e.startTime).toLocaleDateString('pt-BR'),col.label,`"${(e.task||'').replace(/"/g,'""')}"`,proj.label,fmtTime(e.startTime),fmtTime(e.endTime),durH,pt+'%',pa+'%',tot+'%',`"${(e.tags||[]).join('; ')}"`,`"${(e.obs||'').replace(/"/g,'""')}"`].join(',');
   });
   dlCSV([header,...lines].join('\n'),`kronos_${state.viewDate.toISOString().slice(0,10)}.csv`);

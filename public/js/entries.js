@@ -288,6 +288,8 @@ export async function saveModal() {
       payload = { ...orig, task, collab, project, obs, tags, startTime:sTs, endTime:eTs,
         duration:eTs-sTs, modifiedAt:now, modifiedBy:state.currentUser?.email||'desconhecido' };
     }
+    // peso é por projeto: se mudou de projeto, descarta o snapshot (usa o peso atual do novo)
+    if(orig && project !== orig.project && payload) delete payload.peso;
   }
   if (!state.isManager) {
     const entryTs = state.editingId ? (origEntry?.startTime||sTs) : sTs;

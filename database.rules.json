@@ -2,21 +2,28 @@
   "rules": {
 
     "usuarios": {
+      ".read": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'",
+      ".indexOn": ["email"],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh')",
-        ".write": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (!data.exists() && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' && newData.child('equipeId').val() === root.child('usuarios').child(auth.uid).child('equipeId').val()))",
-        ".validate": "root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (auth.uid !== $uid && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('papel').val() === data.child('papel').val() && newData.child('equipeId').val() === data.child('equipeId').val())"
+        ".write": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (!data.exists() && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' && newData.child('equipeId').val() === root.child('usuarios').child(auth.uid).child('equipeId').val()) || (!data.exists() && root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' && root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child(newData.child('equipeId').val()).exists()))",
+        ".validate": "root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (auth.uid !== $uid && (root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador')) || (newData.child('papel').val() === data.child('papel').val() && newData.child('equipeId').val() === data.child('equipeId').val())"
       }
+    },
+
+    "coordenacoes": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'"
     },
 
     "equipes": {
       "$equipeId": {
 
-        ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh')",
+        ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || ((root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh') && (!root.child('coordenacoes').exists() || root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists())))",
 
         "config": {
-          ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh')",
-          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))"
+          ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || ((root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh') && (!root.child('coordenacoes').exists() || root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists())))",
+          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' && (!root.child('coordenacoes').exists() || root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists())) || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))"
         },
 
         "entries": {
@@ -67,7 +74,7 @@
 
         "avatars": {
           "$collabKey": {
-            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || $collabKey === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val())",
+            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' && root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists()) || $collabKey === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val())",
             "emoji": { ".validate": "newData.isString() && newData.val().length <= 16" },
             "color": { ".validate": "newData.isString() && newData.val().matches(/^#[0-9a-fA-F]{3,8}$/)" },
             "nome":  { ".validate": "newData.isString() && newData.val().length <= 40" },
@@ -103,7 +110,7 @@
 
         "indicadoresManuais": {
           ".indexOn": ["ajuste_avaliado_em"],
-          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
+          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || ((root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh') && (!root.child('coordenacoes').exists() || root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists())) || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
           "$id": {
             ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 120 && (!newData.child('assignee').exists() || newData.child('assignee').isString()) && (!newData.child('curador').exists() || newData.child('curador').isString()))"
           }

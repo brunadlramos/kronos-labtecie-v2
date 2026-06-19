@@ -26,9 +26,15 @@ export function isActive(collabKey) {
 }
 
 // ── calcAmount ─────────────────────────────────────────────────────────────────
-export function calcAmount(proj, ms) {
+// pesoOverride: peso "congelado" gravado no registro (e.peso). Quando presente, tem
+// prioridade sobre o peso atual do projeto — permite "aplicar só aos futuros" sem
+// alterar retroativamente os registros antigos.
+export function calcAmount(proj, ms, pesoOverride) {
   const p = state.PROJECTS[proj];
-  return p ? (ms / 3600000) * p.amountPerHour : 0;
+  const rate = (pesoOverride !== undefined && pesoOverride !== null && !isNaN(pesoOverride))
+    ? Number(pesoOverride)
+    : (p ? p.amountPerHour : 0);
+  return (ms / 3600000) * (rate || 0);
 }
 
 // ── getDailyGoalMs ─────────────────────────────────────────────────────────────
@@ -96,7 +102,7 @@ export function getEntriesForDay(dk, collabFilter=null) {
     if(!e.periods || e.periods.length <= 1) {
       if(dateKey(e.startTime) === dk && !seen.has(k)) {
         seen.add(k);
-        result.push({...e, _key:k, _dayDuration: e.duration, _dayAmount: calcAmount(e.project, e.duration)});
+        result.push({...e, _key:k, _dayDuration: e.duration, _dayAmount: calcAmount(e.project, e.duration, e.peso)});
       }
     } else {
       const dayPeriods = e.periods.filter(p => dateKey(p.startTime) === dk);
@@ -105,7 +111,7 @@ export function getEntriesForDay(dk, collabFilter=null) {
         const dayDuration = dayPeriods.reduce((s,p) => s + (p.duration || (p.endTime - p.startTime)), 0);
         result.push({
           ...e, _key: k, _dayDuration: dayDuration,
-          _dayAmount: calcAmount(e.project, dayDuration),
+          _dayAmount: calcAmount(e.project, dayDuration, e.peso),
           _dayPeriods: dayPeriods
         });
       }
@@ -120,7 +126,7 @@ export function calcDay(collabKey, dk) {
   const totalMs = day.reduce((s,e) => s + (e._dayDuration ?? e.duration), 0);
   const goalMs = getDailyGoalMs(dk, collabKey);
   const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / state.DAILY_GOAL_MS * 100 : 0);
-  const percAmount = day.reduce((s,e) => s + (e._dayAmount ?? calcAmount(e.project, e.duration)), 0);
+  const percAmount = day.reduce((s,e) => s + (e._dayAmount ?? calcAmount(e.project, e.duration, e.peso)), 0);
   return { totalMs, percTime, percAmount, percTotal: percTime+percAmount, count: day.length, entries: day, goalMs, isSaturday: goalMs===0 };
 }
 
@@ -291,6 +297,14 @@ export function renderDashboard() {
   }
 }
 
+// Formata a meta (ms) como rótulo "Xh", "XhYYmin" ou "opcional" (evita hora decimal tipo 6.5)
+function _fmtMetaLabel(ms){
+  if(!ms || ms <= 0) return 'opcional';
+  const h = Math.floor(ms/3600000);
+  const m = Math.round((ms % 3600000)/60000);
+  return (m > 0 ? `${h}h${String(m).padStart(2,'0')}min` : `${h}h`) + ' = 100%';
+}
+
 // ── renderDashCards ────────────────────────────────────────────────────────────
 export function renderDashCards() {
   const tk = dKey(state.dashDay);
@@ -314,7 +328,7 @@ export function renderDashCards() {
         <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${c.percAmount.toFixed(1)}%</div></div>
         <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${c.percTotal.toFixed(1)}%</div></div>
       </div>
-      <div class="bar-label"><span>Meta (${goalLabel})</span><span>${c.percTotal.toFixed(1)}%</span></div>
+      <div class="bar-label"><span>Meta (${_fmtMetaLabel(c.goalMs)})</span><span>${c.percTotal.toFixed(1)}%</span></div>
       <div class="bar-track"><div class="bar-fill ${c.percTotal>=100?'over':''}" style="width:${Math.min(c.percTotal,100)}%"></div></div>
       ${renderConquistasBadges(c.key, state.dashDay)}
     </div>`;
@@ -505,7 +519,7 @@ export function renderMeuDashboard() {
   </tr>
   <tr style="border-top:1.5px solid var(--border);">
     <td colspan="${days.length+2}" style="padding:8px 10px;font-size:0.72rem;color:var(--muted);">
-      Meta diária: 9h = 100% &nbsp;·&nbsp; Verde ≥ 90% &nbsp;·&nbsp; Vermelho < 90%
+      Meta diária conforme a jornada de cada colaborador (descontando ausências) = 100% &nbsp;·&nbsp; Verde ≥ 90% &nbsp;·&nbsp; Vermelho < 90%
     </td>
   </tr>`;
   // D5: indicadores de avaliação (Demanda) individuais do colaborador
@@ -572,7 +586,9 @@ export async function fetchTeamWeek(equipeId, weekOffset = 0){
         if(!ms) return;
         totalMs += ms; count++;
         const p = projects[e.project];
-        if(p) amount += (ms / MS_PER_HOUR) * p.amountPerHour;
+        // peso congelado no registro (e.peso) tem prioridade sobre o peso atual do projeto
+        const rate = (e.peso !== undefined && e.peso !== null && !isNaN(e.peso)) ? Number(e.peso) : (p ? p.amountPerHour : 0);
+        amount += (ms / MS_PER_HOUR) * (rate || 0);
       });
       const goalMs = goalFor(d, c);
       const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / defaultGoalMs * 100 : 0);
@@ -710,7 +726,7 @@ export function renderDemandasSemana(tbodyId, days, collabFilter='', searchFilte
   tbody.innerHTML = data.map(e=>{
     const proj = state.PROJECTS[e.project] || {label:escH(e.project||'?'), color:'#94A3B8'};
     const col  = state.COLLABS[e.collab]  || {label:escH(e.collab||'?'),  initials:'?', color:'#94A3B8'};
-    const amt  = calcAmount(e.project, e.duration);
+    const amt  = calcAmount(e.project, e.duration, e.peso);
     const modBadge = e.modifiedAt ? `<span class="modified-badge" title="Editado por ${escH(e.modifiedBy||'?')}">${ICONS.edit}</span>` : '';
     const hasPeriods = e.periods && e.periods.length>1;
     const periodsBadge = hasPeriods ? `<span style="font-size:0.65rem;background:var(--orange-light,#fff3e0);color:var(--orange);border-radius:4px;padding:1px 5px;font-weight:700;margin-left:4px">${e.periods.length}×</span>` : '';

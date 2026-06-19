@@ -2026,7 +2026,14 @@ window.saveAvatar = async()=>{
   if(nome) toSave.nome = nome;
   // set() sobrescreve o nó: incluir foto quando houver; omitir = remover a foto
   if(avatarState.foto && /^data:image\//.test(avatarState.foto)) toSave.foto = avatarState.foto;
-  await set(child(avatarsRef, state.currentCollabKey), toSave);
+  if(!state.currentCollabKey){ showToast('Erro','Não foi possível identificar seu usuário. Recarregue a página.'); return; }
+  try{
+    await set(child(avatarsRef, state.currentCollabKey), toSave);
+  }catch(err){
+    showToast('Erro ao salvar','Não foi possível salvar o perfil. Verifique sua conexão/permissão.');
+    console.error('[saveAvatar]', err);
+    return;
+  }
   if(nome && state.COLLABS[state.currentCollabKey]) state.COLLABS[state.currentCollabKey].label = nome;
   avatarState = toSave;
   updateSidebarAvatar(toSave);
