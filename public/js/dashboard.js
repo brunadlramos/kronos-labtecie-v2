@@ -314,7 +314,7 @@ export function renderDashCards() {
     .filter(k => isActive(k) && !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''))
     .map(k => ({key:k, ...state.COLLABS[k], ...calcDay(k,tk)}));
   results.sort((a,b) => b.percTotal - a.percTotal);
-  document.getElementById('cardsGrid').innerHTML = results.map((c,i)=>{
+  const rankedHtml = results.map((c,i)=>{
     const rank = i+1;
     const rankIcon = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
     const rankCls = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
@@ -333,6 +333,27 @@ export function renderDashCards() {
       ${renderConquistasBadges(c.key, state.dashDay)}
     </div>`;
   }).join('');
+  // Item: card próprio da gestora (informativo) — fora do ranking e das métricas coletivas
+  let ownHtml = '';
+  if(state.userPapel === 'gestora' && state.currentCollabKey && state.COLLABS[state.currentCollabKey]){
+    const meKey = state.currentCollabKey;
+    const me = { ...state.COLLABS[meKey], ...calcDay(meKey, tk) };
+    const avo = getCollabAvatar(meKey);
+    ownHtml = `<div class="collab-card" style="border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;">
+      <div class="collab-card-header">
+        <div class="collab-card-av" style="background:${avo.color};overflow:hidden;">${avatarInner(avo)}</div>
+        <div><div class="collab-card-name">${escH(me.label)} <span style="font-size:0.6rem;color:var(--orange);font-weight:800;">(você)</span></div><div class="collab-card-rank" style="color:var(--muted)">Seu desempenho · não entra no ranking</div></div>
+      </div>
+      <div class="collab-card-stats">
+        <div><div class="ccs-label">% Tempo</div><div class="ccs-value">${me.percTime.toFixed(1)}%</div></div>
+        <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${me.percAmount.toFixed(1)}%</div></div>
+        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${me.percTotal.toFixed(1)}%</div></div>
+      </div>
+      <div class="bar-label"><span>Meta (${_fmtMetaLabel(me.goalMs)})</span><span>${me.percTotal.toFixed(1)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(me.percTotal,100)}%"></div></div>
+    </div>`;
+  }
+  document.getElementById('cardsGrid').innerHTML = ownHtml + rankedHtml;
 }
 
 // ── renderWeekTable ────────────────────────────────────────────────────────────

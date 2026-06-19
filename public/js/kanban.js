@@ -1243,6 +1243,7 @@ function kdRenderAvaliacao(card){
           <div class="ajuste-star-label" data-field="${c.field}" style="font-size:0.72rem;font-weight:700;color:${ajusteLabel(c.value)?.color||'var(--muted)'};min-height:16px;">
             ${currentLabel||'<span style="font-style:italic;color:var(--muted);font-weight:400;">Clique para avaliar</span>'}
           </div>
+          ${lv ? `<button onclick="limparAjuste('${card._key}','${c.field}')" title="Excluir esta avaliação" style="margin-top:4px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:3px 9px;font-size:0.62rem;font-weight:700;cursor:pointer;">✕ Excluir avaliação</button>` : ''}
           <textarea
             class="ajuste-obs-input"
             placeholder="Justificativa curta (opcional)..."
@@ -1347,6 +1348,27 @@ window.saveAjuste = async(key, field, value)=>{
   } catch(e){
     showToast('❌ Erro','Falha ao salvar avaliação. Verifique a conexão.');
     console.error('[saveAjuste] erro:', e);
+  }
+};
+
+// Exclui a avaliação (nota + justificativa) de um campo — só gestão.
+window.limparAjuste = async(key, field)=>{
+  if(!state.isManager){ showToast('Sem permissão','Apenas a gestão pode excluir avaliação.'); return; }
+  if(!confirm('Excluir esta avaliação? A nota e a justificativa serão removidas.')) return;
+  const now = Date.now();
+  // Limpa o cache local (e o merge do onValue não vai mais preservar o valor antigo)
+  if(state.kanbanCards[key]){ delete state.kanbanCards[key][field]; delete state.kanbanCards[key][field+'_obs']; state.kanbanCards[key].updatedAt = now; }
+  if(window._arquivoCards?.[key]){ delete window._arquivoCards[key][field]; delete window._arquivoCards[key][field+'_obs']; }
+  const cardForRender = state.kanbanCards[key] || window._arquivoCards?.[key] || {};
+  kdRenderAvaliacao({...cardForRender, _key:key});
+  const targetRef = state.kanbanCards[key] ? kanbanRef : arquivoRef;
+  try{
+    await update(child(targetRef, key), { [field]: null, [field+'_obs']: null, updatedAt: now });
+    registrarLog('avaliar', `Excluiu avaliação de ${field==='ajuste_curadoria'?'curadoria':'demanda'}`, (cardForRender.name||'').slice(0,40));
+    showToast('Avaliação excluída', 'A nota foi removida.');
+  }catch(e){
+    showToast('Erro','Não foi possível excluir a avaliação.');
+    console.error('[limparAjuste]', e);
   }
 };
 

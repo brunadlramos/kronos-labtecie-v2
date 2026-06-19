@@ -50,14 +50,14 @@
       <div class="modal-field full"><label class="modal-label" for="mTask">Tarefa</label><input class="modal-input" id="mTask" type="text" placeholder="Descrição da tarefa" maxlength="200" aria-required="true"></div>
       <div class="modal-field" id="mCollabField" style="display:none"><label class="modal-label" for="mCollab">Colaborador</label>
         <select class="modal-select" id="mCollab">
-          
+          <option value="">Selecionar...</option>
         </select>
       </div>
       <div class="modal-field"><label class="modal-label" for="mProject">Projeto</label>
         <div style="display:flex;align-items:center;gap:7px;">
           <span id="mProjectColorDot" style="width:10px;height:10px;border-radius:50%;background:#94A3B8;flex-shrink:0;transition:background 0.2s;"></span>
           <select class="modal-select" id="mProject" onchange="updateProjectColorDot(this,'mProjectColorDot')" style="flex:1;">
-          <option value="">Selecione um projeto...</option>
+          <option value="">Selecionar...</option>
         </select>
         </div>
       </div>

@@ -168,10 +168,10 @@ export function openModal(id) {
     document.getElementById('mStart').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     document.getElementById('mEnd').value   = `${String(endDefault.getHours()).padStart(2,'0')}:${String(endDefault.getMinutes()).padStart(2,'0')}`;
     document.getElementById('mObs').value   = '';
-    // Para gestora/admin: deixa mCollab sem valor fixo para forçar seleção consciente
+    // Selects sempre começam em "Selecionar..." (sem último valor nem alfabético) — escolha consciente
     const collabSel = document.getElementById('mCollab');
-    if(collabSel) collabSel.value = state.isManager ? (collabSel.options[1]?.value || state.currentCollabKey || '') : (state.currentCollabKey || '');
-    document.getElementById('mProject').value = 'trabalho';
+    if(collabSel) collabSel.value = '';
+    document.getElementById('mProject').value = '';
     _ctx.updateProjectColorDot(document.getElementById('mProject'), 'mProjectColorDot');
     _ctx.clearTags(document.getElementById('mTagsContainer'));
     document.getElementById('mPeriodsWrap').style.display = 'none';
@@ -234,6 +234,12 @@ export async function saveModal() {
     return;
   }
   const project = document.getElementById('mProject').value;
+  if(!project){
+    const el = document.getElementById('mProject');
+    if(el){ el.style.borderColor='var(--danger)'; setTimeout(()=>el.style.borderColor='',3000); }
+    showToast('Projeto obrigatório','Selecione o projeto para este registro.');
+    return;
+  }
   const obs     = document.getElementById('mObs').value.trim().slice(0,500);
   const tags    = _ctx.getSelectedTags(document.getElementById('mTagsContainer'));
   const [sh,sm] = document.getElementById('mStart').value.split(':').map(Number);
