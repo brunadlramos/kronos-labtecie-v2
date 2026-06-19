@@ -1607,7 +1607,7 @@ window.renderIndicadores = ()=>{
             return obsVal ? `<span title="${escH(obsVal)}">"${escH(obsVal.length>60?obsVal.slice(0,60)+'…':obsVal)}"</span>` : '<span style="color:var(--border)">—</span>';
           })()}
         </td>
-        <td style="padding:9px 14px;font-size:0.7rem;font-family:var(--mono);color:var(--muted);">${ts?new Date(ts).toLocaleDateString('pt-BR'):'—'}</td>
+        <td style="padding:9px 14px;font-size:0.7rem;font-family:var(--mono);color:var(--muted);white-space:nowrap;">${ts?new Date(ts).toLocaleDateString('pt-BR'):'—'}${c.manual && (state.isManager||state.isAuditor) ? ` <button onclick="excluirDemandaManual('${c._manualKey}',event)" title="Excluir demanda manual" style="margin-left:6px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:5px;padding:1px 7px;font-size:0.62rem;font-weight:800;cursor:pointer;">✕</button>` : ''}</td>
       </tr>`;
     }).join('') || `<tr><td colspan="6" style="padding:20px;text-align:center;font-size:0.78rem;color:var(--muted);">Nenhum card avaliado com esses filtros.</td></tr>`;
   }
@@ -1683,6 +1683,22 @@ window.saveDemandaManual = async()=>{
   }catch(e){
     showToast('Erro','Não foi possível salvar a demanda manual.');
     console.error('[saveDemandaManual]', e);
+  }
+};
+// Exclui uma demanda adicionada manualmente (só gestão/coordenação)
+window.excluirDemandaManual = async(manualKey, ev)=>{
+  if(ev) ev.stopPropagation();
+  if(!state.isManager && !state.isAuditor){ showToast('Sem permissão','Apenas gestão/coordenação pode excluir.'); return; }
+  if(!manualKey){ return; }
+  if(!confirm('Excluir esta demanda manual? Ela some dos Indicadores.')) return;
+  try{
+    await remove(child(indicadoresManuaisRef, manualKey));
+    registrarLog('avaliar','Excluiu demanda manual', manualKey);
+    showToast('Demanda manual excluída','');
+    renderIndicadores();
+  }catch(e){
+    showToast('Erro','Não foi possível excluir a demanda manual.');
+    console.error('[excluirDemandaManual]', e);
   }
 };
 
