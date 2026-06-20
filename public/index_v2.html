@@ -115,7 +115,6 @@
         </label>
         <button class="btn-sm" id="avatarRemovePhotoBtn" onclick="removeAvatarPhoto()" style="display:none;">Remover foto</button>
       </div>
-      <div style="font-size:0.66rem;color:var(--muted);margin-top:6px;">A foto é reduzida e salva pequena (sem custo). Se houver foto, ela tem prioridade sobre o emoji.</div>
     </div>
     <label class="modal-label" style="margin-bottom:6px;display:block;" for="avatarNameInput">Seu nome de exibição</label>
     <input class="modal-input" id="avatarNameInput" type="text" maxlength="40" placeholder="Como seu nome aparece para a equipe" style="width:100%;margin-bottom:16px;">
@@ -158,27 +157,9 @@
       <div class="avatar-opt" onclick="selectEmoji(this,'💪')" role="button" tabindex="0" aria-label="Emoji 💪">💪</div>
     </div>
     <div class="modal-label" style="margin-bottom:8px;">Cor do fundo</div>
-    <div class="color-grid" id="avatarColorGrid">
-      <div class="color-opt selected" onclick="selectColor(this,'#F15A24')" style="background:#F15A24"></div>
-      <div class="color-opt" onclick="selectColor(this,'#7C6AFF')" style="background:#7C6AFF"></div>
-      <div class="color-opt" onclick="selectColor(this,'#10B981')" style="background:#10B981"></div>
-      <div class="color-opt" onclick="selectColor(this,'#F59E0B')" style="background:#F59E0B"></div>
-      <div class="color-opt" onclick="selectColor(this,'#EF4444')" style="background:#EF4444"></div>
-      <div class="color-opt" onclick="selectColor(this,'#8B5CF6')" style="background:#8B5CF6"></div>
-      <div class="color-opt" onclick="selectColor(this,'#EC4899')" style="background:#EC4899"></div>
-      <div class="color-opt" onclick="selectColor(this,'#06B6D4')" style="background:#06B6D4"></div>
-      <div class="color-opt" onclick="selectColor(this,'#6366F1')" style="background:#6366F1"></div>
-      <div class="color-opt" onclick="selectColor(this,'#1A1A2E')" style="background:#1A1A2E"></div>
-      <div class="color-opt" onclick="selectColor(this,'#0EA5E9')" style="background:#0EA5E9"></div>
-      <div class="color-opt" onclick="selectColor(this,'#22C55E')" style="background:#22C55E"></div>
-      <div class="color-opt" onclick="selectColor(this,'#EAB308')" style="background:#EAB308"></div>
-      <div class="color-opt" onclick="selectColor(this,'#F97316')" style="background:#F97316"></div>
-      <div class="color-opt" onclick="selectColor(this,'#D946EF')" style="background:#D946EF"></div>
-      <div class="color-opt" onclick="selectColor(this,'#64748B')" style="background:#64748B"></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
-      <label for="avatarColorWheel" style="font-size:0.75rem;color:var(--muted);font-weight:600;">Ou escolha qualquer cor:</label>
-      <input type="color" id="avatarColorWheel" value="#F15A24" oninput="selectColorWheel(this.value)" aria-label="Seletor de cor livre" style="width:48px;height:34px;padding:2px;border-radius:8px;cursor:pointer;border:1.5px solid var(--border);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <input type="color" id="avatarColorWheel" value="#F15A24" oninput="selectColorWheel(this.value)" aria-label="Seletor de cor do fundo" style="width:56px;height:40px;padding:2px;border-radius:8px;cursor:pointer;border:1.5px solid var(--border);">
+      <span style="font-size:0.75rem;color:var(--muted);font-weight:600;">Clique no quadrado para escolher qualquer cor.</span>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeAvatarPicker()">Cancelar</button>

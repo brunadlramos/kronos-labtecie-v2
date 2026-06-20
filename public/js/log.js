@@ -98,7 +98,7 @@ window.openLogPanel = function(){
   const c = document.getElementById('logViewerContent');
   if(c && !c.dataset.loaded){
     c.innerHTML = `<div style="text-align:center;padding:42px 16px;color:var(--muted);">
-      <div style="font-size:0.82rem;margin-bottom:16px;line-height:1.5;">O log não é carregado automaticamente<br>para economizar acessos ao banco.</div>
+      <div style="font-size:0.82rem;margin-bottom:16px;line-height:1.5;">Clique para carregar os registros.</div>
       <button class="btn-sm" onclick="renderLogsPanel()" style="font-weight:700;">↻ Carregar registros</button>
     </div>`;
   }

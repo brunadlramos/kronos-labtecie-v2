@@ -60,6 +60,7 @@ export const app = {
   allAvatars:       {},
   usersConfig:      {},            // {collabKey: {active: bool}}
   indicadoresManuais: {},          // demandas adicionadas manualmente (só Indicadores)
+  capDia:           {},            // {dk: {collabKey: true}} — dias "fechados em 100%" pela gestora
 
   // ── Memoização de entries ─────────────────────────────────────────────────
   _entriesVersion:      0,

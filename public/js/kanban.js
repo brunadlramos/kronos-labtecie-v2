@@ -1587,7 +1587,7 @@ window.renderIndicadores = ()=>{
       const badgeCur  = ajusteLabel(c.ajuste_curadoria);
       const ts = c.ajuste_avaliado_em||c.updatedAt||0;
       return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:9px 14px;font-size:0.78rem;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${c.manual?'':'cursor:pointer;'}" ${c.manual?'':`onclick="openKanbanDetail('${c._key}')"`} title="${c.manual?escH('Adicionada manualmente'+(c.motivo?': '+c.motivo:'')):'Abrir card'}">${escH(c.name||c.title||'Sem nome')}${c.manual?' <span class="ind-manual-tag">✋ manual</span>':''}</td>
+        <td style="padding:9px 14px;font-size:0.78rem;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${c.manual?'':'cursor:pointer;'}" ${c.manual?'':`onclick="openKanbanDetail('${c._key}')"`} title="${c.manual?escH('Adicionada manualmente'+(c.motivo?': '+c.motivo:'')):'Abrir card'}">${escH(c.name||c.title||'Sem nome')}${c.manual?' <span class="ind-manual-tag">manual</span>':''}</td>
         <td style="padding:9px 14px;">
           <div style="display:flex;align-items:center;gap:5px;">
             <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${col.initials}</div>

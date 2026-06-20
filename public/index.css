@@ -535,6 +535,10 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 .collab-card-rank.gold{color:#F59E0B;}
 .collab-card-rank.silver{color:#94A3B8;}
 .collab-card-rank.bronze{color:#B45309;}
+.collab-card.capped{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;}
+.cap-toggle{flex-shrink:0;align-self:flex-start;font-family:var(--mono);font-size:0.6rem;font-weight:800;letter-spacing:0.02em;padding:3px 7px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.cap-toggle:hover{border-color:var(--orange-border);color:var(--orange);}
+.cap-toggle.on{background:var(--orange);border-color:var(--orange);color:#fff;}
 .collab-card-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;}
 .ccs-label{font-size:var(--fz-2xs);font-weight:700;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:2px;}
 .ccs-value{font-family:var(--mono);font-size:0.85rem;font-weight:500;}
@@ -869,8 +873,9 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .nav-item-sub.active{border-left-color:var(--orange);background:var(--orange-light);color:var(--orange);font-weight:700;}
 
 /* ── AVATAR PICKER MODAL ── */
-.avatar-modal{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;width:100%;max-width:400px;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;}
-.avatar-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:16px 0;}
+.avatar-modal{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;width:100%;max-width:580px;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;}
+.avatar-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin:16px 0;}
+@media(max-width:560px){.avatar-grid{grid-template-columns:repeat(6,1fr);}}
 .avatar-opt{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;cursor:pointer;border:2px solid transparent;transition:all 0.18s;background:var(--surface2);}
 .avatar-opt:hover{transform:scale(1.15);border-color:var(--orange);}
 .avatar-opt.selected{border-color:var(--orange);box-shadow:0 0 0 3px rgba(241,90,36,0.2);}

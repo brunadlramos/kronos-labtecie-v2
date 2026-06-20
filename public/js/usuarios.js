@@ -335,7 +335,7 @@ window.openNovoColabModal = function(){
           <input class="modal-input" id="editColabSenha" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" style="width:100%;padding-right:44px;">
           <button type="button" onclick="const i=document.getElementById('editColabSenha');i.type=i.type==='password'?'text':'password';" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;">${ICONS.edit}</button>
         </div>
-        <div style="font-size:0.68rem;color:var(--muted);margin-top:4px;">A conta Firebase Auth será criada automaticamente com este e-mail e senha.</div>
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:4px;">A conta será criada com este e-mail e senha.</div>
       </label>
       ${state.userPapel === 'admin' ? `
       <label class="modal-label">Equipe

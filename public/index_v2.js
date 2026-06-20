@@ -40,7 +40,7 @@ import {
   EQUIPE_ID,
   entriesRef, kanbanRef, customTagsRef, removedTagsRef, customProjectsRef,
   muralRef, desafioRef, usersRef, notifsRef, avatarsRef, arquivoRef,
-  approvalRequestsRef, activeTimersRef, holidaysRef, indicadoresManuaisRef,
+  approvalRequestsRef, activeTimersRef, holidaysRef, indicadoresManuaisRef, capDiaRef,
   _buildRefs, _getSecondaryAuth,
   createUserWithEmailAndPassword, signOut, logEvent
 } from './js/firebase-refs.js';
@@ -214,6 +214,8 @@ function _applyConfig(cfg){
         if(u.horasSemana !== undefined) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), horasSemana: u.horasSemana };
         // Ausências recorrentes (ex.: estágio) — reduzem a meta do dia automaticamente
         if(Array.isArray(u.ausencias) && u.ausencias.length) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), ausencias: u.ausencias };
+        // Férias — períodos com meta zerada (sem penalidade), exibe "Férias"
+        if(Array.isArray(u.ferias) && u.ferias.length) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), ferias: u.ferias };
       } else if(u.papel === 'rh' || u.papel === 'auditor' || u.papel === 'coordenador'){
         if(em) state.AUDITOR_EMAILS.push(em);
         if(em) state.MANAGER_PROFILES[em] = { label:_clean(u.nome||em), initials:_clean(u.iniciais||'??'), color:_color(u.cor), role:'Coordenador' };
@@ -353,6 +355,12 @@ function startDataListeners(){
     if(document.getElementById('page-indicadores')?.classList.contains('active') && typeof window.renderIndicadores==='function') window.renderIndicadores();
   },(err)=>console.warn('[V2] indicadoresManuais:', err));
 
+  if(_unsubCapDia) _unsubCapDia();
+  _unsubCapDia = onValue(capDiaRef,(snap)=>{
+    state.capDia = snap.val()||{};
+    renderDebounced();
+  },(err)=>console.warn('[V2] capDia:', err));
+
   if(_unsubNotifs) _unsubNotifs();
   const _notifsQuery = query(notifsRef, orderByChild('to'), equalTo(state.currentCollabKey));
   _unsubNotifs = onValue(_notifsQuery,(snap)=>{
@@ -412,7 +420,7 @@ let _unsubEntries = null, _unsubKanban = null, _unsubActiveTimers = null;
 let _unsubNotifs = null, _unsubCustomTags = null, _unsubCustomProjects = null;
 let _unsubMural = null, _unsubDesafio = null, _unsubUsers = null;
 let _unsubKanban2 = null, _unsubNotifs2 = null, _unsubAvatars = null, _unsubArquivo = null;
-let _unsubApprovals = null, _unsubHolidays = null, _unsubIndManuais = null;
+let _unsubApprovals = null, _unsubHolidays = null, _unsubIndManuais = null, _unsubCapDia = null;
 
 // ── ENTRIES ARRAY MEMOIZATION ─────────────────────────────────────────────────
 
@@ -550,11 +558,29 @@ onAuthStateChanged(auth, async user => {
 window.doLogout = () => {
   [_unsubEntries, _unsubKanban, _unsubActiveTimers, _unsubNotifs, _unsubCustomTags,
    _unsubCustomProjects, _unsubMural, _unsubDesafio, _unsubUsers,
-   _unsubKanban2, _unsubNotifs2, _unsubAvatars, _unsubArquivo, _unsubApprovals, _unsubHolidays, _unsubIndManuais].forEach(fn => fn?.());
+   _unsubKanban2, _unsubNotifs2, _unsubAvatars, _unsubArquivo, _unsubApprovals, _unsubHolidays, _unsubIndManuais, _unsubCapDia].forEach(fn => fn?.());
   if(state.intervalId) clearInterval(state.intervalId);
   if(state.noActivityTimer) clearTimeout(state.noActivityTimer);
   if(state._onlineAutoRefresh){ clearInterval(state._onlineAutoRefresh); state._onlineAutoRefresh=null; }
   signOut(auth).then(() => window.location.href='login_v2.html').catch(()=>{ window.location.href='login_v2.html'; });
+};
+
+
+// ── CAP DIA (fechar dia em 100%) ──────────────────────────────────────────────
+// Marca/desmarca capDia/{dk}/{collabKey}. Só gestão (regra do RTDB também valida).
+window.toggleCapDia = async (collabKey, dk) => {
+  if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
+  if(!collabKey || !dk) return;
+  const node = child(capDiaRef, `${dk}/${collabKey}`);
+  const on = !(state.capDia?.[dk]?.[collabKey]);
+  try {
+    if(on) await set(node, true);
+    else   await remove(node);
+    try { registrarLog('capDia', `${on?'Fechou':'Reabriu'} dia em 100%`, `${collabKey} · ${dk}`); } catch(e){}
+  } catch(e) {
+    console.warn('[toggleCapDia]', e);
+    alert('Não foi possível alterar o fechamento do dia: ' + (e?.message||e));
+  }
 };
 
 
@@ -573,7 +599,7 @@ window.openHolidaysModal = () => {
   modal.innerHTML = `
     <div style="background:var(--surface);border-radius:16px;padding:24px;width:440px;max-width:95vw;max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="font-size:1rem;font-weight:800;">🏖 Feriados e Folgas</div>
+        <div style="font-size:1rem;font-weight:800;">Feriados e Folgas</div>
         <button onclick="document.getElementById('holidaysModal').remove()" aria-label="Fechar" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);"><span aria-hidden="true">✕</span></button>
       </div>
       ${canEdit ? `

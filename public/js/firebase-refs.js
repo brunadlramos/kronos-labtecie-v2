@@ -44,6 +44,7 @@ export let activeTimersRef     = ref(db, `equipes/${EQUIPE_ID}/activeTimers`);
 export let holidaysRef         = ref(db, `equipes/${EQUIPE_ID}/holidays`);
 export let logsRef             = ref(db, `equipes/${EQUIPE_ID}/logs`);
 export let indicadoresManuaisRef = ref(db, `equipes/${EQUIPE_ID}/indicadoresManuais`);
+export let capDiaRef           = ref(db, `equipes/${EQUIPE_ID}/capDia`);
 
 // ── _buildRefs — reatribui todos os refs ao trocar de equipe ─────────────────
 export function _buildRefs(equipeId) {
@@ -64,6 +65,7 @@ export function _buildRefs(equipeId) {
   holidaysRef         = ref(db, `equipes/${equipeId}/holidays`);
   logsRef             = ref(db, `equipes/${equipeId}/logs`);
   indicadoresManuaisRef = ref(db, `equipes/${equipeId}/indicadoresManuais`);
+  capDiaRef           = ref(db, `equipes/${equipeId}/capDia`);
 }
 
 // ── Segunda instância Firebase — cria usuários sem deslogar a gestora ─────────

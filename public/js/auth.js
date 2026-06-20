@@ -97,9 +97,8 @@ export async function bootV2(user, { applyConfig, initDefaultConfig, showEquipeS
       if (spin) spin.style.display = 'none';
       const txt = loadEl.querySelector('.app-loading-text');
       if (txt) txt.innerHTML =
-        'Perfil não encontrado no banco de dados.<br>' +
-        `<span style="font-size:0.65rem;opacity:0.75;font-family:monospace">UID: ${user.uid}</span><br>` +
-        `<span style="font-size:0.65rem;opacity:0.6">Crie /usuarios/${user.uid} no Firebase Console.</span>`;
+        'Seu perfil ainda não foi configurado.<br>Entre em contato com o administrador.<br>' +
+        `<span style="font-size:0.65rem;opacity:0.6;font-family:monospace">ID: ${user.uid}</span>`;
     }
     console.warn('[bootV2] Perfil ausente. Email:', user.email, '| UID:', user.uid);
     return { booted: false, userPapel: null, userEquipes: [], equipeAtiva: null, coordenacaoAtiva: null };

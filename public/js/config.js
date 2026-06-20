@@ -34,6 +34,10 @@ function _uniqueId(base, existing){
   return id;
 }
 
+// Quem pode alterar o CARGO de um colaborador (promover/rebaixar): só coordenador/admin.
+// A gestão apenas ativa a curadoria — não promove colaboradores.
+function _canPromover(){ return state.userPapel === 'admin' || state.userPapel === 'coordenador'; }
+
 // ── CFG: COLABORADORES ───────────────────────────────────────────────────────
 export async function renderCfgColaboradores(targetEl){
   const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/usuarios`));
@@ -58,7 +62,7 @@ export async function renderCfgColaboradores(targetEl){
         ${Object.entries(data).map(([uid,u])=>`<tr>
           <td><input class="filter-select" value="${escH(u.nome||u.key||uid)}" id="unm_${uid}" style="width:120px;height:var(--ctrl-h)"></td>
           <td style="font-size:0.75rem;color:var(--muted);white-space:nowrap">${escH(u.email||'')}</td>
-          <td><select class="filter-select" id="upl_${uid}" style="width:110px">
+          <td><select class="filter-select" id="upl_${uid}" style="width:110px" ${_canPromover()?'':'disabled title="Apenas o coordenador altera o cargo. A gestão só ativa a curadoria."'}>
             <option value="colaborador"  ${u.papel==='colaborador'?'selected':''}>Colaborador</option>
             <option value="gestora"      ${u.papel==='gestora'?'selected':''}>Gestão</option>
             <option value="coordenador"  ${(u.papel==='coordenador'||u.papel==='auditor'||u.papel==='rh')?'selected':''}>Coordenador</option>
@@ -92,6 +96,7 @@ export async function renderCfgColaboradores(targetEl){
           <td style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-sm" onclick="cfgSaveColaborador('${uid}')">${ICONS.save} Salvar</button>
             <button class="btn-sm" onclick="openAusenciasModal('${uid}')" title="Ausências recorrentes (ex.: estágio)" style="font-size:0.7rem;">⏰ Ausências${Array.isArray(u.ausencias)&&u.ausencias.length?` (${u.ausencias.length})`:''}</button>
+            <button class="btn-sm" onclick="openFeriasModal('${uid}')" title="Períodos de férias" style="font-size:0.7rem;">Férias${Array.isArray(u.ferias)&&u.ferias.length?` (${u.ferias.length})`:''}</button>
             <label class="btn-sm" style="cursor:pointer;font-size:0.7rem;" title="Foto do colaborador">📷 Foto<input type="file" accept="image/*" onchange="cfgUploadColabFoto('${escH(u.key||uid)}', this)" style="display:none;"></label>
             ${u.email?`<button class="btn-sm" onclick="cfgResetPassword('${escH(u.email)}')" title="Redefinir senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
           </td>
@@ -125,7 +130,8 @@ window.cfgSaveColaborador = async function(uid){
   const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/usuarios/${uid}`));
   const orig = snap.val()||{};
   const nome     = document.getElementById(`unm_${uid}`)?.value?.trim()||orig.nome;
-  const papel    = document.getElementById(`upl_${uid}`)?.value||orig.papel;
+  // Cargo só muda se o usuário pode promover (coordenador/admin). Gestão mantém o original.
+  const papel    = _canPromover() ? (document.getElementById(`upl_${uid}`)?.value||orig.papel) : (orig.papel||'colaborador');
   const cor      = document.getElementById(`ucl_${uid}`)?.value||orig.cor;
   const ativo    = document.getElementById(`uat_${uid}`)?.checked;
   const curadora = document.getElementById(`ucr_${uid}`)?.checked;
@@ -242,6 +248,89 @@ window.saveAusencias = async ()=>{
   }catch(e){
     showToast('Erro','Não foi possível salvar as ausências.');
     console.error('[saveAusencias]', e);
+  }
+};
+
+// ── FÉRIAS (períodos por colaborador) ─────────────────────────────────────────
+// Intervalos de datas em que o colaborador está de férias. Nesses dias a meta é 0
+// (não é penalizado) e a tabela/cards mostram "Férias".
+const _fmtFeriasRange = (ini,fim)=>{
+  const f = s => { const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||'')); return m?`${m[3]}/${m[2]}/${m[1]}`:s; };
+  return `${f(ini)} → ${f(fim)}`;
+};
+window.openFeriasModal = async function(uid){
+  const snap = await get(ref(db,`equipes/${EQUIPE_ID}/config/usuarios/${uid}`));
+  const u = snap.val()||{};
+  window._ferUid  = uid;
+  window._ferKey  = u.key || uid;
+  window._ferNome = u.nome || u.key || uid;
+  window._ferList = Array.isArray(u.ferias) ? u.ferias.map(a=>({...a})) : [];
+  let modal = document.getElementById('feriasModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'feriasModal';
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    document.body.appendChild(modal);
+  }
+  _renderFeriasModal();
+  modal.classList.add('open');
+};
+window.closeFeriasModal = ()=>{ document.getElementById('feriasModal')?.classList.remove('open'); };
+function _renderFeriasModal(){
+  const modal = document.getElementById('feriasModal'); if(!modal) return;
+  const list = (window._ferList||[]).slice().sort((a,b)=>String(a.ini).localeCompare(String(b.ini)));
+  const linhas = list.length ? list.map((a,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
+      <div style="flex:1;font-size:0.78rem;"><strong>${escH(_fmtFeriasRange(a.ini,a.fim))}</strong>${a.motivo?` · <span style="color:var(--muted)">${escH(a.motivo)}</span>`:''}</div>
+      <button class="btn-sm danger" onclick="removeFerias(${i})" style="font-size:0.7rem;" aria-label="Remover">${ICONS.trash}</button>
+    </div>`).join('') : `<div style="font-size:0.78rem;color:var(--muted);padding:6px 0;">Nenhum período cadastrado.</div>`;
+  modal.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <div class="modal-title">Férias de ${escH(window._ferNome||'')}</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin:-6px 0 14px;line-height:1.5;">Nos dias dentro do período, a meta do dia fica zerada e o colaborador aparece como "Férias".</div>
+      <div style="margin-bottom:12px;">${linhas}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--border);padding-top:12px;">
+        <div><label class="modal-label" for="ferIni">Início</label>
+          <input class="modal-input" type="date" id="ferIni" style="width:150px;"></div>
+        <div><label class="modal-label" for="ferFim">Fim</label>
+          <input class="modal-input" type="date" id="ferFim" style="width:150px;"></div>
+        <div style="flex:1;min-width:120px;"><label class="modal-label" for="ferMotivo">Motivo (opcional)</label>
+          <input class="modal-input" type="text" id="ferMotivo" placeholder="Ex.: férias" maxlength="60"></div>
+        <button class="btn-sm" onclick="addFerias()" style="height:var(--ctrl-h);">+ Adicionar</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeFeriasModal()">Cancelar</button>
+        <button class="btn-save" onclick="saveFerias()">Salvar</button>
+      </div>
+    </div>`;
+}
+window.addFerias = ()=>{
+  const ini = document.getElementById('ferIni')?.value||'';
+  const fim = document.getElementById('ferFim')?.value||'';
+  const motivo = (document.getElementById('ferMotivo')?.value||'').trim().slice(0,60);
+  if(!ini || !fim){ showToast('⚠️ Atenção','Informe início e fim.'); return; }
+  if(fim < ini){ showToast('⚠️ Atenção','O fim deve ser igual ou depois do início.'); return; }
+  window._ferList = window._ferList||[];
+  window._ferList.push({ini, fim, motivo});
+  _renderFeriasModal();
+};
+window.removeFerias = (i)=>{ (window._ferList||[]).splice(i,1); _renderFeriasModal(); };
+window.saveFerias = async ()=>{
+  const uid = window._ferUid, key = window._ferKey;
+  const list = window._ferList||[];
+  try{
+    await update(ref(db,`equipes/${EQUIPE_ID}/config/usuarios/${uid}`), { ferias: list.length ? list : null });
+    state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), ferias: list.length ? list : undefined };
+    registrarLog('config','Atualizou férias', `${window._ferNome} (${list.length})`);
+    showToast('Salvo','Férias atualizadas.');
+    closeFeriasModal();
+    try { window.renderDashboard?.(); } catch(e){}
+    await renderCfgColaboradores(document.getElementById('usuariosConfigArea')||document.getElementById('cfgContent'));
+  }catch(e){
+    showToast('Erro','Não foi possível salvar as férias.');
+    console.error('[saveFerias]', e);
   }
 };
 
