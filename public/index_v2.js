@@ -447,6 +447,7 @@ onAuthStateChanged(auth, async user => {
   const email     = (user.email||'').toLowerCase();
   // isAuditor é definido primeiro — coordenador nunca vira gestor mesmo se estiver em config de equipe
   state.isAuditor = state.userPapel === 'rh' || state.userPapel === 'auditor' || state.userPapel === 'coordenador';
+  state.isRH = state.userPapel === 'rh';   // RH: visão ampla (2 coordenações), porém SOMENTE LEITURA
   state.isManager = !state.isAuditor && (state.MANAGER_EMAILS.includes(email) || state.userPapel === 'gestora' || isAdmin);
   state.currentCollabKey = state.COLLAB_EMAILS[email] || null;
 
@@ -501,6 +502,21 @@ onAuthStateChanged(auth, async user => {
     show('btnNovoColab'); show('btnKanbanCols',''); show('btnArquivoMortoCols',''); show('btnArquivoCols','');
     show('ferrFeriados');
     hide('collabWrap'); hide('navMeuDashboard');
+
+  } else if(state.isRH){
+    // RH — SOMENTE LEITURA das 2 coordenações: Dashboard, Fluxo de Demandas e Gestão.
+    // Sem Timer, Meus Registros, Ferramentas e sem nenhum botão de edição.
+    hide('navTimer'); hide('navMeuHistorico'); hide('navMeuDashboard');
+    hide('collabWrap'); hide('desafioTopBtn');
+    hide('navFerramentas');
+    show('navDashboard'); show('navGestora'); show('navIndicadores','');
+    show('navKanban','flex');
+    // edição desligada: NÃO mostra mCollabField, btnNovoColab, btnManageTags, colunas, ferrConfig
+    hide('mCollabField'); hide('btnNovoColab'); hide('btnManageTags');
+    hide('btnKanbanCols'); hide('btnArquivoMortoCols'); hide('btnArquivoCols');
+    hide('ferrConfig'); hide('ferrFeriados');
+    if(state.userEquipes.length > 1) renderEquipeSelector(state.userEquipes, state.equipeAtiva);
+    setTimeout(()=>showPage('dashboard', document.querySelector('[onclick*="\'dashboard\'"]')), 100);
 
   } else if(state.isAuditor){
     // COORDENADOR — acesso igual ao admin, sem Timer / Meus Registros
@@ -566,7 +582,7 @@ window.doLogout = () => {
 };
 
 
-// ── CAP DIA (fechar dia em 100%) ──────────────────────────────────────────────
+// ── CAP DIA (piso de 95%) ─────────────────────────────────────────────────────
 // Marca/desmarca capDia/{dk}/{collabKey}. Só gestão (regra do RTDB também valida).
 window.toggleCapDia = async (collabKey, dk) => {
   if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
@@ -576,10 +592,32 @@ window.toggleCapDia = async (collabKey, dk) => {
   try {
     if(on) await set(node, true);
     else   await remove(node);
-    try { registrarLog('capDia', `${on?'Fechou':'Reabriu'} dia em 100%`, `${collabKey} · ${dk}`); } catch(e){}
+    try { registrarLog('capDia', `${on?'Ativou':'Removeu'} piso 95%`, `${collabKey} · ${dk}`); } catch(e){}
   } catch(e) {
     console.warn('[toggleCapDia]', e);
-    alert('Não foi possível alterar o fechamento do dia: ' + (e?.message||e));
+    alert('Não foi possível alterar o piso do dia: ' + (e?.message||e));
+  }
+};
+
+// Liga/desliga o piso de 95% para TODOS os colaboradores do dia exibido (gestão).
+window.toggleCapDiaAll = async () => {
+  if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
+  const dk = dKey(state.dashDay);
+  // mesma regra do renderDashCards: ativos e não-gestores
+  const keys = Object.keys(state.COLLABS).filter(k =>
+    (state.usersConfig[k]?.active !== false) &&
+    !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||'')
+  );
+  if(!keys.length) return;
+  const allCapped = keys.every(k => state.capDia?.[dk]?.[k]);
+  const updates = {};
+  keys.forEach(k => { updates[k] = allCapped ? null : true; });  // null remove a folha
+  try {
+    await update(child(capDiaRef, dk), updates);
+    try { registrarLog('capDia', `${allCapped?'Removeu':'Ativou'} piso 95% de TODOS`, dk); } catch(e){}
+  } catch(e) {
+    console.warn('[toggleCapDiaAll]', e);
+    alert('Não foi possível atualizar todos: ' + (e?.message||e));
   }
 };
 

@@ -314,9 +314,12 @@ function _fmtMetaLabel(ms){
   return (m > 0 ? `${h}h${String(m).padStart(2,'0')}min` : `${h}h`) + ' = 100%';
 }
 
-// ── capDia (fechar dia em 100%) ──────────────────────────────────────────────────
+// ── capDia (piso de 95%) ──────────────────────────────────────────────────────
 // state.capDia = { dk: { collabKey: true } } — quando marcado, a %Total EXIBIDA do dia
-// vira 100% (card + tabela). Tempo/Amt continuam reais; o ranking do card usa a % real.
+// tem PISO de 95% (se o real for >=95 mantém; se for menor, exibe 95). Card + tabela.
+// Tempo/Amt continuam reais; o ranking (card e tabela) usa SEMPRE a % real.
+export const CAP_FLOOR = 95;
+export function capValue(perc){ return Math.max(CAP_FLOOR, perc); }
 export function isCapped(collabKey, dk){
   return !!(state.capDia && state.capDia[dk] && state.capDia[dk][collabKey]);
 }
@@ -340,9 +343,9 @@ export function renderDashCards() {
     const rankIcon = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
     const rankCls = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     const capped = isCapped(c.key, tk);
-    const dispTotal = capped ? 100 : c.percTotal;        // só a EXIBIÇÃO da %Total muda
+    const dispTotal = capped ? capValue(c.percTotal) : c.percTotal;  // piso de 95% só na EXIBIÇÃO
     const onVac = c.onVacation;
-    const capBtn = (canCap && !onVac) ? `<button class="cap-toggle ${capped?'on':''}" title="${capped?'Dia fechado em 100% — clique para reverter':'Fechar este dia em 100%'}" onclick="window.toggleCapDia('${c.key}','${tk}')">100%${capped?' ✓':''}</button>` : '';
+    const capBtn = (canCap && !onVac) ? `<button class="cap-toggle ${capped?'on':''}" title="${capped?'Piso de 95% ativo — clique para reverter':'Garantir piso de 95% neste dia'}" onclick="window.toggleCapDia('${c.key}','${tk}')">95%${capped?' ✓':''}</button>` : '';
     const vacBadge = onVac ? `<span style="font-size:0.6rem;font-weight:800;color:#fff;background:var(--orange);border-radius:100px;padding:2px 8px;white-space:nowrap;">Férias</span>` : '';
     return `<div class="collab-card${capped?' capped':''}">
       <div class="collab-card-header">
@@ -353,7 +356,7 @@ export function renderDashCards() {
       <div class="collab-card-stats">
         <div><div class="ccs-label">% Tempo</div><div class="ccs-value" style="color:var(--text)">${c.percTime.toFixed(1)}%</div></div>
         <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${c.percAmount.toFixed(1)}%</div></div>
-        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${dispTotal.toFixed(1)}%${capped?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${c.percTotal.toFixed(0)}%)</span>`:''}</div></div>
+        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${dispTotal.toFixed(1)}%${(capped && c.percTotal < CAP_FLOOR)?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${c.percTotal.toFixed(0)}%)</span>`:''}</div></div>
       </div>
       <div class="bar-label"><span>Meta (${_fmtMetaLabel(c.goalMs)})</span><span>${dispTotal.toFixed(1)}%</span></div>
       <div class="bar-track"><div class="bar-fill ${dispTotal>=100?'over':''}" style="width:${Math.min(dispTotal,100)}%"></div></div>
@@ -381,6 +384,19 @@ export function renderDashCards() {
     </div>`;
   }
   document.getElementById('cardsGrid').innerHTML = ownHtml + rankedHtml;
+
+  // Botão "piso de 95% para todos" (gestão) — liga/desliga todos os colaboradores do dia
+  const capAllBtn = document.getElementById('capAllBtn');
+  if(capAllBtn){
+    if(canCap && results.length){
+      const allCapped = results.every(c => isCapped(c.key, tk));
+      capAllBtn.style.display = '';
+      capAllBtn.textContent = allCapped ? 'Reverter 95% de todos' : 'Ativar 95% p/ todos';
+      capAllBtn.dataset.allcapped = allCapped ? '1' : '0';
+    } else {
+      capAllBtn.style.display = 'none';
+    }
+  }
 }
 
 // ── renderWeekTable ────────────────────────────────────────────────────────────
@@ -391,9 +407,9 @@ export function renderWeekTable() {
   const tbody = document.getElementById('weekTableBody');
   thead.innerHTML = `<tr><th class="name-col">Colaborador</th>${days.map(d=>{const iso=_dkToISO(dKey(d));const hol=state.allHolidays?.[iso];return`<th>${fmtShortDate(d)}${hol?`<br><span style="font-size:0.58rem;color:var(--orange);font-weight:600;">${escH(hol.label||'Feriado')}</span>`:''}</th>`;}).join('')}<th>Média</th><th>Rank</th></tr>`;
   // ✅ Gestora excluída das métricas coletivas
-  // eff = % EXIBIDA/MÉDIA: 100 quando o dia foi "fechado em 100%" pela gestão.
+  // eff = % EXIBIDA/MÉDIA: piso de 95% quando a gestão ativou o dia (real<95 → 95).
   // O RANKING (semanal e diário) usa SEMPRE a % original (item 190 do doc):
-  // ex. todos fechados em 100% → todos exibem 100%, mas o destaque continua sendo a maior % real.
+  // ex. dias com piso exibem >=95%, mas o destaque continua sendo a maior % real.
   const tableData = Object.keys(state.COLLABS)
     .filter(k => isActive(k) && !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''))
     .map(k => {
@@ -401,7 +417,7 @@ export function renderWeekTable() {
         const dk = dKey(d);
         const cd = calcDay(k, dk);
         cd.capped = isCapped(k, dk);
-        cd.eff = cd.capped ? 100 : cd.percTotal;
+        cd.eff = cd.capped ? capValue(cd.percTotal) : cd.percTotal;
         return cd;
       });
       const active = dayData.filter(d=>d.count>0).length;
@@ -437,7 +453,7 @@ export function renderWeekTable() {
       const color = d.eff>=90 ? 'var(--success)' : 'var(--danger)';
       const dr = dayRankMaps[i][c.key];
       const drBadge = dr<=3 ? `<span style="font-size:0.65rem;line-height:1;">${dayRankIcons[dr-1]}</span>` : `<span style="font-size:0.6rem;color:var(--muted);font-weight:700">#${dr}</span>`;
-      const sub = d.capped ? `<span class="cell-sub" style="color:var(--orange);font-weight:700" title="Dia fechado em 100% (real ${d.percTotal.toFixed(0)}%)">✓ fechado</span>` : `<span class="cell-sub">${d.percTime.toFixed(0)}%t +${d.percAmount.toFixed(0)}%a</span>`;
+      const sub = d.capped ? `<span class="cell-sub" style="color:var(--orange);font-weight:700" title="Piso de 95% ativo (real ${d.percTotal.toFixed(0)}%)">✓ piso 95%</span>` : `<span class="cell-sub">${d.percTime.toFixed(0)}%t +${d.percAmount.toFixed(0)}%a</span>`;
       return `<td class="${cls}" style="${todayStyle}"><div class="cell-multi"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><span class="cell-total" style="color:${color}">${d.eff.toFixed(1)}%</span>${drBadge}</div>${sub}</div></td>`;
     }).join('');
     return `<tr><td class="name-col"><div class="cell-collab"><div class="cell-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'0.8rem':'0.52rem'}">${getCollabAvatar(c.key).display}</div><div class="cell-name">${c.label}</div></div></td>${cells}<td><div class="cell-multi"><span class="cell-total" style="color:var(--orange)">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td><td>${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`}</td></tr>`;

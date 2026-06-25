@@ -51,7 +51,8 @@ export async function renderUsuarios(){
 
   // C3: configuração de jornada da equipe — visível p/ gestora E coordenador/auditor
   // (o coordenador analisa; a gravação segue restrita a gestora/admin pelas regras).
-  if(state.isManager || state.isAuditor){
+  // RH é SOMENTE LEITURA: pula a config editável e mostra só a visão consolidada abaixo.
+  if((state.isManager || state.isAuditor) && !state.isRH){
     const cfgArea = document.getElementById('usuariosConfigArea');
     if(cfgArea && !cfgArea.dataset.loaded){
       cfgArea.dataset.loaded = '1';
@@ -72,7 +73,9 @@ export async function renderUsuarios(){
   grid.innerHTML = _buildUserCards(Object.entries(data), state.isManager);
 }
 
-function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID){
+// avatarsMap (opcional): avatares DA EQUIPE daquele bloco — usado na visão admin/coord
+// que lista várias equipes. Sem ele, cai no state.allAvatars (equipe ativa) — caso da gestora.
+function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID, avatarsMap = null){
   const today = todayKey();
   const now = new Date(); const y=now.getFullYear(), mo=now.getMonth();
   const filtered = entries
@@ -88,6 +91,10 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID){
     const color    = u.cor || '#94A3B8';
     const active   = u.ativo !== false;
     const roleLabel = u.papel === 'gestora' ? 'Gestão' : u.papel === 'admin' ? 'Administração' : '';
+    // Foto: na visão multi-equipe usa o avatarsMap da equipe certa; senão, o avatar da equipe ativa.
+    const _photo = avatarsMap
+      ? (typeof avatarsMap[key]?.foto === 'string' && /^data:image\//.test(avatarsMap[key].foto) ? avatarsMap[key].foto : null)
+      : getCollabAvatar(key).photo;
     const todayData = calcDay(key, today);
     const todayH = Math.floor(todayData.totalMs/3600000);
     const todayM = Math.floor((todayData.totalMs%3600000)/60000);
@@ -98,7 +105,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID){
 
     return `<div class="user-mgmt-card${active?'':' inactive'}">
       <div class="user-mgmt-card-header">
-        <div class="user-mgmt-av" style="background:${color};overflow:hidden;${active?'':'filter:grayscale(0.5);opacity:0.7'}">${(()=>{const _p=getCollabAvatar(key).photo;return _p?`<img src="${_p}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`:escH(initials);})()}</div>
+        <div class="user-mgmt-av" style="background:${color};overflow:hidden;${active?'':'filter:grayscale(0.5);opacity:0.7'}">${_photo?`<img src="${_photo}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`:escH(initials)}</div>
         <div style="flex:1;min-width:0;">
           <div class="user-mgmt-name">${escH(u.nome||key)}</div>
           <div class="user-mgmt-email">${escH(u.email||'')}</div>
@@ -120,10 +127,14 @@ async function _renderUsuariosAdmin(grid, canEdit = true){
 
   const results = await Promise.all(equipes.map(async eqId => {
     try {
-      const snap = await get(ref(db,`equipes/${eqId}/config/usuarios`));
-      return { eqId, data: snap.val()||{} };
+      // busca config E avatares DESTA equipe (a foto vive em equipes/{eq}/avatars)
+      const [snap, avSnap] = await Promise.all([
+        get(ref(db,`equipes/${eqId}/config/usuarios`)),
+        get(ref(db,`equipes/${eqId}/avatars`)),
+      ]);
+      return { eqId, data: snap.val()||{}, avatars: avSnap.val()||{} };
     } catch(e) {
-      return { eqId, data: {} };
+      return { eqId, data: {}, avatars: {} };
     }
   }));
 
@@ -133,7 +144,7 @@ async function _renderUsuariosAdmin(grid, canEdit = true){
     return;
   }
 
-  grid.innerHTML = results.map(({ eqId, data })=>{
+  grid.innerHTML = results.map(({ eqId, data, avatars })=>{
     const entries = Object.entries(data).filter(([,u])=>u.papel!=='auditor');
     if(!entries.length) return '';
     const eqLabel = state.EQUIPE_LABELS[eqId] || eqId;
@@ -143,7 +154,7 @@ async function _renderUsuariosAdmin(grid, canEdit = true){
         <span style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">${escH(eqLabel)}</span>
         <span style="font-size:0.65rem;color:var(--muted);margin-left:6px;">${count} usuário${count!==1?'s':''}</span>
       </div>
-      ${_buildUserCards(entries, canEdit, eqId)}`;
+      ${_buildUserCards(entries, canEdit, eqId, avatars)}`;
   }).join('');
 }
 
@@ -337,10 +348,10 @@ window.openNovoColabModal = function(){
         </div>
         <div style="font-size:0.68rem;color:var(--muted);margin-top:4px;">A conta será criada com este e-mail e senha.</div>
       </label>
-      ${state.userPapel === 'admin' ? `
+      ${(state.userPapel === 'admin' || (state.isAuditor && !state.isRH)) ? `
       <label class="modal-label">Equipe
         <select class="modal-input" id="editColabEquipe" style="width:100%;margin-top:4px;">
-          <option value="all">Todas as equipes (acesso global)</option>
+          ${state.userPapel === 'admin' ? '<option value="all">Todas as equipes (acesso global)</option>' : ''}
           ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===EQUIPE_ID?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabEquipe" value="${EQUIPE_ID}">`}
@@ -350,6 +361,7 @@ window.openNovoColabModal = function(){
             <option value="colaborador">Colaborador</option>
             <option value="gestora">Gestão</option>
             <option value="coordenador">Coordenador</option>
+            ${state.userPapel === 'admin' ? '<option value="rh">RH (somente leitura)</option>' : ''}
           </select>
         </label>
         <label class="modal-label">Cor
@@ -398,7 +410,6 @@ window.saveNovoColab = async function(){
     const secAuth = _getSecondaryAuth();
     const cred = await createUserWithEmailAndPassword(secAuth, email, senha);
     const firebaseUid = cred.user.uid;
-    await signOut(secAuth);
 
     // Salva dados no banco usando o UID real do Firebase Auth
     const key = nome.toLowerCase()
@@ -410,12 +421,23 @@ window.saveNovoColab = async function(){
     const equipeDefault = todasEquipes[0] || 'diagramacao';
 
     const isCoord = papel === 'coordenador' || papel === 'auditor' || papel === 'rh';
-    if(equipeId === 'all' || isCoord){
-      // Coordenador/auditor: apenas no registro global, sem config de equipe
-      await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId:equipeDefault,equipes:todasEquipes,papel});
-    } else {
-      await set(ref(db,`equipes/${equipeId}/config/usuarios/${firebaseUid}`),userData);
-      await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId,papel});
+    // RH é SOMENTE LEITURA: equipeId '-' não casa com nenhuma equipe, então as regras
+    // que liberam escrita por "equipeId === $equipeId" (kanban/arquivo/mural) nunca o autorizam.
+    const equipeIdGlobal = papel === 'rh' ? '-' : equipeDefault;
+    // TRANSACIONAL: se a gravação no banco falhar, desfaz a conta Auth recém-criada
+    // (evita conta "fantasma" que causa "e-mail já em uso" em tentativas seguintes).
+    try {
+      if(equipeId === 'all' || isCoord){
+        await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId:equipeIdGlobal,equipes:todasEquipes,papel});
+      } else {
+        await set(ref(db,`equipes/${equipeId}/config/usuarios/${firebaseUid}`),userData);
+        await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId,papel});
+      }
+      await signOut(secAuth);
+    } catch(dbErr) {
+      try { await cred.user.delete(); } catch(_) {}   // rollback do Auth órfão
+      try { await signOut(secAuth); } catch(_) {}
+      throw dbErr;
     }
 
     // Atualiza memória local

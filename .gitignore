@@ -25,3 +25,7 @@ Thumbs.db
 
 # Configs locais do Claude Code
 .claude/
+
+# Backup do Auth (hashes de senha) e prints temporarios — nao versionar
+backups/auth-backup-*.json
+Captura de tela*.png

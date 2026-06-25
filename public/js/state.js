@@ -42,7 +42,8 @@ export const app = {
   currentUser:      null,
   isManager:        false,
   isAuditor:        false,
-  userPapel:        null,          // 'admin' | 'gestora' | 'colaborador' | 'auditor'
+  isRH:             false,          // RH: vê tudo (2 coordenações) mas SOMENTE LEITURA
+  userPapel:        null,          // 'admin' | 'gestora' | 'colaborador' | 'auditor' | 'rh'
   userEquipes:      [],
   equipeAtiva:      null,
   currentCollabKey: null,

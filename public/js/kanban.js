@@ -442,13 +442,13 @@ function renderKCard(card, botoesMemo){
     ? `<button onclick="toggleUrgente('${card._key}',event)" title="${card.urgente?'Remover urgência':'Marcar como urgente'}" aria-label="Alternar urgência" style="background:none;border:none;cursor:pointer;font-size:0.8rem;padding:2px 4px;flex-shrink:0;line-height:1;opacity:${card.urgente?'1':'0.4'};">🔴</button>` : '';
 
   return `<div class="k-card${card.urgente?' urgent':''}" id="kcard-${card._key}"
-    draggable="true"
+    ${state.isRH ? '' : `draggable="true"
     ondragstart="kDragStart(event,'${card._key}')"
-    ondragend="kDragEnd(event)">
+    ondragend="kDragEnd(event)"`}>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:6px;">
       <div class="k-card-name" onclick="openKanbanDetail('${card._key}')" style="flex:1">${escH(card.name||'Sem título')}</div>
       ${urgenteBtn}
-      <button onclick="openArchiveChoiceModal('${card._key}')" title="Arquivar (escolher: coluna do mês ou lixeira)" aria-label="Arquivar card" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.75rem;padding:2px 4px;flex-shrink:0;line-height:1;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">⤵</button>
+      ${state.isRH ? '' : `<button onclick="openArchiveChoiceModal('${card._key}')" title="Arquivar (escolher: coluna do mês ou lixeira)" aria-label="Arquivar card" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.75rem;padding:2px 4px;flex-shrink:0;line-height:1;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">⤵</button>`}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
       ${urgenteBadge}${modBadge}${labelsHtml}
@@ -464,7 +464,7 @@ function renderKCard(card, botoesMemo){
       </div>
     </div>
     ${workersSummary?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;align-items:center;">${workersSummary}</div>`:''}
-    ${botoesHtml}
+    ${state.isRH ? '' : botoesHtml}
   </div>`;
 }
 
@@ -1473,7 +1473,7 @@ function _indPopMeses(){
 }
 
 window.renderIndicadores = ()=>{
-  if(!state.isManager && !state.isAuditor) return;
+  if((!state.isManager && !state.isAuditor) || state.isRH) return;
   // A7: equipe sem avaliação por estrelas — Indicadores não se aplica
   if(!state.avaliacaoAtiva){
     const grid = document.getElementById('indResumoGrid');
@@ -1639,7 +1639,7 @@ function _dmNivelOptions(){
     AJUSTE_LEVELS.map(lv=>`<option value="${lv.id}">${escH(lv.label)} (nota ${lv.nota})</option>`).join('');
 }
 window.openDemandaManualModal = ()=>{
-  if(!state.isManager && !state.isAuditor){ showToast('Sem permissão','Apenas gestão/coordenação pode adicionar.'); return; }
+  if((!state.isManager && !state.isAuditor) || state.isRH){ showToast('Sem permissão','Apenas gestão/coordenação pode adicionar.'); return; }
   const a = document.getElementById('dmAssignee'); if(a) a.innerHTML = _dmCollabOptions('Selecione o responsável…');
   const cu = document.getElementById('dmCurador');  if(cu) cu.innerHTML = _dmCollabOptions('Selecione o curador…');
   const nv = document.getElementById('dmNivel');     if(nv) nv.innerHTML = _dmNivelOptions();
@@ -1650,7 +1650,7 @@ window.openDemandaManualModal = ()=>{
 };
 window.closeDemandaManualModal = ()=>{ releaseFocus(); document.getElementById('demandaManualModal')?.classList.remove('open'); };
 window.saveDemandaManual = async()=>{
-  if(!state.isManager && !state.isAuditor){ showToast('Sem permissão',''); return; }
+  if((!state.isManager && !state.isAuditor) || state.isRH){ showToast('Sem permissão',''); return; }
   const nome     = document.getElementById('dmNome')?.value.trim()||'';
   const assignee = document.getElementById('dmAssignee')?.value||'';
   const nivel    = document.getElementById('dmNivel')?.value||'';
@@ -1688,7 +1688,7 @@ window.saveDemandaManual = async()=>{
 // Exclui uma demanda adicionada manualmente (só gestão/coordenação)
 window.excluirDemandaManual = async(manualKey, ev)=>{
   if(ev) ev.stopPropagation();
-  if(!state.isManager && !state.isAuditor){ showToast('Sem permissão','Apenas gestão/coordenação pode excluir.'); return; }
+  if((!state.isManager && !state.isAuditor) || state.isRH){ showToast('Sem permissão','Apenas gestão/coordenação pode excluir.'); return; }
   if(!manualKey){ return; }
   if(!confirm('Excluir esta demanda manual? Ela some dos Indicadores.')) return;
   try{
@@ -1704,7 +1704,7 @@ window.excluirDemandaManual = async(manualKey, ev)=>{
 
 // Export CSV dos indicadores
 window.exportIndicadoresCSV = ()=>{
-  if(!state.isManager && !state.isAuditor) return;
+  if((!state.isManager && !state.isAuditor) || state.isRH) return;
   const tipoF = document.getElementById('indTipoFilter')?.value||'diagramacao';
   const field = tipoF==='curadoria'?'ajuste_curadoria':'ajuste_diagramacao';
   const all = _indGetAllCards().filter(c=>c[field]);

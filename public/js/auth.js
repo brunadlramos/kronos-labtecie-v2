@@ -63,11 +63,11 @@ export async function bootV2(user, { applyConfig, initDefaultConfig, showEquipeS
       const allTeams  = Object.keys(state.EQUIPE_LABELS);
       coordenacaoAtiva = profile.coordenacaoId || null;
 
-      if (userPapel === 'admin') {
-        // Admin vê todas as equipes; o departamento (coordenação) é escolhido na UI
+      if (userPapel === 'admin' || userPapel === 'rh') {
+        // Admin e RH veem TODAS as equipes das duas coordenações (RH é somente leitura)
         userEquipes = hasCoords ? allTeams : (profile.equipes?.length ? profile.equipes : allTeams);
         if (!coordenacaoAtiva && hasCoords) coordenacaoAtiva = Object.keys(state.COORDENACOES)[0];
-      } else if (userPapel === 'coordenador' || userPapel === 'auditor' || userPapel === 'rh') {
+      } else if (userPapel === 'coordenador' || userPapel === 'auditor') {
         // Coordenador vê SÓ as equipes da sua coordenação
         if (coordenacaoAtiva && state.COORDENACOES[coordenacaoAtiva]) {
           userEquipes = Object.keys(state.COORDENACOES[coordenacaoAtiva].equipes || {});
@@ -80,7 +80,10 @@ export async function bootV2(user, { applyConfig, initDefaultConfig, showEquipeS
         // gestora / colaborador: equipe única
         userEquipes = profile.equipes?.length ? profile.equipes : (profile.equipeId ? [profile.equipeId] : []);
       }
-      equipeAtiva = profile.equipeId || userEquipes[0] || allTeams[0] || 'diagramacao';
+      // equipeId '-' (coordenador/RH global) não é equipe real: cai na 1ª equipe para a visão inicial
+      equipeAtiva = (profile.equipeId && profile.equipeId !== '-')
+        ? profile.equipeId
+        : (userEquipes[0] || allTeams[0] || 'diagramacao');
       state.coordenacaoAtiva = coordenacaoAtiva;
       _buildRefs(equipeAtiva);
     }

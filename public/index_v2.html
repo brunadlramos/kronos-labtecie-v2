@@ -662,6 +662,7 @@
               <button class="date-nav-btn" onclick="changeDashDay(1)" aria-label="Próximo dia">&#8250;</button>
               <input type="date" class="filter-select" id="dashDayPicker" onchange="setDashDay(this.value)" style="border-radius:8px;padding:5px 10px;">
               <button class="today-btn" onclick="goDashToday()">Hoje</button>
+              <button id="capAllBtn" class="today-btn" style="display:none;background:var(--orange);color:#fff;border-color:var(--orange);" onclick="window.toggleCapDiaAll()" title="Ativa/desativa o piso de 95% para todos os colaboradores deste dia"></button>
             </div>
           </div>
           <div class="collab-cards" id="cardsGrid"></div>
