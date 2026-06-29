@@ -76,7 +76,7 @@ import {
   renderDashboard, renderDashCards, renderDashboardOnline, renderWeekTable,
   renderMeuDashboard,
   renderDemandasSemana, renderDashDemandasWeek,
-  renderOnline
+  renderOnline, invalidateCalcDay
 } from './js/dashboard.js';
 import {
   isManagerUser, isCuradora, isRecuradora,
@@ -190,6 +190,7 @@ async function bootV2(user){
   return true;
 }
 function _applyConfig(cfg){
+  invalidateCalcDay();   // metas/horas/ausências podem ter mudado → recalcular dias
   // SEC: rótulos/cores da config vão crus para innerHTML em vários renders.
   // Neutraliza injeção na origem: remove <> de textos e valida cor (#hex), senão cinza.
   const _clean = s => String(s||'').replace(/[<>]/g,'');
@@ -430,12 +431,14 @@ function startDataListeners(){
   if(_unsubHolidays) _unsubHolidays();
   _unsubHolidays = onValue(holidaysRef, snap => {
     state.allHolidays = snap.val() || {};
+    invalidateCalcDay();
     renderDebounced();
   }, err => console.warn('[V2] holidays:', err));
 
   if(_unsubFolgas) _unsubFolgas();
   _unsubFolgas = onValue(folgasRef, snap => {
     state.allFolgas = snap.val() || {};
+    invalidateCalcDay();
     renderDebounced();
   }, err => console.warn('[V2] folgas:', err));
 }
@@ -693,18 +696,18 @@ window.openHolidaysModal = () => {
       </div>
       ${canEdit ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div><div style="${fldLbl}">Data</div><input id="holidayDateInput" type="date" style="${fld}"></div>
-        <div><div style="${fldLbl}">Tipo</div><select id="holidayTypeInput" style="${fld}">${tipoOpts}</select></div>
-        <div><div style="${fldLbl}">Abrangência</div>
+        <div><label for="holidayDateInput" style="${fldLbl};display:block;">Data</label><input id="holidayDateInput" type="date" style="${fld}"></div>
+        <div><label for="holidayTypeInput" style="${fldLbl};display:block;">Tipo</label><select id="holidayTypeInput" style="${fld}">${tipoOpts}</select></div>
+        <div><label for="holidayScopeInput" style="${fldLbl};display:block;">Abrangência</label>
           <select id="holidayScopeInput" style="${fld}" onchange="document.getElementById('holidayCollabWrap').style.display=this.value==='collab'?'block':'none'">
             <option value="all">Todos os colaboradores</option>
             <option value="collab">Colaborador específico</option>
           </select>
         </div>
-        <div id="holidayCollabWrap" style="display:none;"><div style="${fldLbl}">Colaborador</div>
+        <div id="holidayCollabWrap" style="display:none;"><label for="holidayCollabInput" style="${fldLbl};display:block;">Colaborador</label>
           <select id="holidayCollabInput" style="${fld}"><option value="">Selecione…</option>${collabOpts}</select>
         </div>
-        <div style="grid-column:1 / -1;"><div style="${fldLbl}">Nome (opcional)</div>
+        <div style="grid-column:1 / -1;"><label for="holidayLabelInput" style="${fldLbl};display:block;">Nome (opcional)</label>
           <input id="holidayLabelInput" type="text" placeholder="Ex: Corpus Christi" maxlength="50" style="${fld}">
         </div>
       </div>
@@ -1392,6 +1395,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 // renderCurrentPage, renderDebounced → js/ui.js (inicializados via initUI abaixo)
 
 function renderPage(id){
+  invalidateCalcDay();   // nova visualização: calcDay fresco (cobre edições de config off-dashboard)
   switch(id){
     case 'timer': renderTimerPage();break;
     case 'meuhistorico': renderMyHistory();break;

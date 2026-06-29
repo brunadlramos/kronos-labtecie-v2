@@ -147,8 +147,21 @@ export function getEntriesForDay(dk, collabFilter=null) {
   return result.sort((a,b) => b.startTime - a.startTime);
 }
 
-// ── calcDay ────────────────────────────────────────────────────────────────────
+// ── calcDay (memoizado) ────────────────────────────────────────────────────────
+// Cache por (colaborador, dia): num único render do dashboard, calcDay é chamado
+// repetidamente para os mesmos pares (cards + tabela + Meu Dashboard). O cache é
+// invalidado por versão: entries (state._entriesVersion) + deps (feriados/folgas/
+// config) via invalidateCalcDay(). IMPORTANTE: o resultado é compartilhado — não
+// mutar o objeto retornado (callers que precisam adicionar campos fazem cópia).
+const _calcDayCache = new Map();
+let _calcDayToken = null;
+export function invalidateCalcDay(){ state._calcDepsVer = (state._calcDepsVer || 0) + 1; }
 export function calcDay(collabKey, dk) {
+  const token = state._entriesVersion + '|' + (state._calcDepsVer || 0);
+  if(token !== _calcDayToken){ _calcDayCache.clear(); _calcDayToken = token; }
+  const _ck = collabKey + '|' + dk;
+  const _hit = _calcDayCache.get(_ck);
+  if(_hit) return _hit;
   const day = getEntriesForDay(dk, collabKey);
   const totalMs = day.reduce((s,e) => s + (e._dayDuration ?? e.duration), 0);
   // Dia cujos registros são TODOS importados do Clockify → meta cheia (ignora ausência):
@@ -157,7 +170,9 @@ export function calcDay(collabKey, dk) {
   const goalMs = getDailyGoalMs(dk, collabKey, { ignoreAusencia: _allClockify });
   const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / state.DAILY_GOAL_MS * 100 : 0);
   const percAmount = day.reduce((s,e) => s + (e._dayAmount ?? calcAmount(e.project, e.duration, e.peso)), 0);
-  return { totalMs, percTime, percAmount, percTotal: percTime+percAmount, count: day.length, entries: day, goalMs, isSaturday: goalMs===0, onVacation: isOnVacation(collabKey, dk) };
+  const result = { totalMs, percTime, percAmount, percTotal: percTime+percAmount, count: day.length, entries: day, goalMs, isSaturday: goalMs===0, onVacation: isOnVacation(collabKey, dk) };
+  _calcDayCache.set(_ck, result);
+  return result;
 }
 
 // ── getCollabAvatar ────────────────────────────────────────────────────────────
@@ -453,9 +468,9 @@ export function renderWeekTable() {
         const cd = calcDay(k, dk);
         // piso de 100% só vale para dia COM registros: capar um dia vazio (real 0%) geraria
         // um "100% fantasma" que entra na soma mas não no divisor `active`, inflando a média.
-        cd.capped = isCapped(k, dk) && cd.count > 0;
-        cd.eff = cd.capped ? capValue(cd.percTotal) : cd.percTotal;
-        return cd;
+        // Cópia (não mutar o objeto do calcDay, que agora é cacheado/compartilhado).
+        const capped = isCapped(k, dk) && cd.count > 0;
+        return { ...cd, capped, eff: capped ? capValue(cd.percTotal) : cd.percTotal };
       });
       const active = dayData.filter(d=>d.count>0).length;
       const avg = active>0 ? dayData.reduce((s,d)=>s+d.eff,0)/active : 0;
@@ -487,9 +502,8 @@ export function renderWeekTable() {
       const dayData = days.map(d => {
         const dk = dKey(d);
         const cd = calcDay(k, dk);
-        cd.capped = isCapped(k, dk) && cd.count > 0;
-        cd.eff = cd.capped ? capValue(cd.percTotal) : cd.percTotal;
-        return cd;
+        const capped = isCapped(k, dk) && cd.count > 0;
+        return { ...cd, capped, eff: capped ? capValue(cd.percTotal) : cd.percTotal };
       });
       const active = dayData.filter(d=>d.count>0).length;
       const avg = active>0 ? dayData.reduce((s,d)=>s+d.eff,0)/active : 0;
