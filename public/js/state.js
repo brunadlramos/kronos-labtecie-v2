@@ -55,6 +55,7 @@ export const app = {
   kanbanCards:      {},
   arquivoCards:     {},
   allHolidays:      {},
+  allFolgas:        {},            // folgas/atestados por colaborador: {iso: {collabKey: {type,label,...}}}
   customTags:       [],
   customProjects:   [],
   muralPosts:       {},

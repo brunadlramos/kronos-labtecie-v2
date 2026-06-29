@@ -17,7 +17,7 @@ import {
 import {
   calcDay, calcAmount, getEntriesArray, getEntriesForDay,
   getCollabAvatar, getDailyGoalMs, chartPalette,
-  isActive, renderMeuDashboard
+  isActive, renderMeuDashboard, isCapped, capValue
 } from './dashboard.js';
 import { showToast, setSyncStatus, trapFocus, releaseFocus } from './ui.js';
 
@@ -260,9 +260,9 @@ export function renderDemandas(resetPage=false){
     if(totalPages > 1){
       paginationEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;padding:10px 0;font-family:var(--mono);font-size:0.72rem;color:var(--muted);">
-          <button class="btn-sm" onclick="state._demandasPage=Math.max(1,state._demandasPage-1);renderDemandas();" ${state._demandasPage<=1?'disabled':''} aria-label="Página anterior">${ICONS.back}</button>
+          <button class="btn-sm" onclick="demandasGoPage(-1,${totalPages})" ${state._demandasPage<=1?'disabled':''} aria-label="Página anterior">${ICONS.back}</button>
           <span>Pág. <strong style="color:var(--text)">${state._demandasPage}</strong> de ${totalPages} · ${totalResults} registros</span>
-          <button class="btn-sm" onclick="state._demandasPage=Math.min(${totalPages},state._demandasPage+1);renderDemandas();" ${state._demandasPage>=totalPages?'disabled':''} aria-label="Próxima página">${ICONS.forward}</button>
+          <button class="btn-sm" onclick="demandasGoPage(1,${totalPages})" ${state._demandasPage>=totalPages?'disabled':''} aria-label="Próxima página">${ICONS.forward}</button>
         </div>`;
     } else {
       paginationEl.innerHTML = totalResults > 0
@@ -488,7 +488,8 @@ export function render4Weeks(){
         datasets:Object.keys(state.COLLABS).filter(k=>!state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||'')).map(k=>({
           label:state.COLLABS[k].label,
           data:weeks.map(w=>{
-            const avgs=w.map(d=>calcDay(k,dKey(d)).percTotal);
+            // aplica o piso de 100% (capDia) por dia, igual à tabela semanal
+            const avgs=w.map(d=>{const dk=dKey(d);const cd=calcDay(k,dk);return cd.count>0?(isCapped(k,dk)?capValue(cd.percTotal):cd.percTotal):0;});
             const active=avgs.filter(v=>v>0);
             return active.length?(active.reduce((s,v)=>s+v,0)/active.length).toFixed(1):0;
           }),
@@ -506,9 +507,14 @@ export function render4Weeks(){
   while(md.getMonth()===m){monthDays.push(new Date(md));md.setDate(md.getDate()+1);}
   const COLLAB_KEYS_TEAM=Object.keys(state.COLLABS).filter(k=>isActive(k)&&!state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''));
   const ranking=COLLAB_KEYS_TEAM.map(k=>{
-    const activeDays=monthDays.filter(d=>calcDay(k,dKey(d)).count>0);
-    const avg=activeDays.length?activeDays.reduce((s,d)=>s+calcDay(k,dKey(d)).percTotal,0)/activeDays.length:0;
-    return{...state.COLLABS[k],key:k,avg,activeDays:activeDays.length};
+    // média mensal com piso de 100% (capDia) aplicado por dia — destaque do mês segue a lógica da semana
+    let sum=0, active=0;
+    monthDays.forEach(d=>{
+      const dk=dKey(d); const cd=calcDay(k,dk);
+      if(cd.count>0){ active++; sum += (isCapped(k,dk)?capValue(cd.percTotal):cd.percTotal); }
+    });
+    const avg=active?sum/active:0;
+    return{...state.COLLABS[k],key:k,avg,activeDays:active};
   }).sort((a,b)=>b.avg-a.avg);
   const max=ranking[0]?.avg||1;
   const rankEl = document.getElementById('rankingList4w');
@@ -806,5 +812,12 @@ export function renderRelatorio(){
 }
 
 // ── Window registrations ──────────────────────────────────────────────────────
+// Paginação das Demandas: handler global (onclick inline roda no escopo do window,
+// onde `state` não existe — por isso os botões manipulam a página por aqui).
+window.demandasGoPage = (delta, totalPages) => {
+  const max = totalPages || 1;
+  state._demandasPage = Math.min(max, Math.max(1, (state._demandasPage || 1) + delta));
+  renderDemandas();
+};
 window.renderDemandas   = renderDemandas;
 window.renderMyHistory  = renderMyHistory;

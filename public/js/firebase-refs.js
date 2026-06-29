@@ -42,6 +42,7 @@ export let arquivoRef          = ref(db, `equipes/${EQUIPE_ID}/arquivo`);
 export let approvalRequestsRef = ref(db, `equipes/${EQUIPE_ID}/approvalRequests`);
 export let activeTimersRef     = ref(db, `equipes/${EQUIPE_ID}/activeTimers`);
 export let holidaysRef         = ref(db, `equipes/${EQUIPE_ID}/holidays`);
+export let folgasRef           = ref(db, `equipes/${EQUIPE_ID}/folgas`);
 export let logsRef             = ref(db, `equipes/${EQUIPE_ID}/logs`);
 export let indicadoresManuaisRef = ref(db, `equipes/${EQUIPE_ID}/indicadoresManuais`);
 export let capDiaRef           = ref(db, `equipes/${EQUIPE_ID}/capDia`);
@@ -63,6 +64,7 @@ export function _buildRefs(equipeId) {
   approvalRequestsRef = ref(db, `equipes/${equipeId}/approvalRequests`);
   activeTimersRef     = ref(db, `equipes/${equipeId}/activeTimers`);
   holidaysRef         = ref(db, `equipes/${equipeId}/holidays`);
+  folgasRef           = ref(db, `equipes/${equipeId}/folgas`);
   logsRef             = ref(db, `equipes/${equipeId}/logs`);
   indicadoresManuaisRef = ref(db, `equipes/${equipeId}/indicadoresManuais`);
   capDiaRef           = ref(db, `equipes/${equipeId}/capDia`);

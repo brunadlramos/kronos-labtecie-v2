@@ -181,6 +181,10 @@
         <label class="modal-label">Responsáveis <span style="font-weight:500;color:var(--muted)">(opcional — pode marcar mais de um)</span></label>
         <div class="kc-assignee-wrap" id="kcAssigneeWrap"></div>
       </div>
+      <div class="modal-field full" id="kcCuradorField" style="display:none;">
+        <label class="modal-label" for="kcCurador">Curador <span style="font-weight:500;color:var(--muted)">(separado do responsável)</span></label>
+        <select class="modal-select" id="kcCurador"><option value="">Sem curador</option></select>
+      </div>
       <div class="modal-field">
         <label class="modal-label" for="kcColumn">Coluna</label>
         <select class="modal-select" id="kcColumn">
@@ -662,7 +666,7 @@
               <button class="date-nav-btn" onclick="changeDashDay(1)" aria-label="Próximo dia">&#8250;</button>
               <input type="date" class="filter-select" id="dashDayPicker" onchange="setDashDay(this.value)" style="border-radius:8px;padding:5px 10px;">
               <button class="today-btn" onclick="goDashToday()">Hoje</button>
-              <button id="capAllBtn" class="today-btn" style="display:none;background:var(--orange);color:#fff;border-color:var(--orange);" onclick="window.toggleCapDiaAll()" title="Ativa/desativa o piso de 95% para todos os colaboradores deste dia"></button>
+              <button id="capAllBtn" class="today-btn" style="display:none;background:var(--orange);color:#fff;border-color:var(--orange);" onclick="window.toggleCapDiaAll()" title="Ativa/desativa o piso de 100% para todos os colaboradores deste dia"></button>
             </div>
           </div>
           <div class="collab-cards" id="cardsGrid"></div>
@@ -682,7 +686,8 @@
               <button class="date-nav-btn" onclick="changeWeek(1)" aria-label="Próxima semana">&#8250;</button>
               <input type="date" class="filter-select" id="weekPicker" onchange="setWeekFromDate(this.value)" style="border-radius:8px;padding:5px 10px;">
               <button class="today-btn" onclick="goCurrentWeek()">Semana atual</button>
-              <button class="btn-sm success" onclick="exportWeekCSV()">⬇ CSV</button>
+              <button class="btn-sm success" onclick="exportWeekExcel()">⬇ Excel</button>
+              <button id="btnDashFeriados" class="btn-sm" onclick="openHolidaysModal()" style="display:none;align-items:center;gap:5px;" title="Lançar feriado, folga ou atestado sem sair da dashboard"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Feriados/Folgas</button>
             </div>
           </div>
           <div id="dashTableSemanal" class="table-wrap"><table class="week-table"><thead id="weekTableHead"></thead><tbody id="weekTableBody"></tbody></table></div>
@@ -1207,7 +1212,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
             </div>
             <div class="ferr-card-title">Feriados e Folgas</div>
-            <div class="ferr-card-desc">Gerenciar feriados que zerão a meta do dia para toda a equipe</div>
+            <div class="ferr-card-desc">Feriados (toda a equipe) e folgas/atestados por colaborador — zeram a meta do dia</div>
           </div>
 
         </div>

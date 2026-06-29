@@ -399,6 +399,13 @@ function renderKCard(card, botoesMemo){
         <span>${escH((state.COLLABS[assignees[0]]||{label:assignees[0]}).label||assignees[0])}${assignees.length>1?` +${assignees.length-1}`:''}</span>
       </div>`
     : `<div class="k-card-assignee" style="color:var(--muted)"><div class="k-card-av" style="background:#94A3B8">—</div>Sem responsável</div>`;
+  // Badge de Curador (só Revisão) — distinto dos responsáveis/revisores
+  const curadorHtml = (EQUIPE_ID==='revisao' && card.curador && state.COLLABS[card.curador])
+    ? (()=>{ const cu=state.COLLABS[card.curador];
+        return `<div class="k-card-curador" style="display:flex;align-items:center;gap:5px;margin-top:3px;font-size:0.62rem;font-weight:700;color:var(--muted);">
+          <span style="width:16px;height:16px;border-radius:50%;background:${cu.color||'#94A3B8'};display:inline-flex;align-items:center;justify-content:center;font-size:0.45rem;font-weight:800;color:#fff;flex-shrink:0;">${escH(cu.initials||'?')}</span>
+          <span style="color:#8b5cf6;">🔎 Curador:</span> ${escH(cu.label||card.curador)}</div>`; })()
+    : '';
   const modColors = {MOD1:'#7C6AFF',MOD2:'#10B981',MOD3:'#F59E0B',MOD4:'#EF4444'};
   const modBadge = card.module&&card.module!=='none'
     ?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:${modColors[card.module]||'#94A3B8'}22;border:1px solid ${modColors[card.module]||'#94A3B8'}55;color:${modColors[card.module]||'#94A3B8'}">${card.module}</span>`:'';
@@ -456,6 +463,7 @@ function renderKCard(card, botoesMemo){
     </div>
     ${card.obs?`<div class="k-card-obs">"${escH(card.obs)}"</div>`:''}
     ${linksHtml?`<div class="k-card-links">${linksHtml}</div>`:''}
+    ${curadorHtml}
     <div class="k-card-meta">
       ${assigneeHtml}
       <div style="display:flex;align-items:center;gap:6px;">
@@ -948,6 +956,21 @@ window.openKanbanCardModal = (key)=>{
     document.getElementById('kcColumn').value = defaultCol?.id || (state.K_COLS?.[0]?.id || '');
     document.getElementById('kcObs').value='';
   }
+  // Curador — só no Kanban da Revisão: seletor único, separado dos responsáveis.
+  const _curField = document.getElementById('kcCuradorField');
+  const _curSel = document.getElementById('kcCurador');
+  if(_curField && _curSel){
+    if(EQUIPE_ID === 'revisao'){
+      _curField.style.display = '';
+      _curSel.innerHTML = '<option value="">Sem curador</option>' +
+        Object.keys(state.COLLABS||{}).filter(k=>isActive(k))
+          .sort((a,b)=>(state.COLLABS[a].label||a).localeCompare(state.COLLABS[b].label||b))
+          .map(k=>`<option value="${escH(k)}">${escH(state.COLLABS[k].label||k)}</option>`).join('');
+      _curSel.value = (key && state.kanbanCards[key]?.curador) || '';
+    } else {
+      _curField.style.display = 'none';
+    }
+  }
   closeKanbanDetail();
   const _kcm = document.getElementById('kanbanCardModal'); _kcm?.classList.add('open'); if(_kcm) trapFocus(_kcm);
 };
@@ -1001,6 +1024,8 @@ window.saveKanbanCard = async () => {
     name,
     assignee,
     assignees,
+    // Curador (só Revisão): salva o escolhido ou null para limpar; outras equipes não tocam.
+    ...(EQUIPE_ID === 'revisao' ? { curador: (document.getElementById('kcCurador')?.value || null) } : {}),
     column,
     module,
     obs: obs || '',

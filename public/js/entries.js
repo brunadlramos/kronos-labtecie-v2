@@ -141,6 +141,10 @@ export function openModal(id) {
   state.editingId = id;
   window._periodDraft = null;
   document.getElementById('modalTitle').textContent = id ? 'Editar Registro' : 'Novo Registro';
+  // Reset de visibilidade: evita herdar o editor de períodos de uma abertura anterior
+  // (e blinda a detecção de modo no saveModal). Multi-período reativa em _openModalWithDraft.
+  const _pw = document.getElementById('mPeriodsWrap'); if(_pw){ _pw.style.display='none'; _pw.innerHTML=''; }
+  const _sf = document.getElementById('mSimpleTimeFields'); if(_sf) _sf.style.display='contents';
   if (id) {
     const e = state.allEntries[id];
     if (!e) return;
@@ -149,7 +153,8 @@ export function openModal(id) {
     document.getElementById('mProject').value = e.project || 'gestao';
     _ctx.updateProjectColorDot(document.getElementById('mProject'), 'mProjectColorDot');
     const d = new Date(e.startTime);
-    document.getElementById('mDate').value  = d.toISOString().slice(0,10);
+    // data LOCAL (toISOString usa UTC e podia jogar o dia +1 em horários à noite)
+    document.getElementById('mDate').value  = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     document.getElementById('mStart').value = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     const de = new Date(e.endTime);
     document.getElementById('mEnd').value   = `${String(de.getHours()).padStart(2,'0')}:${String(de.getMinutes()).padStart(2,'0')}`;
@@ -192,7 +197,7 @@ function _openModalWithDraft(id, draft) {
     wrap.innerHTML = e.periods.map((p, i) => {
       const ds = new Date(p.startTime), de2 = new Date(p.endTime);
       const fmt = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      const fmtDate = d => d.toISOString().slice(0,10);
+      const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       return `<div class="period-edit-row" data-idx="${i}" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <span style="font-size:0.72rem;font-weight:800;color:var(--muted)">Período #${i+1}</span>
@@ -208,7 +213,7 @@ function _openModalWithDraft(id, draft) {
           <div><label style="font-size:0.62rem;font-weight:700;color:var(--muted)">Hora fim</label>
             <input class="modal-input period-time-end" type="time" data-idx="${i}" value="${fmt(de2)}" oninput="window._updatePeriodDuration(${i})"></div>
         </div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">Duração: <span class="period-dur-display" style="font-family:var(--mono);color:var(--orange)">${fmtDur(p.duration||(p.endTime-p.startTime))}</span></div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">Duração: <span class="period-dur-display" data-idx="${i}" style="font-family:var(--mono);color:var(--orange)">${fmtDur(p.duration||(p.endTime-p.startTime))}</span></div>
       </div>`;
     }).join('');
   }
@@ -242,60 +247,71 @@ export async function saveModal() {
   }
   const obs     = document.getElementById('mObs').value.trim().slice(0,500);
   const tags    = _ctx.getSelectedTags(document.getElementById('mTagsContainer'));
-  const [sh,sm] = document.getElementById('mStart').value.split(':').map(Number);
-  const [eh,em] = document.getElementById('mEnd').value.split(':').map(Number);
-  const dateVal = document.getElementById('mDate').value;
-  let base;
-  if (dateVal) { const [y,mo,d] = dateVal.split('-').map(Number); base = new Date(y,mo-1,d); }
-  else if (state.editingId) { base = new Date(state.allEntries[state.editingId]?.startTime || Date.now()); }
-  else { base = state.viewDate; }
-  const sTs = new Date(base.getFullYear(),base.getMonth(),base.getDate(),sh,sm).getTime();
-  let eTs   = new Date(base.getFullYear(),base.getMonth(),base.getDate(),eh,em).getTime();
-  if (eTs < sTs) eTs += MS_PER_DAY;
-  if (eTs - sTs < 60000) {
-    ['mStart','mEnd'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.style.borderColor='var(--danger)'; el.style.boxShadow='0 0 0 3px var(--danger-bg)'; setTimeout(()=>{el.style.borderColor='';el.style.boxShadow='';},3000); }
-    });
-    showToast('Duração inválida','O registro precisa ter pelo menos 1 minuto.');
-    return;
-  }
   const now = Date.now();
   const origEntry = (state.editingId && window._periodDraft && window._periodDraft === Object(window._periodDraft))
     ? window._periodDraft : (state.editingId ? state.allEntries[state.editingId] : null);
-  let payload;
-  if (state.editingId) {
-    const orig = origEntry;
-    const hasPeriods = orig?.periods?.length > 1;
-    if (hasPeriods) {
-      const wrap = document.getElementById('mPeriodsWrap');
-      const rows = wrap ? wrap.querySelectorAll('.period-edit-row') : [];
-      const newPeriods = Array.from(rows).map(row => {
-        const idx = parseInt(row.dataset.idx);
-        const ds2 = wrap.querySelector(`.period-date-start[data-idx="${idx}"]`)?.value;
-        const ts2 = wrap.querySelector(`.period-time-start[data-idx="${idx}"]`)?.value;
-        const de2 = wrap.querySelector(`.period-date-end[data-idx="${idx}"]`)?.value;
-        const te2 = wrap.querySelector(`.period-time-end[data-idx="${idx}"]`)?.value;
-        if (!ds2||!ts2||!de2||!te2) return orig.periods[idx];
-        const [sy,sm2,sd] = ds2.split('-').map(Number);
-        const [sh3,smin]  = ts2.split(':').map(Number);
-        const [ey2,em3,ed]= de2.split('-').map(Number);
-        const [eh3,emin]  = te2.split(':').map(Number);
-        const pSts = new Date(sy,sm2-1,sd,sh3,smin).getTime();
-        let   pEts = new Date(ey2,em3-1,ed,eh3,emin).getTime();
-        if (pEts<=pSts) pEts = pSts+60000;
-        return { startTime:pSts, endTime:pEts, duration:pEts-pSts };
+
+  // Modo "múltiplos períodos": decidido pelo editor de períodos VISÍVEL (não pelo nº de
+  // períodos do original). Corrige o bug em que editar/remover período caía no caminho
+  // simples e gravava o intervalo original inteiro (data/hora errada).
+  const _wrap = document.getElementById('mPeriodsWrap');
+  const _periodRows = (_wrap && _wrap.style.display !== 'none')
+    ? Array.from(_wrap.querySelectorAll('.period-edit-row')) : [];
+  const usePeriods = _periodRows.length > 0;
+
+  let payload, sTs, eTs;
+
+  if (usePeriods) {
+    const newPeriods = _periodRows.map(row => {
+      const idx = parseInt(row.dataset.idx);
+      const ds2 = _wrap.querySelector(`.period-date-start[data-idx="${idx}"]`)?.value;
+      const ts2 = _wrap.querySelector(`.period-time-start[data-idx="${idx}"]`)?.value;
+      const de2 = _wrap.querySelector(`.period-date-end[data-idx="${idx}"]`)?.value;
+      const te2 = _wrap.querySelector(`.period-time-end[data-idx="${idx}"]`)?.value;
+      if (!ds2||!ts2||!de2||!te2) return origEntry?.periods?.[idx] || null;
+      const [sy,sm2,sd] = ds2.split('-').map(Number);
+      const [sh3,smin]  = ts2.split(':').map(Number);
+      const [ey2,em3,ed]= de2.split('-').map(Number);
+      const [eh3,emin]  = te2.split(':').map(Number);
+      const pSts = new Date(sy,sm2-1,sd,sh3,smin).getTime();
+      let   pEts = new Date(ey2,em3-1,ed,eh3,emin).getTime();
+      if (pEts<=pSts) pEts = pSts+60000;
+      return { startTime:pSts, endTime:pEts, duration:pEts-pSts };
+    }).filter(Boolean);
+    if (!newPeriods.length) { showToast('Erro','Nenhum período válido para salvar.'); return; }
+    const totalDuration = newPeriods.reduce((s,p)=>s+p.duration,0);
+    sTs = newPeriods[0].startTime;
+    eTs = newPeriods[newPeriods.length-1].endTime;
+    payload = { ...(origEntry||{}), task, collab, project, obs, tags,
+      startTime:sTs, endTime:eTs, duration:totalDuration,
+      modifiedAt:now, modifiedBy:state.currentUser?.email||'desconhecido' };
+    if (newPeriods.length > 1) payload.periods = newPeriods;
+    else delete payload.periods;   // sobrou 1 período => vira registro simples
+    if (origEntry && project !== origEntry.project) delete payload.peso;
+  } else {
+    const [sh,sm] = document.getElementById('mStart').value.split(':').map(Number);
+    const [eh,em] = document.getElementById('mEnd').value.split(':').map(Number);
+    const dateVal = document.getElementById('mDate').value;
+    let base;
+    if (dateVal) { const [y,mo,d] = dateVal.split('-').map(Number); base = new Date(y,mo-1,d); }
+    else if (state.editingId) { base = new Date(state.allEntries[state.editingId]?.startTime || Date.now()); }
+    else { base = state.viewDate; }
+    sTs = new Date(base.getFullYear(),base.getMonth(),base.getDate(),sh,sm).getTime();
+    eTs = new Date(base.getFullYear(),base.getMonth(),base.getDate(),eh,em).getTime();
+    if (eTs < sTs) eTs += MS_PER_DAY;
+    if (eTs - sTs < 60000) {
+      ['mStart','mEnd'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.style.borderColor='var(--danger)'; el.style.boxShadow='0 0 0 3px var(--danger-bg)'; setTimeout(()=>{el.style.borderColor='';el.style.boxShadow='';},3000); }
       });
-      const totalDuration = newPeriods.reduce((s,p)=>s+p.duration,0);
-      payload = { ...orig, task, collab, project, obs, tags, periods:newPeriods,
-        startTime:newPeriods[0].startTime, endTime:newPeriods[newPeriods.length-1].endTime,
-        duration:totalDuration, modifiedAt:now, modifiedBy:state.currentUser?.email||'desconhecido' };
-    } else {
-      payload = { ...orig, task, collab, project, obs, tags, startTime:sTs, endTime:eTs,
-        duration:eTs-sTs, modifiedAt:now, modifiedBy:state.currentUser?.email||'desconhecido' };
+      showToast('Duração inválida','O registro precisa ter pelo menos 1 minuto.');
+      return;
     }
-    // peso é por projeto: se mudou de projeto, descarta o snapshot (usa o peso atual do novo)
-    if(orig && project !== orig.project && payload) delete payload.peso;
+    if (state.editingId) {
+      payload = { ...(origEntry||{}), task, collab, project, obs, tags, startTime:sTs, endTime:eTs,
+        duration:eTs-sTs, modifiedAt:now, modifiedBy:state.currentUser?.email||'desconhecido' };
+      if (origEntry && project !== origEntry.project) delete payload.peso;
+    }
   }
   if (!state.isManager) {
     const entryTs = state.editingId ? (origEntry?.startTime||sTs) : sTs;

@@ -25,6 +25,20 @@ export function isActive(collabKey) {
   return state.usersConfig[collabKey]?.active !== false;
 }
 
+// ── isRankable ───────────────────────────────────────────────────────────────
+// Colaboradores que entram em ranking/destaques/conquistas: ativos e SEM papel de
+// gestão. Gestores (papel 'gestora', cujo e-mail vai p/ MANAGER_EMAILS) aparecem só
+// no card informativo próprio — ficam fora das métricas coletivas e dos destaques.
+export function isRankable(collabKey) {
+  if(!isActive(collabKey)) return false;
+  const email = Object.keys(state.COLLAB_EMAILS).find(e => state.COLLAB_EMAILS[e] === collabKey) || '';
+  return !state.MANAGER_EMAILS.includes(email);
+}
+
+// Rótulos/cores dos tipos de folga (espelha FOLGA_TIPOS de index_v2.js) — usados nas tabelas
+const FOLGA_TIPO_LABELS = { feriado:'Feriado', atestado:'Atestado', dayoff:'Day off' };
+const FOLGA_TIPO_CORES  = { feriado:'#f15a24', atestado:'#ef4444', dayoff:'#3b82f6' };
+
 // ── calcAmount ─────────────────────────────────────────────────────────────────
 // pesoOverride: peso "congelado" gravado no registro (e.peso). Quando presente, tem
 // prioridade sobre o peso atual do projeto — permite "aplicar só aos futuros" sem
@@ -54,7 +68,7 @@ export function isOnVacation(collabKey, dk){
   return fer.some(f => f && f.ini && f.fim && iso >= f.ini && iso <= f.fim);
 }
 
-export function getDailyGoalMs(dateOrDk, collabKey=null) {
+export function getDailyGoalMs(dateOrDk, collabKey=null, opts={}) {
   let dow;
   let dk;
   if(typeof dateOrDk === 'string') {
@@ -66,7 +80,8 @@ export function getDailyGoalMs(dateOrDk, collabKey=null) {
     dow = dateOrDk.getDay();
   }
   if(dow===6||dow===0) return 0;
-  if(state.allHolidays?.[_dkToISO(dk)]) return 0;
+  if(state.allHolidays?.[_dkToISO(dk)]) return 0;                       // feriado da equipe (todos)
+  if(collabKey && state.allFolgas?.[_dkToISO(dk)]?.[collabKey]) return 0; // folga/atestado individual
   if(isOnVacation(collabKey, dk)) return 0;   // férias: meta zerada (sem penalidade)
 
   let base;
@@ -81,7 +96,10 @@ export function getDailyGoalMs(dateOrDk, collabKey=null) {
 
   // Ausências recorrentes (ex.: estágio) reduzem a meta do dia automaticamente,
   // para o colaborador não precisar registrar nem ser penalizado no % do dia.
-  if(collabKey){
+  // EXCEÇÃO (opts.ignoreAusencia): dias 100% importados do Clockify usam a meta CHEIA —
+  // naquele período o estágio era lançado como registro normal, então reduzir a meta também
+  // contaria o estágio duas vezes (no total trabalhado E na meta), inflando o %.
+  if(collabKey && !opts.ignoreAusencia){
     const aus = state.COLLAB_HOURS[collabKey]?.ausencias;
     if(Array.isArray(aus)){
       let absMs = 0;
@@ -133,7 +151,10 @@ export function getEntriesForDay(dk, collabFilter=null) {
 export function calcDay(collabKey, dk) {
   const day = getEntriesForDay(dk, collabKey);
   const totalMs = day.reduce((s,e) => s + (e._dayDuration ?? e.duration), 0);
-  const goalMs = getDailyGoalMs(dk, collabKey);
+  // Dia cujos registros são TODOS importados do Clockify → meta cheia (ignora ausência):
+  // o histórico antigo (anterior ao estágio no Kronos) não deve sofrer a redução de meta.
+  const _allClockify = day.length > 0 && day.every(e => String(e.importedFrom||'').startsWith('clockify'));
+  const goalMs = getDailyGoalMs(dk, collabKey, { ignoreAusencia: _allClockify });
   const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / state.DAILY_GOAL_MS * 100 : 0);
   const percAmount = day.reduce((s,e) => s + (e._dayAmount ?? calcAmount(e.project, e.duration, e.peso)), 0);
   return { totalMs, percTime, percAmount, percTotal: percTime+percAmount, count: day.length, entries: day, goalMs, isSaturday: goalMs===0, onVacation: isOnVacation(collabKey, dk) };
@@ -190,14 +211,14 @@ export function getConquistas(collabKey, refDate) {
   const todayData = calcDay(collabKey, dKey(today));
   if(todayData.percTotal>=120) conquistas.push({cls:'lightning',icon:'⚡',label:'Relâmpago!'});
   const days = getWeekDays(0);
-  const weekTotals = Object.keys(state.COLLABS).filter(k=>isActive(k)).map(k=>({key:k,total:days.reduce((s,d)=>s+calcDay(k,dKey(d)).percTotal,0)}));
+  const weekTotals = Object.keys(state.COLLABS).filter(k=>isRankable(k)).map(k=>({key:k,total:days.reduce((s,d)=>s+calcDay(k,dKey(d)).percTotal,0)}));
   weekTotals.sort((a,b)=>b.total-a.total);
   if(weekTotals.length&&weekTotals[0].key===collabKey&&weekTotals[0].total>0) conquistas.push({cls:'crown',icon:'👑',label:'Rei da semana!'});
   let consistent = 0;
   for(let i=1;i<=7;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(d.getDay()===0)continue;if(calcDay(collabKey,dKey(d)).percTotal>=80)consistent++;else break;}
   if(consistent>=5) conquistas.push({cls:'target',icon:'🎯',label:'Consistente!'});
   // KRN-031: Estrela do dia — usa o dia visualizado no dashboard
-  const todayTotals = Object.keys(state.COLLABS).filter(k=>isActive(k)).map(k=>({key:k,perc:calcDay(k,dKey(viewDay)).percTotal}));
+  const todayTotals = Object.keys(state.COLLABS).filter(k=>isRankable(k)).map(k=>({key:k,perc:calcDay(k,dKey(viewDay)).percTotal}));
   todayTotals.sort((a,b)=>b.perc-a.perc);
   if(todayTotals.length&&todayTotals[0].key===collabKey&&todayTotals[0].perc>0) conquistas.push({cls:'star',icon:'⭐',label:'Estrela do dia!'});
   return conquistas;
@@ -314,11 +335,11 @@ function _fmtMetaLabel(ms){
   return (m > 0 ? `${h}h${String(m).padStart(2,'0')}min` : `${h}h`) + ' = 100%';
 }
 
-// ── capDia (piso de 95%) ──────────────────────────────────────────────────────
+// ── capDia (piso de 100%) ─────────────────────────────────────────────────────
 // state.capDia = { dk: { collabKey: true } } — quando marcado, a %Total EXIBIDA do dia
-// tem PISO de 95% (se o real for >=95 mantém; se for menor, exibe 95). Card + tabela.
+// tem PISO de 100% (se o real for >=100 mantém; se for menor, exibe 100). Card + tabela.
 // Tempo/Amt continuam reais; o ranking (card e tabela) usa SEMPRE a % real.
-export const CAP_FLOOR = 95;
+export const CAP_FLOOR = 100;
 export function capValue(perc){ return Math.max(CAP_FLOOR, perc); }
 export function isCapped(collabKey, dk){
   return !!(state.capDia && state.capDia[dk] && state.capDia[dk][collabKey]);
@@ -335,7 +356,7 @@ export function renderDashCards() {
   const goalLabel = goalMs > 0 ? `${goalMs/MS_PER_HOUR}h=100%` : 'opcional';
   const canCap = _canCapDia();
   const results = Object.keys(state.COLLABS)
-    .filter(k => isActive(k) && !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''))
+    .filter(k => isRankable(k))
     .map(k => ({key:k, ...state.COLLABS[k], ...calcDay(k,tk)}));
   results.sort((a,b) => b.percTotal - a.percTotal); // ranking do card SEMPRE pela % real
   const rankedHtml = results.map((c,i)=>{
@@ -343,9 +364,9 @@ export function renderDashCards() {
     const rankIcon = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
     const rankCls = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     const capped = isCapped(c.key, tk);
-    const dispTotal = capped ? capValue(c.percTotal) : c.percTotal;  // piso de 95% só na EXIBIÇÃO
+    const dispTotal = (capped && c.count > 0) ? capValue(c.percTotal) : c.percTotal;  // piso de 100% só na EXIBIÇÃO e só em dia COM registros
     const onVac = c.onVacation;
-    const capBtn = (canCap && !onVac) ? `<button class="cap-toggle ${capped?'on':''}" title="${capped?'Piso de 95% ativo — clique para reverter':'Garantir piso de 95% neste dia'}" onclick="window.toggleCapDia('${c.key}','${tk}')">95%${capped?' ✓':''}</button>` : '';
+    const capBtn = (canCap && !onVac) ? `<button class="cap-toggle ${capped?'on':''}" title="${capped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${c.key}','${tk}')">100%${capped?' ✓':''}</button>` : '';
     const vacBadge = onVac ? `<span style="font-size:0.6rem;font-weight:800;color:#fff;background:var(--orange);border-radius:100px;padding:2px 8px;white-space:nowrap;">Férias</span>` : '';
     return `<div class="collab-card${capped?' capped':''}">
       <div class="collab-card-header">
@@ -363,35 +384,49 @@ export function renderDashCards() {
       ${renderConquistasBadges(c.key, state.dashDay)}
     </div>`;
   }).join('');
-  // Item: card próprio da gestora (informativo) — fora do ranking e das métricas coletivas
-  let ownHtml = '';
-  if(state.userPapel === 'gestora' && state.currentCollabKey && state.COLLABS[state.currentCollabKey]){
-    const meKey = state.currentCollabKey;
-    const me = { ...state.COLLABS[meKey], ...calcDay(meKey, tk) };
-    const avo = getCollabAvatar(meKey);
-    ownHtml = `<div class="collab-card" style="border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;">
+  // Cards de GESTORES (todos os gestores ativos da equipe) — fora do ranking/destaque, mas
+  // visíveis para que os gestores vejam a % uns dos outros. O botão de piso de 100% só
+  // aparece no próprio card (cada gestor registra o próprio dia).
+  const _gestorCard = (gk) => {
+    const me = { ...state.COLLABS[gk], ...calcDay(gk, tk) };
+    const avo = getCollabAvatar(gk);
+    const isSelf = gk === state.currentCollabKey;
+    const gIsCapped = isCapped(gk, tk);
+    const gCapped = gIsCapped && me.count > 0;
+    const gDisp = gCapped ? capValue(me.percTotal) : me.percTotal;
+    const gCapBtn = (isSelf && canCap)
+      ? `<button class="cap-toggle ${gIsCapped?'on':''}" title="${gIsCapped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${gk}','${tk}')">100%${gIsCapped?' ✓':''}</button>`
+      : (gCapped ? `<span style="font-size:0.58rem;font-weight:800;color:var(--orange);" title="Piso de 100% ativo">✓ 100%</span>` : '');
+    const tag = isSelf
+      ? `<span style="font-size:0.6rem;color:var(--orange);font-weight:800;">(você)</span>`
+      : `<span style="font-size:0.55rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:0.3px;">Gestão</span>`;
+    return `<div class="collab-card${gCapped?' capped':''}" style="border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;">
       <div class="collab-card-header">
         <div class="collab-card-av" style="background:${avo.color};overflow:hidden;">${avatarInner(avo)}</div>
-        <div><div class="collab-card-name">${escH(me.label)} <span style="font-size:0.6rem;color:var(--orange);font-weight:800;">(você)</span></div><div class="collab-card-rank" style="color:var(--muted)">Seu desempenho</div></div>
+        <div style="flex:1"><div class="collab-card-name">${escH(me.label)} ${tag}</div><div class="collab-card-rank" style="color:var(--muted)">${isSelf?'Seu desempenho':'Gestor(a)'}</div></div>
+        ${gCapBtn}
       </div>
       <div class="collab-card-stats">
         <div><div class="ccs-label">% Tempo</div><div class="ccs-value">${me.percTime.toFixed(1)}%</div></div>
         <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${me.percAmount.toFixed(1)}%</div></div>
-        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${me.percTotal.toFixed(1)}%</div></div>
+        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${gDisp.toFixed(1)}%${(gCapped && me.percTotal < CAP_FLOOR)?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${me.percTotal.toFixed(0)}%)</span>`:''}</div></div>
       </div>
-      <div class="bar-label"><span>Meta (${_fmtMetaLabel(me.goalMs)})</span><span>${me.percTotal.toFixed(1)}%</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(me.percTotal,100)}%"></div></div>
+      <div class="bar-label"><span>Meta (${_fmtMetaLabel(me.goalMs)})</span><span>${gDisp.toFixed(1)}%</span></div>
+      <div class="bar-track"><div class="bar-fill ${gDisp>=100?'over':''}" style="width:${Math.min(gDisp,100)}%"></div></div>
     </div>`;
-  }
-  document.getElementById('cardsGrid').innerHTML = ownHtml + rankedHtml;
+  };
+  const gestorCardsHtml = Object.keys(state.COLLABS)
+    .filter(k => isActive(k) && !isRankable(k))
+    .map(_gestorCard).join('');
+  document.getElementById('cardsGrid').innerHTML = gestorCardsHtml + rankedHtml;
 
-  // Botão "piso de 95% para todos" (gestão) — liga/desliga todos os colaboradores do dia
+  // Botão "piso de 100% para todos" (gestão) — liga/desliga todos os colaboradores do dia
   const capAllBtn = document.getElementById('capAllBtn');
   if(capAllBtn){
     if(canCap && results.length){
       const allCapped = results.every(c => isCapped(c.key, tk));
       capAllBtn.style.display = '';
-      capAllBtn.textContent = allCapped ? 'Reverter 95% de todos' : 'Ativar 95% p/ todos';
+      capAllBtn.textContent = allCapped ? 'Reverter 100% de todos' : 'Ativar 100% p/ todos';
       capAllBtn.dataset.allcapped = allCapped ? '1' : '0';
     } else {
       capAllBtn.style.display = 'none';
@@ -407,16 +442,18 @@ export function renderWeekTable() {
   const tbody = document.getElementById('weekTableBody');
   thead.innerHTML = `<tr><th class="name-col">Colaborador</th>${days.map(d=>{const iso=_dkToISO(dKey(d));const hol=state.allHolidays?.[iso];return`<th>${fmtShortDate(d)}${hol?`<br><span style="font-size:0.58rem;color:var(--orange);font-weight:600;">${escH(hol.label||'Feriado')}</span>`:''}</th>`;}).join('')}<th>Média</th><th>Rank</th></tr>`;
   // ✅ Gestora excluída das métricas coletivas
-  // eff = % EXIBIDA/MÉDIA: piso de 95% quando a gestão ativou o dia (real<95 → 95).
+  // eff = % EXIBIDA/MÉDIA: piso de 100% quando a gestão ativou o dia (real<100 → 100).
   // O RANKING (semanal e diário) usa SEMPRE a % original (item 190 do doc):
-  // ex. dias com piso exibem >=95%, mas o destaque continua sendo a maior % real.
+  // ex. dias com piso exibem >=100%, mas o destaque continua sendo a maior % real.
   const tableData = Object.keys(state.COLLABS)
-    .filter(k => isActive(k) && !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''))
+    .filter(k => isRankable(k))
     .map(k => {
       const dayData = days.map(d => {
         const dk = dKey(d);
         const cd = calcDay(k, dk);
-        cd.capped = isCapped(k, dk);
+        // piso de 100% só vale para dia COM registros: capar um dia vazio (real 0%) geraria
+        // um "100% fantasma" que entra na soma mas não no divisor `active`, inflando a média.
+        cd.capped = isCapped(k, dk) && cd.count > 0;
         cd.eff = cd.capped ? capValue(cd.percTotal) : cd.percTotal;
         return cd;
       });
@@ -429,8 +466,10 @@ export function renderWeekTable() {
   const sorted = [...tableData].sort((a,b)=>b.weekTotalReal-a.weekTotalReal);
   const rankMap = {}; sorted.forEach((c,i)=>rankMap[c.key]=i+1);
   const daySums = days.map((_,i)=>{
-    const tots = tableData.map(c=>c.dayData[i].eff);
-    return tots.length ? tots.reduce((s,v)=>s+v,0)/tots.length : 0;
+    // Média do dia: só colaboradores COM meta (>0) naquele dia — exclui férias, folga/atestado,
+    // feriado e fim de semana, que entrariam como 0% e derrubariam a média indevidamente.
+    const tots = tableData.filter(c=>c.dayData[i].goalMs > 0).map(c=>c.dayData[i].eff);
+    return tots.length ? tots.reduce((s,v)=>s+v,0)/tots.length : null;
   });
   // ✅ NOVO: ranking diário — usa a % ORIGINAL (destaque é a maior % real, mesmo com 100% exibido)
   const dayRankMaps = days.map((_,i)=>{
@@ -439,25 +478,63 @@ export function renderWeekTable() {
     return m;
   });
   const dayRankIcons = ['🥇','🥈','🥉'];
-  tbody.innerHTML = tableData.map(c=>{
-    const rank = rankMap[c.key];
-    const cells = c.dayData.map((d,i)=>{
-      const isToday = dKey(days[i])===tk;
-      const todayStyle = isToday ? 'outline:2px solid var(--orange);outline-offset:-2px;' : '';
-      if(d.onVacation) return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-sub" style="color:var(--orange);font-weight:700">Férias</span></div></td>`;
-      if(!d.count) return `<td style="${todayStyle}">&mdash;</td>`;
-      if(d.isSaturday) {
-        return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-total" style="color:var(--muted)">${d.percTotal.toFixed(1)}%</span><span class="cell-sub" style="color:var(--muted)">opcional</span></div></td>`;
-      }
-      const cls = d.eff>=100?'cell-over100':d.eff>=90?'cell-over90':'cell-low';
-      const color = d.eff>=90 ? 'var(--success)' : 'var(--danger)';
+
+  // Linhas de GESTORES: aparecem na tabela (para os gestores verem a % uns dos outros e dos
+  // colaboradores), mas NUNCA entram no ranking, no destaque diário nem na média do time.
+  const gestorData = Object.keys(state.COLLABS)
+    .filter(k => isActive(k) && !isRankable(k))
+    .map(k => {
+      const dayData = days.map(d => {
+        const dk = dKey(d);
+        const cd = calcDay(k, dk);
+        cd.capped = isCapped(k, dk) && cd.count > 0;
+        cd.eff = cd.capped ? capValue(cd.percTotal) : cd.percTotal;
+        return cd;
+      });
+      const active = dayData.filter(d=>d.count>0).length;
+      const avg = active>0 ? dayData.reduce((s,d)=>s+d.eff,0)/active : 0;
+      return {key:k, ...state.COLLABS[k], dayData, avg};
+    });
+
+  // Renderiza as células de % de uma linha. withDayRank=false p/ gestores (sem 🥇/#).
+  const _cellsFor = (c, withDayRank) => c.dayData.map((d,i)=>{
+    const isToday = dKey(days[i])===tk;
+    const todayStyle = isToday ? 'outline:2px solid var(--orange);outline-offset:-2px;' : '';
+    if(d.onVacation) return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-sub" style="color:var(--orange);font-weight:700">Férias</span></div></td>`;
+    if(!d.count){
+      const _iso = _dkToISO(dKey(days[i]));
+      const _hol = state.allHolidays?.[_iso];
+      const _fol = state.allFolgas?.[_iso]?.[c.key];
+      if(_hol) return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-sub" style="color:var(--orange);font-weight:700">${escH(_hol.label||'Feriado')}</span></div></td>`;
+      if(_fol) return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-sub" style="color:${FOLGA_TIPO_CORES[_fol.type]||'var(--orange)'};font-weight:700">${escH(_fol.label||FOLGA_TIPO_LABELS[_fol.type]||'Folga')}</span></div></td>`;
+      return `<td style="${todayStyle}">&mdash;</td>`;
+    }
+    if(d.isSaturday) {
+      return `<td style="${todayStyle}background:var(--surface2);"><div class="cell-multi"><span class="cell-total" style="color:var(--muted)">${d.percTotal.toFixed(1)}%</span><span class="cell-sub" style="color:var(--muted)">opcional</span></div></td>`;
+    }
+    const cls = d.eff>=100?'cell-over100':d.eff>=90?'cell-over90':'cell-low';
+    const color = d.eff>=90 ? 'var(--success)' : 'var(--danger)';
+    let drBadge = '';
+    if(withDayRank){
       const dr = dayRankMaps[i][c.key];
-      const drBadge = dr<=3 ? `<span style="font-size:0.65rem;line-height:1;">${dayRankIcons[dr-1]}</span>` : `<span style="font-size:0.6rem;color:var(--muted);font-weight:700">#${dr}</span>`;
-      const sub = d.capped ? `<span class="cell-sub" style="color:var(--orange);font-weight:700" title="Piso de 95% ativo (real ${d.percTotal.toFixed(0)}%)">✓ piso 95%</span>` : `<span class="cell-sub">${d.percTime.toFixed(0)}%t +${d.percAmount.toFixed(0)}%a</span>`;
-      return `<td class="${cls}" style="${todayStyle}"><div class="cell-multi"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><span class="cell-total" style="color:${color}">${d.eff.toFixed(1)}%</span>${drBadge}</div>${sub}</div></td>`;
-    }).join('');
-    return `<tr><td class="name-col"><div class="cell-collab"><div class="cell-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'0.8rem':'0.52rem'}">${getCollabAvatar(c.key).display}</div><div class="cell-name">${c.label}</div></div></td>${cells}<td><div class="cell-multi"><span class="cell-total" style="color:var(--orange)">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td><td>${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`}</td></tr>`;
-  }).join('') + `<tr class="summary-row"><td class="name-col">Média do time</td>${daySums.map(v=>`<td>${v.toFixed(1)}%</td>`).join('')}<td>${(tableData.length ? tableData.reduce((s,c)=>s+c.avg,0)/tableData.length : 0).toFixed(1)}%</td><td>—</td></tr>`;
+      drBadge = dr<=3 ? `<span style="font-size:0.65rem;line-height:1;">${dayRankIcons[dr-1]}</span>` : `<span style="font-size:0.6rem;color:var(--muted);font-weight:700">#${dr}</span>`;
+    }
+    const sub = d.capped ? `<span class="cell-sub" style="color:var(--orange);font-weight:700" title="Piso de 100% ativo (real ${d.percTotal.toFixed(0)}%)">✓ piso 100%</span>` : `<span class="cell-sub">${d.percTime.toFixed(0)}%t +${d.percAmount.toFixed(0)}%a</span>`;
+    return `<td class="${cls}" style="${todayStyle}"><div class="cell-multi"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><span class="cell-total" style="color:${color}">${d.eff.toFixed(1)}%</span>${drBadge}</div>${sub}</div></td>`;
+  }).join('');
+
+  const _avatarCell = c => `<td class="name-col"><div class="cell-collab"><div class="cell-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'0.8rem':'0.52rem'}">${getCollabAvatar(c.key).display}</div><div class="cell-name">${c.label}</div></div></td>`;
+  const _avgCell = c => `<td><div class="cell-multi"><span class="cell-total" style="color:var(--orange)">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td>`;
+
+  const rankedRows = tableData.map(c=>{
+    const rank = rankMap[c.key];
+    return `<tr>${_avatarCell(c)}${_cellsFor(c,true)}${_avgCell(c)}<td>${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`}</td></tr>`;
+  }).join('');
+  const gestorRows = gestorData.map(c=>
+    `<tr style="opacity:0.92;">${_avatarCell(c)}${_cellsFor(c,false)}${_avgCell(c)}<td><span style="font-size:0.56rem;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px;">Gestão</span></td></tr>`
+  ).join('');
+  const summaryRow = `<tr class="summary-row"><td class="name-col">Média do time</td>${daySums.map(v=>`<td>${v===null?'&mdash;':v.toFixed(1)+'%'}</td>`).join('')}<td>${(()=>{ const ac = tableData.filter(c=>c.dayData.some(d=>d.count>0)); return (ac.length ? ac.reduce((s,c)=>s+c.avg,0)/ac.length : 0).toFixed(1); })()}%</td><td>—</td></tr>`;
+  tbody.innerHTML = rankedRows + gestorRows + summaryRow;
 }
 
 // ── MEU DASHBOARD (colaborador individual) ─────────────────────────────────────
@@ -571,7 +648,14 @@ export function renderMeuDashboard() {
   const cells = dayData.map((d,i)=>{
     const isToday = dKey(days[i])===tk;
     const todayStyle = isToday ? 'outline:2px solid var(--orange);outline-offset:-2px;' : '';
-    if(!d.count) return `<td style="text-align:center;padding:8px 4px;font-size:0.78rem;color:var(--muted);${todayStyle}">—</td>`;
+    if(!d.count){
+      const _iso = _dkToISO(dKey(days[i]));
+      const _hol = state.allHolidays?.[_iso];
+      const _fol = state.allFolgas?.[_iso]?.[k];
+      if(_hol) return `<td style="text-align:center;padding:6px 4px;${todayStyle}"><span style="font-size:0.62rem;font-weight:700;color:var(--orange)">${escH(_hol.label||'Feriado')}</span></td>`;
+      if(_fol) return `<td style="text-align:center;padding:6px 4px;${todayStyle}"><span style="font-size:0.62rem;font-weight:700;color:${FOLGA_TIPO_CORES[_fol.type]||'var(--orange)'}">${escH(_fol.label||FOLGA_TIPO_LABELS[_fol.type]||'Folga')}</span></td>`;
+      return `<td style="text-align:center;padding:8px 4px;font-size:0.78rem;color:var(--muted);${todayStyle}">—</td>`;
+    }
     const color = d.percTotal>=90 ? 'var(--success)' : 'var(--danger)';
     const cls = d.percTotal>=100?'cell-over100':d.percTotal>=90?'cell-over90':'cell-low';
     return `<td class="${cls}" style="text-align:center;padding:6px 4px;${todayStyle}">
@@ -618,31 +702,35 @@ export async function fetchTeamWeek(equipeId, weekOffset = 0){
   const days = getWeekDays(weekOffset);
   const startTs = days[0].getTime();
   const endTs = new Date(days[5].getFullYear(), days[5].getMonth(), days[5].getDate(), 23,59,59,999).getTime();
-  const [cfgSnap, entSnap, holSnap] = await Promise.all([
+  const [cfgSnap, entSnap, holSnap, folSnap] = await Promise.all([
     get(ref(db, `equipes/${equipeId}/config`)),
     get(query(ref(db, `equipes/${equipeId}/entries`), orderByChild('startTime'), startAt(startTs), endAt(endTs))),
     get(ref(db, `equipes/${equipeId}/holidays`)),
+    get(ref(db, `equipes/${equipeId}/folgas`)),
   ]);
   const cfg = cfgSnap.val() || {};
   const entries = Object.values(entSnap.val() || {});
   const holidays = holSnap.val() || {};
+  const folgas = folSnap.val() || {};
 
   const projects = {};
   Object.entries(cfg.projetos || {}).forEach(([k,p]) => { projects[k] = { amountPerHour: p.amountPerHour || 0 }; });
   const collabs = {};
   Object.values(cfg.usuarios || {}).forEach(u => {
-    if(u.key && (u.papel === 'colaborador' || u.papel === 'gestora')){
+    // Só colaboradores entram nos destaques/remoto — gestores ficam de fora.
+    if(u.key && u.papel === 'colaborador'){
       collabs[u.key] = { label: u.nome || u.key, color: u.cor || '#94A3B8', active: u.ativo !== false, estilo: u.estiloTrabalho || 'presencial', horasDia: u.horasDia };
     }
   });
   const defaultGoalMs = (cfg.metas?.horasDia || 9) * MS_PER_HOUR;
   const metasDias = cfg.metas?.metasDias || null;
 
-  const goalFor = (d, c) => {
+  const goalFor = (d, c, key) => {
     const dow = d.getDay();
     if(dow === 0 || dow === 6) return 0;
     const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if(holidays[iso]) return 0;
+    if(key && folgas[iso]?.[key]) return 0;   // folga/atestado individual
     if(c.horasDia !== undefined && c.horasDia !== null) return c.horasDia * MS_PER_HOUR;
     if(metasDias && metasDias[_DOW_K[dow]] !== undefined) return metasDias[_DOW_K[dow]] * MS_PER_HOUR;
     if(dow === 5) return 8 * MS_PER_HOUR;
@@ -667,7 +755,7 @@ export async function fetchTeamWeek(equipeId, weekOffset = 0){
         const rate = (e.peso !== undefined && e.peso !== null && !isNaN(e.peso)) ? Number(e.peso) : (p ? p.amountPerHour : 0);
         amount += (ms / MS_PER_HOUR) * (rate || 0);
       });
-      const goalMs = goalFor(d, c);
+      const goalMs = goalFor(d, c, key);
       const percTime = goalMs > 0 ? totalMs / goalMs * 100 : (totalMs > 0 ? totalMs / defaultGoalMs * 100 : 0);
       return { percTotal: percTime + amount, count };
     });

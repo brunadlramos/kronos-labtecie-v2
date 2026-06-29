@@ -40,7 +40,7 @@ import {
   EQUIPE_ID,
   entriesRef, kanbanRef, customTagsRef, removedTagsRef, customProjectsRef,
   muralRef, desafioRef, usersRef, notifsRef, avatarsRef, arquivoRef,
-  approvalRequestsRef, activeTimersRef, holidaysRef, indicadoresManuaisRef, capDiaRef,
+  approvalRequestsRef, activeTimersRef, holidaysRef, folgasRef, indicadoresManuaisRef, capDiaRef,
   _buildRefs, _getSecondaryAuth,
   createUserWithEmailAndPassword, signOut, logEvent
 } from './js/firebase-refs.js';
@@ -111,6 +111,17 @@ const MS_PER_WEEK       = 604800000;
 const ENTRIES_LIVE_DAYS = 180;
 const DEFAULT_DAILY_GOAL_HOURS = 9;
 // LATE_CUTOFF_HOUR/MIN → js/timer.js
+
+// FIX: <input type="date"> sem min/max deixa o campo de ANO "solto" ao digitar (ex.: vira
+// 19__ ou aceita anos absurdos). Definir min/max limita o ano a uma janela sã de 4 dígitos.
+// Via focusin (delegação) cobre também os inputs criados dinamicamente nos modais.
+document.addEventListener('focusin', (e) => {
+  const el = e.target;
+  if (el && el.tagName === 'INPUT' && el.type === 'date') {
+    if (!el.min) el.min = '2020-01-01';
+    if (!el.max) el.max = '2035-12-31';
+  }
+});
 
 // firebase-refs.js → app, auth, db, analytics, EQUIPE_ID, todos os refs, _buildRefs
 
@@ -310,8 +321,19 @@ async function bootV2Config(eqId){
 // ── V2: INICIAR LISTENERS DE DADOS ──────────────────────────────────────────
 function startDataListeners(){
   if(_unsubEntries) _unsubEntries();
-  const _liveStart = Date.now() - ENTRIES_LIVE_DAYS * MS_PER_DAY;
-  const _entriesQuery = query(entriesRef, orderByChild('startTime'), startAt(_liveStart));
+  // OTIMIZAÇÃO: o colaborador comum só precisa dos PRÓPRIOS registros — Meu Dashboard,
+  // Timer e Meus Registros são todos individuais (ele não vê o dashboard da equipe).
+  // Carregar só os dele reduz o download a uma fração e evita trazer registros de
+  // colegas ao cliente. Gestão/admin/coordenação/RH/auditoria seguem com a janela de
+  // equipe (precisam do time inteiro). Usa o índice "collab" já declarado nas regras.
+  const _isPlainCollab = !state.isManager && !state.isAuditor && !!state.currentCollabKey;
+  let _entriesQuery;
+  if(_isPlainCollab){
+    _entriesQuery = query(entriesRef, orderByChild('collab'), equalTo(state.currentCollabKey));
+  } else {
+    const _liveStart = Date.now() - ENTRIES_LIVE_DAYS * MS_PER_DAY;
+    _entriesQuery = query(entriesRef, orderByChild('startTime'), startAt(_liveStart));
+  }
   _unsubEntries = onValue(_entriesQuery, (snap)=>{
     const newData = snap.val()||{};
     if(Object.keys(state.allEntries).length>0){
@@ -410,6 +432,12 @@ function startDataListeners(){
     state.allHolidays = snap.val() || {};
     renderDebounced();
   }, err => console.warn('[V2] holidays:', err));
+
+  if(_unsubFolgas) _unsubFolgas();
+  _unsubFolgas = onValue(folgasRef, snap => {
+    state.allFolgas = snap.val() || {};
+    renderDebounced();
+  }, err => console.warn('[V2] folgas:', err));
 }
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -421,6 +449,7 @@ let _unsubNotifs = null, _unsubCustomTags = null, _unsubCustomProjects = null;
 let _unsubMural = null, _unsubDesafio = null, _unsubUsers = null;
 let _unsubKanban2 = null, _unsubNotifs2 = null, _unsubAvatars = null, _unsubArquivo = null;
 let _unsubApprovals = null, _unsubHolidays = null, _unsubIndManuais = null, _unsubCapDia = null;
+let _unsubFolgas = null;
 
 // ── ENTRIES ARRAY MEMOIZATION ─────────────────────────────────────────────────
 
@@ -539,6 +568,11 @@ onAuthStateChanged(auth, async user => {
     show('navMeuHistorico','flex');
     const nt=document.getElementById('navTimer');if(nt)nt.classList.add('active');
   }
+  // Botão de Feriados/Folgas na dashboard (acesso rápido) — só gestão/admin/coordenador
+  if(state.isManager || state.userPapel==='coordenador'){
+    const bf=document.getElementById('btnDashFeriados'); if(bf) bf.style.display='inline-flex';
+  }
+
   const cs=document.getElementById('collabSelect');
   if(cs && state.currentCollabKey && state.COLLABS[state.currentCollabKey]) cs.value=state.currentCollabKey;
 
@@ -574,7 +608,7 @@ onAuthStateChanged(auth, async user => {
 window.doLogout = () => {
   [_unsubEntries, _unsubKanban, _unsubActiveTimers, _unsubNotifs, _unsubCustomTags,
    _unsubCustomProjects, _unsubMural, _unsubDesafio, _unsubUsers,
-   _unsubKanban2, _unsubNotifs2, _unsubAvatars, _unsubArquivo, _unsubApprovals, _unsubHolidays, _unsubIndManuais, _unsubCapDia].forEach(fn => fn?.());
+   _unsubKanban2, _unsubNotifs2, _unsubAvatars, _unsubArquivo, _unsubApprovals, _unsubHolidays, _unsubFolgas, _unsubIndManuais, _unsubCapDia].forEach(fn => fn?.());
   if(state.intervalId) clearInterval(state.intervalId);
   if(state.noActivityTimer) clearTimeout(state.noActivityTimer);
   if(state._onlineAutoRefresh){ clearInterval(state._onlineAutoRefresh); state._onlineAutoRefresh=null; }
@@ -582,7 +616,7 @@ window.doLogout = () => {
 };
 
 
-// ── CAP DIA (piso de 95%) ─────────────────────────────────────────────────────
+// ── CAP DIA (piso de 100%) ────────────────────────────────────────────────────
 // Marca/desmarca capDia/{dk}/{collabKey}. Só gestão (regra do RTDB também valida).
 window.toggleCapDia = async (collabKey, dk) => {
   if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
@@ -592,14 +626,14 @@ window.toggleCapDia = async (collabKey, dk) => {
   try {
     if(on) await set(node, true);
     else   await remove(node);
-    try { registrarLog('capDia', `${on?'Ativou':'Removeu'} piso 95%`, `${collabKey} · ${dk}`); } catch(e){}
+    try { registrarLog('capDia', `${on?'Ativou':'Removeu'} piso 100%`, `${collabKey} · ${dk}`); } catch(e){}
   } catch(e) {
     console.warn('[toggleCapDia]', e);
     alert('Não foi possível alterar o piso do dia: ' + (e?.message||e));
   }
 };
 
-// Liga/desliga o piso de 95% para TODOS os colaboradores do dia exibido (gestão).
+// Liga/desliga o piso de 100% para TODOS os colaboradores do dia exibido (gestão).
 window.toggleCapDiaAll = async () => {
   if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
   const dk = dKey(state.dashDay);
@@ -614,7 +648,7 @@ window.toggleCapDiaAll = async () => {
   keys.forEach(k => { updates[k] = allCapped ? null : true; });  // null remove a folha
   try {
     await update(child(capDiaRef, dk), updates);
-    try { registrarLog('capDia', `${allCapped?'Removeu':'Ativou'} piso 95% de TODOS`, dk); } catch(e){}
+    try { registrarLog('capDia', `${allCapped?'Removeu':'Ativou'} piso 100% de TODOS`, dk); } catch(e){}
   } catch(e) {
     console.warn('[toggleCapDiaAll]', e);
     alert('Não foi possível atualizar todos: ' + (e?.message||e));
@@ -623,6 +657,11 @@ window.toggleCapDiaAll = async () => {
 
 
 // ── FERIADOS E FOLGAS ─────────────────────────────────────────────────────────
+// Tipos: feriado / atestado / dayoff (só rótulo — todos zeram a meta do dia).
+// Abrangência: 'all' (toda a equipe → holidays/{iso}) ou um colaborador
+// específico (folgas/{iso}/{collabKey}). getDailyGoalMs zera a meta conforme o caso.
+const FOLGA_TIPOS  = { feriado:'Feriado', atestado:'Atestado', dayoff:'Day off' };
+const FOLGA_CORES  = { feriado:'#f15a24', atestado:'#ef4444', dayoff:'#3b82f6' };
 window.openHolidaysModal = () => {
   let modal = document.getElementById('holidaysModal');
   if(!modal){
@@ -632,54 +671,98 @@ window.openHolidaysModal = () => {
     modal.onclick = e => { if(e.target===modal) modal.remove(); };
     document.body.appendChild(modal);
   }
-  const list = Object.entries(state.allHolidays).sort((a,b)=>a[0].localeCompare(b[0]));
   const canEdit = state.isManager;
+  // Lista unificada: feriados da equipe (todos) + folgas/atestados por colaborador
+  const rows = [];
+  Object.entries(state.allHolidays||{}).forEach(([iso,h])=>rows.push({iso, scope:'all', type:h.type||'feriado', label:h.label||'Feriado'}));
+  Object.entries(state.allFolgas||{}).forEach(([iso,byCollab])=>{
+    Object.entries(byCollab||{}).forEach(([ck,f])=> f && rows.push({iso, scope:'collab', collab:ck, type:f.type||'atestado', label:f.label||'Folga'}));
+  });
+  rows.sort((a,b)=> a.iso.localeCompare(b.iso) || a.scope.localeCompare(b.scope) || (a.collab||'').localeCompare(b.collab||''));
+  const collabOpts = Object.keys(state.COLLABS||{}).filter(k=>isActive(k))
+    .sort((a,b)=>(state.COLLABS[a].label||a).localeCompare(state.COLLABS[b].label||b))
+    .map(k=>`<option value="${escH(k)}">${escH(state.COLLABS[k].label||k)}</option>`).join('');
+  const tipoOpts = Object.entries(FOLGA_TIPOS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  const fldLbl = 'font-size:0.65rem;font-weight:800;color:var(--muted);margin-bottom:4px;text-transform:uppercase;';
+  const fld = 'width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:0.82rem;';
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:16px;padding:24px;width:440px;max-width:95vw;max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+    <div style="background:var(--surface);border-radius:16px;padding:24px;width:480px;max-width:95vw;max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div style="font-size:1rem;font-weight:800;">Feriados e Folgas</div>
         <button onclick="document.getElementById('holidaysModal').remove()" aria-label="Fechar" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);"><span aria-hidden="true">✕</span></button>
       </div>
       ${canEdit ? `
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:16px;align-items:end;">
-        <div>
-          <div style="font-size:0.65rem;font-weight:800;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Data</div>
-          <input id="holidayDateInput" type="date" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:0.82rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div><div style="${fldLbl}">Data</div><input id="holidayDateInput" type="date" style="${fld}"></div>
+        <div><div style="${fldLbl}">Tipo</div><select id="holidayTypeInput" style="${fld}">${tipoOpts}</select></div>
+        <div><div style="${fldLbl}">Abrangência</div>
+          <select id="holidayScopeInput" style="${fld}" onchange="document.getElementById('holidayCollabWrap').style.display=this.value==='collab'?'block':'none'">
+            <option value="all">Todos os colaboradores</option>
+            <option value="collab">Colaborador específico</option>
+          </select>
         </div>
-        <div>
-          <div style="font-size:0.65rem;font-weight:800;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Nome (opcional)</div>
-          <input id="holidayLabelInput" type="text" placeholder="Ex: Corpus Christi" maxlength="50" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:0.82rem;">
+        <div id="holidayCollabWrap" style="display:none;"><div style="${fldLbl}">Colaborador</div>
+          <select id="holidayCollabInput" style="${fld}"><option value="">Selecione…</option>${collabOpts}</select>
         </div>
-        <button onclick="window.addHoliday()" style="background:var(--orange);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:0.82rem;cursor:pointer;white-space:nowrap;">+ Adicionar</button>
-      </div>` : ''}
-      <div style="font-size:0.65rem;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Feriados cadastrados</div>
-      ${list.length ? list.map(([iso, h])=>`
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;">
-          <div>
-            <div style="font-size:0.82rem;font-weight:700;">${escH(h.label||'Feriado')}</div>
-            <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">${iso}</div>
+        <div style="grid-column:1 / -1;"><div style="${fldLbl}">Nome (opcional)</div>
+          <input id="holidayLabelInput" type="text" placeholder="Ex: Corpus Christi" maxlength="50" style="${fld}">
+        </div>
+      </div>
+      <button onclick="window.addHoliday()" style="width:100%;background:var(--orange);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:0.82rem;cursor:pointer;margin-bottom:18px;">+ Adicionar</button>` : ''}
+      <div style="font-size:0.65rem;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Registros cadastrados</div>
+      ${rows.length ? rows.map(r=>{
+        const cor = FOLGA_CORES[r.type]||'#94A3B8';
+        const quem = r.scope==='all' ? 'Toda a equipe' : (state.COLLABS[r.collab]?.label||r.collab);
+        const onRemove = r.scope==='all' ? `window.removeHoliday('${escH(r.iso)}')` : `window.removeFolga('${escH(r.iso)}','${escH(r.collab)}')`;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;gap:10px;">
+          <div style="min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:0.58rem;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:100px;background:${cor}22;color:${cor};border:1px solid ${cor}55;">${FOLGA_TIPOS[r.type]||r.type}</span>
+              <span style="font-size:0.82rem;font-weight:700;">${escH(r.label)}</span>
+            </div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:3px;">${r.iso} · ${escH(quem)}</div>
           </div>
-          ${canEdit ? `<button onclick="window.removeHoliday('${escH(iso)}')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:6px;padding:3px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">Remover</button>` : ''}
-        </div>`).join('') : '<div style="text-align:center;color:var(--muted);font-size:0.78rem;padding:12px;">Nenhum feriado cadastrado.</div>'}
+          ${canEdit ? `<button onclick="${onRemove}" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:6px;padding:3px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">Remover</button>` : ''}
+        </div>`;
+      }).join('') : '<div style="text-align:center;color:var(--muted);font-size:0.78rem;padding:12px;">Nenhum registro cadastrado.</div>'}
     </div>`;
 };
 
 window.addHoliday = async () => {
   const iso = document.getElementById('holidayDateInput')?.value;
   if(!iso){ showToast('Data obrigatória','Selecione uma data.'); return; }
-  const label = (document.getElementById('holidayLabelInput')?.value.trim() || 'Feriado').slice(0,50);
+  const type  = document.getElementById('holidayTypeInput')?.value || 'feriado';
+  const scope = document.getElementById('holidayScopeInput')?.value || 'all';
+  const label = (document.getElementById('holidayLabelInput')?.value.trim() || FOLGA_TIPOS[type] || 'Feriado').slice(0,50);
+  const meta = { label, type, setBy: state.currentUser?.email||'', setAt: Date.now() };
   try {
-    await set(child(holidaysRef, iso), { label, setBy: state.currentUser?.email||'', setAt: Date.now() });
-    showToast('✅ Feriado adicionado', `${label} (${iso}) cadastrado.`);
+    if(scope==='collab'){
+      const collab = document.getElementById('holidayCollabInput')?.value;
+      if(!collab){ showToast('Colaborador obrigatório','Selecione o colaborador.'); return; }
+      await set(child(folgasRef, `${iso}/${collab}`), meta);
+      showToast('✅ Registrado', `${label} de ${state.COLLABS[collab]?.label||collab} em ${iso}.`);
+    } else {
+      await set(child(holidaysRef, iso), meta);
+      showToast('✅ Registrado', `${label} (${iso}) para toda a equipe.`);
+    }
     setTimeout(()=>window.openHolidaysModal(), 200);
   } catch(e){ showToast('Erro','Não foi possível salvar. Verifique sua conexão.'); }
 };
 
 window.removeHoliday = async (iso) => {
-  if(!confirm(`Remover o feriado de ${iso}?`)) return;
+  if(!confirm(`Remover o registro de ${iso} (toda a equipe)?`)) return;
   try {
     await remove(child(holidaysRef, iso));
-    showToast('Feriado removido', iso);
+    showToast('Registro removido', iso);
+    setTimeout(()=>window.openHolidaysModal(), 200);
+  } catch(e){ showToast('Erro','Não foi possível remover.'); }
+};
+
+window.removeFolga = async (iso, collab) => {
+  if(!confirm(`Remover a folga/atestado de ${state.COLLABS[collab]?.label||collab} em ${iso}?`)) return;
+  try {
+    await remove(child(folgasRef, `${iso}/${collab}`));
+    showToast('Registro removido', iso);
     setTimeout(()=>window.openHolidaysModal(), 200);
   } catch(e){ showToast('Erro','Não foi possível remover.'); }
 };
@@ -1487,11 +1570,41 @@ window.exportCSV = ()=>{
   dlCSV([header,...lines].join('\n'),`kronos_${state.viewDate.toISOString().slice(0,10)}.csv`);
 };
 
-window.exportWeekCSV = ()=>{
+// Exporta a grade semanal em SpreadsheetML com extensão .xls — abre direto no Excel
+// como planilha (a instrução <?mso-application?> reforça a associação com o Excel).
+window.exportWeekExcel = ()=>{
   const days=getWeekDays(state.weekOffset);
-  const rows=['Colaborador,Data,% Tempo,% Amount,% Total,Horas'];
-  Object.keys(state.COLLABS).forEach(k=>{days.forEach(d=>{const r=calcDay(k,dKey(d));const h=Math.floor(r.totalMs/3600000),m=Math.floor((r.totalMs%3600000)/60000);rows.push([state.COLLABS[k].label,d.toLocaleDateString('pt-BR'),r.percTime.toFixed(2)+'%',r.percAmount.toFixed(2)+'%',r.percTotal.toFixed(2)+'%',`${h}h${String(m).padStart(2,'0')}m`].join(','));});});
-  dlCSV(rows.join('\n'),`kronos_semana_${new Date().toISOString().slice(0,10)}.csv`);
+  const _x = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  const cell  = (v,t)=>`<Cell><Data ss:Type="${t}">${_x(v)}</Data></Cell>`;
+  const hcell = v   =>`<Cell ss:StyleID="hdr"><Data ss:Type="String">${_x(v)}</Data></Cell>`;
+  const headers=['Colaborador','Data','% Tempo','% Amount','% Total','Horas'];
+  const dataRows=[];
+  Object.keys(state.COLLABS).forEach(k=>{days.forEach(d=>{
+    const r=calcDay(k,dKey(d));
+    const h=Math.floor(r.totalMs/3600000),m=Math.floor((r.totalMs%3600000)/60000);
+    dataRows.push('<Row>'+
+      cell(state.COLLABS[k].label,'String')+
+      cell(d.toLocaleDateString('pt-BR'),'String')+
+      cell(r.percTime.toFixed(2),'Number')+
+      cell(r.percAmount.toFixed(2),'Number')+
+      cell(r.percTotal.toFixed(2),'Number')+
+      cell(`${h}h${String(m).padStart(2,'0')}m`,'String')+
+    '</Row>');
+  });});
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles><Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#F15A24" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style></Styles>
+ <Worksheet ss:Name="Semana">
+  <Table>
+   <Row>${headers.map(hcell).join('')}</Row>
+   ${dataRows.join('\n   ')}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`kronos_semana_${new Date().toISOString().slice(0,10)}.xls`;a.click();URL.revokeObjectURL(url);
 };
 
 // ── USER MANAGEMENT (renderUsuarios … dlCSV) → js/usuarios.js ──────────────────

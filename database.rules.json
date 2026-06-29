@@ -36,7 +36,7 @@
         "entries": {
           ".indexOn": ["startTime", "collab"],
           "$entryId": {
-            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && (root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' || newData.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val())))",
+            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && (root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' || (newData.exists() && newData.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val()) || (!newData.exists() && data.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val()))))",
             ".validate": "!newData.exists() || ((!newData.child('task').exists() || (newData.child('task').isString() && newData.child('task').val().length <= 500)) && (!newData.child('obs').exists() || (newData.child('obs').isString() && newData.child('obs').val().length <= 1000)))"
           }
         },
@@ -98,6 +98,15 @@
           ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' && (!root.child('coordenacoes').exists() || root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists())) || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
           "$iso": {
             ".validate": "!newData.exists() || (newData.child('label').isString() && newData.child('label').val().length <= 60)"
+          }
+        },
+
+        "folgas": {
+          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' && (!root.child('coordenacoes').exists() || root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child($equipeId).exists())) || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
+          "$iso": {
+            "$collabKey": {
+              ".validate": "!newData.exists() || (newData.child('label').isString() && newData.child('label').val().length <= 60 && (!newData.child('type').exists() || newData.child('type').val().length <= 20))"
+            }
           }
         },
 
