@@ -526,7 +526,7 @@
   </svg>
 </button>
         <button id="desafioTopBtn" onclick="openDesafioModal()" title="Definir Desafio do Dia" aria-label="Definir Desafio do Dia" class="topbar-icon-btn" style="display:none;">
-          <img src="target.png" alt="Desafio do dia" width="20" height="20" style="filter:grayscale(1) opacity(0.6); display:block;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
         </button>
         <button id="themeBtn" onclick="toggleTheme()" title="Alternar tema escuro/claro" aria-label="Alternar tema escuro/claro" class="topbar-icon-btn">
           <svg id="themeBtnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -701,6 +701,11 @@
             <span>Demandas da Semana</span>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <input type="text" class="filter-select" id="dashDemandasSearch" placeholder="Buscar..." oninput="_debouncedRenderDashDemandas()" style="min-width:160px;font-size:0.78rem;">
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="date" class="filter-select" id="dashDemandasStart" onchange="renderDashDemandasWeek()" title="Data inicial (deixe as duas vazias para ver a semana)" style="font-size:0.78rem;">
+                <span style="font-size:0.7rem;color:var(--muted);">→</span>
+                <input type="date" class="filter-select" id="dashDemandasEnd" onchange="renderDashDemandasWeek()" title="Data final" style="font-size:0.78rem;">
+              </div>
               <select id="dashDemandasCollab" class="filter-select" onchange="renderDashDemandasWeek()" style="font-size:0.78rem;">
                 <option value="">Todos os colaboradores</option>
                 

@@ -17,7 +17,7 @@ import {
 import {
   calcDay, calcAmount, getEntriesArray, getEntriesForDay,
   getCollabAvatar, getDailyGoalMs, chartPalette,
-  isActive, renderMeuDashboard, isCapped, capValue
+  isActive, renderMeuDashboard, isCapped, capValue, isRankable
 } from './dashboard.js';
 import { showToast, setSyncStatus, trapFocus, releaseFocus } from './ui.js';
 
@@ -485,8 +485,10 @@ export function render4Weeks(){
       type:'line',
       data:{
         labels:weekLabels,
-        datasets:Object.keys(state.COLLABS).filter(k=>!state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||'')).map(k=>({
-          label:state.COLLABS[k].label,
+        datasets:Object.keys(state.COLLABS).filter(k=>isActive(k)).map(k=>{
+          const _gestor=!isRankable(k);   // gestores aparecem (linha tracejada + "(Gestão)")
+          return {
+          label:state.COLLABS[k].label+(_gestor?' (Gestão)':''),
           data:weeks.map(w=>{
             // aplica o piso de 100% (capDia) por dia, igual à tabela semanal
             const avgs=w.map(d=>{const dk=dKey(d);const cd=calcDay(k,dk);return cd.count>0?(isCapped(k,dk)?capValue(cd.percTotal):cd.percTotal):0;});
@@ -494,8 +496,10 @@ export function render4Weeks(){
             return active.length?(active.reduce((s,v)=>s+v,0)/active.length).toFixed(1):0;
           }),
           borderColor:state.COLLABS[k].color,backgroundColor:state.COLLABS[k].color+'22',
+          borderDash:_gestor?[6,4]:[],
           tension:0.4,fill:false,pointRadius:5,borderWidth:2
-        }))
+          };
+        })
       },
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},color:chartPalette().legend}}},scales:{y:{grid:{color:chartPalette().grid},ticks:{color:chartPalette().tick,font:{size:10}}},x:{ticks:{color:chartPalette().tick,font:{size:10}}}}}
     });
@@ -505,29 +509,32 @@ export function render4Weeks(){
   const monthDays = [];
   const md = new Date(y,m,1);
   while(md.getMonth()===m){monthDays.push(new Date(md));md.setDate(md.getDate()+1);}
-  const COLLAB_KEYS_TEAM=Object.keys(state.COLLABS).filter(k=>isActive(k)&&!state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||''));
-  const ranking=COLLAB_KEYS_TEAM.map(k=>{
-    // média mensal com piso de 100% (capDia) aplicado por dia — destaque do mês segue a lógica da semana
+  // média mensal com piso de 100% (capDia) aplicado por dia — mesma lógica da semana
+  const _monthAvg=(k)=>{
     let sum=0, active=0;
     monthDays.forEach(d=>{
       const dk=dKey(d); const cd=calcDay(k,dk);
       if(cd.count>0){ active++; sum += (isCapped(k,dk)?capValue(cd.percTotal):cd.percTotal); }
     });
-    const avg=active?sum/active:0;
-    return{...state.COLLABS[k],key:k,avg,activeDays:active};
-  }).sort((a,b)=>b.avg-a.avg);
+    return { avg: active?sum/active:0, activeDays:active };
+  };
+  // Colaboradores entram no ranking; gestores aparecem, mas SEM posição de destaque.
+  const ranking = Object.keys(state.COLLABS).filter(k=>isActive(k)&&isRankable(k))
+    .map(k=>({...state.COLLABS[k],key:k,..._monthAvg(k)})).sort((a,b)=>b.avg-a.avg);
+  const gestores = Object.keys(state.COLLABS).filter(k=>isActive(k)&&!isRankable(k))
+    .map(k=>({...state.COLLABS[k],key:k,..._monthAvg(k)})).sort((a,b)=>b.avg-a.avg);
   const max=ranking[0]?.avg||1;
-  const rankEl = document.getElementById('rankingList4w');
-  if(rankEl) rankEl.innerHTML=ranking.map((c,i)=>{
-    const icon=i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
-    return`<div class="ranking-item" style="${i===0?'border-color:var(--orange-border);background:var(--orange-light);':''}">
-      <div class="ranking-pos">${icon}</div>
+  const _rankItem=(c,posHtml,highlight)=>`<div class="ranking-item" style="${highlight?'border-color:var(--orange-border);background:var(--orange-light);':''}${posHtml==='__GESTAO__'?'opacity:0.92;':''}">
+      <div class="ranking-pos">${posHtml==='__GESTAO__'?`<span style="font-size:0.5rem;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px;">Gestão</span>`:posHtml}</div>
       <div class="ranking-av" style="background:${c.color}">${c.initials}</div>
       <div class="ranking-name">${c.label}<div style="font-size:0.65rem;color:var(--muted);font-weight:600">${c.activeDays} dias ativos · ${numWeeks} sem.</div></div>
       <div class="ranking-bar-wrap"><div class="ranking-bar-track"><div class="ranking-bar-fill" style="width:${(c.avg/max*100).toFixed(0)}%;background:${c.color}"></div></div></div>
       <div class="ranking-val">${c.avg.toFixed(1)}%<div style="font-size:0.6rem;color:var(--muted)">média/dia</div></div>
     </div>`;
-  }).join('');
+  const rankEl = document.getElementById('rankingList4w');
+  if(rankEl) rankEl.innerHTML =
+    ranking.map((c,i)=>_rankItem(c, i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`, i===0)).join('') +
+    gestores.map(c=>_rankItem(c, '__GESTAO__', false)).join('');
 }
 
 

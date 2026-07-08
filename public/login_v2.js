@@ -2,7 +2,7 @@
 // Firebase Authentication
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // ── CONFIGURAÇÃO DO FIREBASE ──────────────────────────────────────────────────
 // Fonte única em firebase-config.js (B6), carregado antes deste módulo.
@@ -24,6 +24,7 @@ window.doLogin = async function () {
   const err      = document.getElementById('errorMsg');
 
   err.classList.remove('show');
+  err.style.color = '';
 
   if (!email || !password) {
     err.textContent = 'Preencha e-mail e senha.';
@@ -56,6 +57,37 @@ window.doLogin = async function () {
     btn.disabled = false;
     if(btnText)    { btnText.textContent = 'Entrar'; }
     if(btnSpinner) { btnSpinner.style.display = 'none'; }
+  }
+};
+
+// ── ESQUECI A SENHA ───────────────────────────────────────────────────────────
+window.doResetPassword = async function () {
+  const email = document.getElementById('emailInput').value.trim();
+  const err   = document.getElementById('errorMsg');
+  err.classList.remove('show');
+  err.style.color = '';
+  if (!email || !email.includes('@')) {
+    err.textContent = 'Digite seu e-mail no campo acima para redefinir a senha.';
+    err.classList.add('show');
+    document.getElementById('emailInput').focus();
+    return;
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    err.style.color = '#10b981';
+    err.textContent = 'Enviamos um link de redefinição para ' + email + '. Confira sua caixa de entrada (e o spam).';
+    err.classList.add('show');
+  } catch (e) {
+    const code = e.code || '';
+    err.style.color = '';
+    err.textContent = code === 'auth/user-not-found'
+      ? 'E-mail não encontrado. Verifique ou contate o gestor.'
+      : code === 'auth/invalid-email'
+      ? 'E-mail inválido.'
+      : code === 'auth/too-many-requests'
+      ? 'Muitas tentativas. Aguarde alguns minutos.'
+      : 'Não foi possível enviar o e-mail. Verifique sua internet e tente novamente.';
+    err.classList.add('show');
   }
 };
 

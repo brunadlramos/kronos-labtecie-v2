@@ -65,7 +65,7 @@ import {
   initEntries, assertCanWrite,
   openEntryDetail, closeEntryDetail,
   openModal, closeModal, saveModal,
-  deleteEntry, clearDay
+  deleteEntry, clearDay, _openModalWithDraft
 } from './js/entries.js';
 import {
   isActive, calcAmount, getDailyGoalMs,
@@ -102,6 +102,7 @@ import {
   renderUsuarios, renderApprovals, initUsersListener
 } from './js/usuarios.js';
 import { registrarLog } from './js/log.js';
+import { logError } from './js/logger.js';
 import './js/importadores.js'; // side-effects only: registers window.* functions
 
 // ── Constantes globais ────────────────────────────────────────────────────────
@@ -127,17 +128,31 @@ document.addEventListener('focusin', (e) => {
 
 // ── MONITORAMENTO DE ERROS ────────────────────────────────────────────────────
 window.onerror = (msg, src, line, col, err) => {
-  if(!_analytics) return;
-  try {
-    logEvent(_analytics, 'js_error', {
-      message: String(msg).slice(0,150),
-      source: String(src).slice(0,100),
-      line: line||0, col: col||0,
-      stack: String(err?.stack||'').slice(0,300),
-      user: state.currentUser?.email||'anon'
-    });
-  } catch(_){}
+  // Persiste no banco de erros (painel) além do Analytics.
+  try { logError({ modulo:'window', action:'onerror',
+    message: String(msg).slice(0,300),
+    stack: String(err?.stack || `${src||''}:${line||0}:${col||0}`).slice(0,2000) }); } catch(_){}
+  if(_analytics){
+    try {
+      logEvent(_analytics, 'js_error', {
+        message: String(msg).slice(0,150),
+        source: String(src).slice(0,100),
+        line: line||0, col: col||0,
+        stack: String(err?.stack||'').slice(0,300),
+        user: state.currentUser?.email||'anon'
+      });
+    } catch(_){}
+  }
 };
+// Promessas rejeitadas sem .catch → também viram log de erro.
+window.addEventListener('unhandledrejection', (e) => {
+  try {
+    const r = e && e.reason;
+    logError({ modulo:'window', action:'unhandledrejection',
+      message: String((r && r.message) || r || 'promessa rejeitada').slice(0,300),
+      stack: String((r && r.stack) || '').slice(0,2000) });
+  } catch(_){}
+});
 window.addEventListener('unhandledrejection', ev => {
   if(!_analytics) return;
   try {
@@ -220,6 +235,9 @@ function _applyConfig(cfg){
         state.COLLABS[key] = { label:_clean(u.nome||key), initials:_clean(u.iniciais||key.slice(0,2).toUpperCase()), color:_color(u.cor), active:u.ativo!==false };
         if(em) state.COLLAB_EMAILS[em] = key;
         if(u.papel === 'gestora'){ if(em) state.MANAGER_EMAILS.push(em); state.KANBAN_ROLES.gestora.push(key); state.KANBAN_ROLES.recuradoria.push(key); }
+        // Gestor TEMPORÁRIO: colaborador com poderes/UI de gestora (fora do ranking/destaque),
+        // enquanto o titular está fora. Entra no "balde" de gestão; o cargo real segue colaborador.
+        if(u.gestorTemp === true){ if(em && !state.MANAGER_EMAILS.includes(em)) state.MANAGER_EMAILS.push(em); if(!state.KANBAN_ROLES.gestora.includes(key)){ state.KANBAN_ROLES.gestora.push(key); state.KANBAN_ROLES.recuradoria.push(key); } }
         if(u.curadora) state.KANBAN_ROLES.curadoras.push(key);
         // Metas individuais de jornada
         if(u.horasDia  !== undefined) state.COLLAB_HOURS[key] = { ...(state.COLLAB_HOURS[key]||{}), horasDia:  u.horasDia  };
@@ -622,7 +640,7 @@ window.doLogout = () => {
 // ── CAP DIA (piso de 100%) ────────────────────────────────────────────────────
 // Marca/desmarca capDia/{dk}/{collabKey}. Só gestão (regra do RTDB também valida).
 window.toggleCapDia = async (collabKey, dk) => {
-  if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
+  if(!(state.isManager || ['gestora','admin','coordenador'].includes(state.userPapel))) return;
   if(!collabKey || !dk) return;
   const node = child(capDiaRef, `${dk}/${collabKey}`);
   const on = !(state.capDia?.[dk]?.[collabKey]);
@@ -638,7 +656,7 @@ window.toggleCapDia = async (collabKey, dk) => {
 
 // Liga/desliga o piso de 100% para TODOS os colaboradores do dia exibido (gestão).
 window.toggleCapDiaAll = async () => {
-  if(!['gestora','admin','coordenador'].includes(state.userPapel)) return;
+  if(!(state.isManager || ['gestora','admin','coordenador'].includes(state.userPapel))) return;
   const dk = dKey(state.dashDay);
   // mesma regra do renderDashCards: ativos e não-gestores
   const keys = Object.keys(state.COLLABS).filter(k =>
@@ -1705,8 +1723,11 @@ window._debouncedRenderArquivo         = _debouncedRenderArquivo;
 })();
 document.addEventListener('click',e=>{
   const panel=document.getElementById('notifPanel');
-  const bell=panel?.previousElementSibling;
-  if(panel&&panel.style.display==='block'&&!panel.contains(e.target)&&!bell?.contains(e.target)){
+  const wrap=panel?.parentElement;   // container que agrupa sino + badge + painel
+  // Fecha só em clique REALMENTE fora do bloco de notificações. Antes usava
+  // previousElementSibling (que é o badge, não o sino) → o próprio clique de abrir
+  // era tratado como "fora" e fechava o painel na hora.
+  if(panel&&panel.style.display==='block'&&wrap&&!wrap.contains(e.target)){
     panel.style.display='none';
   }
 });

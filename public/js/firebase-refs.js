@@ -47,6 +47,9 @@ export let logsRef             = ref(db, `equipes/${EQUIPE_ID}/logs`);
 export let indicadoresManuaisRef = ref(db, `equipes/${EQUIPE_ID}/indicadoresManuais`);
 export let capDiaRef           = ref(db, `equipes/${EQUIPE_ID}/capDia`);
 
+// GLOBAL (não muda por equipe): banco de logs de erro — admin vê de todas as equipes.
+export const errorLogsRef      = ref(db, 'error_logs');
+
 // ── _buildRefs — reatribui todos os refs ao trocar de equipe ─────────────────
 export function _buildRefs(equipeId) {
   EQUIPE_ID           = equipeId;

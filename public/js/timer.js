@@ -50,6 +50,26 @@ export async function toggleTimer() {
 }
 
 // ── startTimer ────────────────────────────────────────────────────────────────
+// Finaliza um timer que ficou ABERTO (nunca parado) salvando-o como registro marcado
+// para revisão, em vez de descartá-lo. Evita perda de tempo trabalhado (ex.: timer
+// esquecido aberto de um dia para o outro). O colaborador ajusta o término em Meus Registros.
+function _finalizeStaleTimer(collab, t){
+  if(t && t.startTime && !t.kanban){
+    const start = t.startTime;
+    const end   = start + 60000;   // placeholder de 1 min — o término é ajustado depois
+    push(entriesRef, {
+      task:    t.task || 'Sem título',
+      project: t.project || 'gestao',
+      collab,
+      obs:     ('⚠️ Timer não finalizado — ajuste o horário de término. ' + (t.obs||'')).slice(0,500),
+      tags:    Array.isArray(t.tags) ? t.tags : [],
+      startTime: start, endTime: end, duration: end - start,
+      createdAt: Date.now(), needsReview: true
+    }).catch(e=>console.error('[finalizeStaleTimer] push', e));
+  }
+  remove(child(activeTimersRef, collab)).catch(()=>{});
+}
+
 export function startTimer() {
   state.isRunning = true;
   state.startTime = Date.now();
@@ -79,6 +99,15 @@ export function startTimer() {
   // Refresh-safe: lembra sob qual collab o timer foi salvo, pois o collabSelect do gestor
   // reseta ao recarregar a página e o restore precisa achar o timer certo.
   try { localStorage.setItem('kronos_timerCollab', collab||''); } catch(e) {}
+
+  // Não SOBRESCREVER um timer já aberto no banco para este colaborador: finaliza o
+  // aberto (salva como registro p/ revisão) antes de gravar o novo. Garante que sempre
+  // se "fecha o que está aberto" antes de começar outro.
+  const _open = state.activeTimers?.[collab];
+  if(_open && _open.startTime && _open.startTime !== state.startTime && !_open.kanban){
+    _finalizeStaleTimer(collab, _open);
+    try { showToast('Timer anterior finalizado', 'Havia um timer aberto — salvei em "Meus Registros" para você ajustar o horário. Novo timer iniciado.'); } catch(e){}
+  }
 
   // Bug: set() retorna Promise — a rejeição é assíncrona, então usa .catch (try/catch síncrono não pegava)
   set(child(activeTimersRef, collab), {
@@ -199,7 +228,9 @@ export function restoreTimerFromFirebase(timers) {
   const timerDate = new Date(active.startTime);
   const now = new Date();
   if (timerDate.toDateString() !== now.toDateString()) {
-    try { remove(child(activeTimersRef, collab)); } catch(e) {}
+    // Timer aberto de OUTRO DIA: não descartar — finaliza como registro (p/ revisão).
+    _finalizeStaleTimer(collab, active);
+    try { showToast('Timer não finalizado', 'Você tinha um timer aberto de outro dia. Salvei em "Meus Registros" para ajustar o horário de término.'); } catch(e){}
     return;
   }
 
@@ -261,12 +292,16 @@ export async function checkRetroActiveStop() {
   if (!state.isRunning || !state.startTime) return;
   const startDate = new Date(state.startTime);
   const cutoff    = new Date(startDate);
-  cutoff.setHours(LATE_CUTOFF_HOUR, LATE_CUTOFF_MINUTE, 0, 0);
+  cutoff.setHours(LATE_CUTOFF_HOUR, LATE_CUTOFF_MINUTE, 0, 0);   // término automático às 18h30
+  const startLimit = new Date(startDate);
+  startLimit.setHours(LATE_CUTOFF_HOUR, 0, 0, 0);                // só pausa quem iniciou ANTES das 18h00
   const now = new Date();
-  if (now > cutoff && startDate < cutoff) {
+  // Iniciou antes das 18h00 e passou das 18h30 → encerra em 18h30. Quem iniciou 18h00+
+  // continua rodando e só para no clique do colaborador.
+  if (now > cutoff && startDate < startLimit) {
     await stopTimer(cutoff.getTime());
     showToast('Timer finalizado automaticamente',
-      `O timer foi encerrado retroativamente às ${LATE_CUTOFF_HOUR}h${String(LATE_CUTOFF_MINUTE).padStart(2,'0')} do dia em que estava rodando.`);
+      `O timer foi encerrado retroativamente às ${LATE_CUTOFF_HOUR}h${String(LATE_CUTOFF_MINUTE).padStart(2,'0')} (havia iniciado antes das ${LATE_CUTOFF_HOUR}h).`);
   }
 }
 

@@ -20,7 +20,7 @@ import { stopTimer }                 from './timer.js';
 import { registrarLog }              from './log.js';
 
 export function isManagerUser(){
-  return state.currentUser && (state.userPapel === 'gestora' || state.userPapel === 'admin');
+  return state.currentUser && (state.userPapel === 'gestora' || state.userPapel === 'admin' || state.isManager);
 }
 export function isCuradora(userKey){
   return state.KANBAN_ROLES.curadoras.includes(userKey) || isManagerUser();

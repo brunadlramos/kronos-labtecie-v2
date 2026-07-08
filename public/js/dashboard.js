@@ -361,7 +361,7 @@ export function isCapped(collabKey, dk){
 }
 // Só gestão (gestora/admin/coordenador) pode marcar/desmarcar.
 function _canCapDia(){
-  return ['gestora','admin','coordenador'].includes(state.userPapel);
+  return state.isManager || ['gestora','admin','coordenador'].includes(state.userPapel);
 }
 
 // ── renderDashCards ────────────────────────────────────────────────────────────
@@ -540,11 +540,12 @@ export function renderWeekTable() {
   const _avatarCell = c => `<td class="name-col"><div class="cell-collab"><div class="cell-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'0.8rem':'0.52rem'}">${getCollabAvatar(c.key).display}</div><div class="cell-name">${c.label}</div></div></td>`;
   const _avgCell = c => `<td><div class="cell-multi"><span class="cell-total" style="color:var(--orange)">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td>`;
 
-  const rankedRows = tableData.map(c=>{
+  // Linhas na ORDEM do ranking (1º, 2º, 3º…) — `sorted` já está por weekTotalReal.
+  const rankedRows = sorted.map(c=>{
     const rank = rankMap[c.key];
     return `<tr>${_avatarCell(c)}${_cellsFor(c,true)}${_avgCell(c)}<td>${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`}</td></tr>`;
   }).join('');
-  const gestorRows = gestorData.map(c=>
+  const gestorRows = [...gestorData].sort((a,b)=>b.avg-a.avg).map(c=>
     `<tr style="opacity:0.92;">${_avatarCell(c)}${_cellsFor(c,false)}${_avgCell(c)}<td><span style="font-size:0.56rem;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px;">Gestão</span></td></tr>`
   ).join('');
   const summaryRow = `<tr class="summary-row"><td class="name-col">Média do time</td>${daySums.map(v=>`<td>${v===null?'&mdash;':v.toFixed(1)+'%'}</td>`).join('')}<td>${(()=>{ const ac = tableData.filter(c=>c.dayData.some(d=>d.count>0)); return (ac.length ? ac.reduce((s,c)=>s+c.avg,0)/ac.length : 0).toFixed(1); })()}%</td><td>—</td></tr>`;
@@ -866,9 +867,22 @@ export function setupDashTabsVisibility(){
 }
 
 // ── DEMANDAS DA SEMANA DA DASHBOARD ───────────────────────────────────────────
+// Gera a lista de dias entre duas datas ISO (inclusivo), com trava de segurança.
+function _dateRangeDays(startStr, endStr){
+  const [sy,sm,sd]=startStr.split('-').map(Number);
+  const [ey,em,ed]=endStr.split('-').map(Number);
+  let s=new Date(sy,sm-1,sd), e=new Date(ey,em-1,ed);
+  if(e<s){ const t=s; s=e; e=t; }
+  const out=[]; const d=new Date(s); let guard=0;
+  while(d<=e && guard<366){ out.push(new Date(d)); d.setDate(d.getDate()+1); guard++; }
+  return out;
+}
 export function renderDashDemandasWeek() {
   if(!Object.keys(state.allEntries).length) return;
-  const days = getWeekDays(state.weekOffset);
+  // Filtro de data opcional: início E fim preenchidos → usa o intervalo; senão, a semana.
+  const _s = document.getElementById('dashDemandasStart')?.value;
+  const _e = document.getElementById('dashDemandasEnd')?.value;
+  const days = (_s && _e) ? _dateRangeDays(_s, _e) : getWeekDays(state.weekOffset);
   const collabFilter = document.getElementById('dashDemandasCollab')?.value || '';
   const searchFilter = (document.getElementById('dashDemandasSearch')?.value||'').toLowerCase().trim();
   renderDemandasSemana('dashDemandasBody', days, collabFilter, searchFilter);

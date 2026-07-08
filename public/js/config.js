@@ -56,6 +56,7 @@ export async function renderCfgColaboradores(targetEl){
         <th title="Presencial ou remoto">Estilo</th>
         <th style="text-align:center">Ativo</th>
         <th style="text-align:center">Curadora</th>
+        <th style="text-align:center" title="Gestor temporário: dá poderes de gestão à pessoa enquanto o gestor titular está de férias/atestado. NÃO altera o cargo e não entra no ranking.">Gestor temp.</th>
         <th>Ações</th>
       </tr></thead>
       <tbody>
@@ -93,6 +94,7 @@ export async function renderCfgColaboradores(targetEl){
           </td>
           <td style="text-align:center"><input type="checkbox" ${u.ativo!==false?'checked':''} id="uat_${uid}"></td>
           <td style="text-align:center"><input type="checkbox" ${u.curadora?'checked':''} id="ucr_${uid}"></td>
+          <td style="text-align:center"><input type="checkbox" ${u.gestorTemp?'checked':''} id="gtmp_${uid}" title="Gestor temporário"></td>
           <td style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-sm" onclick="cfgSaveColaborador('${uid}')">${ICONS.save} Salvar</button>
             <button class="btn-sm" onclick="openAusenciasModal('${uid}')" title="Ausências recorrentes (ex.: estágio)" style="font-size:0.7rem;">⏰ Ausências${Array.isArray(u.ausencias)&&u.ausencias.length?` (${u.ausencias.length})`:''}</button>
@@ -138,10 +140,20 @@ window.cfgSaveColaborador = async function(uid){
   const horasDia     = parseFloat(document.getElementById(`uhd_${uid}`)?.value)||null;
   const horasSemana  = parseFloat(document.getElementById(`uhs_${uid}`)?.value)||null;
   const estiloTrabalho = document.getElementById(`ues_${uid}`)?.value || orig.estiloTrabalho || 'presencial';
-  const updates = {nome,papel,cor,ativo,curadora,estiloTrabalho};
+  const gestorTemp = document.getElementById(`gtmp_${uid}`)?.checked || false;
+  const updates = {nome,papel,cor,ativo,curadora,estiloTrabalho,gestorTemp};
   if(horasDia    !== null) updates.horasDia    = horasDia;
   if(horasSemana !== null) updates.horasSemana = horasSemana;
   await update(ref(db,`equipes/${EQUIPE_ID}/config/usuarios/${uid}`),updates);
+  // FIX (causa raiz): as regras de segurança leem o papel do nó GLOBAL /usuarios.
+  // Ao promover/editar cargo, sincroniza papel + equipeId no global — senão a gestora
+  // "de config" fica como colaborador para as regras e NÃO consegue excluir/editar
+  // registros de outros. Só admin tem permissão de escrever no global existente; para
+  // coordenador a regra de entries já reconhece a gestora via config (fallback).
+  if(_canPromover()){
+    try { await update(ref(db,`usuarios/${uid}`), { papel, equipeId: EQUIPE_ID }); }
+    catch(e){ console.warn('[cfgSaveColaborador] papel global não sincronizado (permissão):', e?.code||e); }
+  }
   // Atualiza cache local imediatamente
   const key = orig.key||nome.toLowerCase().replace(/\s+/g,'_');
   if(horasDia !== null)   state.COLLAB_HOURS[key] = {...(state.COLLAB_HOURS[key]||{}), horasDia};

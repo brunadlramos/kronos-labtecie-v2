@@ -186,7 +186,7 @@ export function openModal(id) {
   const _mo = document.getElementById('modalOverlay'); if(_mo) trapFocus(_mo);
 }
 
-function _openModalWithDraft(id, draft) {
+export function _openModalWithDraft(id, draft) {
   const e = draft || state.allEntries[id];
   if (!e || !e.periods) return openModal(id);
   const wrap = document.getElementById('mPeriodsWrap');
