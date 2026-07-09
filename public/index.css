@@ -609,7 +609,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 
 /* PROJECT CARDS */
 .proj-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-bottom:28px;}
-.proj-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);transition:all 0.2s;}
+.proj-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);transition:all 0.2s;}
 .proj-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .proj-card-header{display:flex;align-items:center;gap:8px;}
 .proj-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
@@ -633,7 +633,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 
 /* RANKING */
 .ranking-list{display:flex;flex-direction:column;gap:8px;}
-.ranking-item{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow);transition:all 0.2s;}
+.ranking-item{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow);transition:all 0.2s;}
 .ranking-pos{font-family:var(--mono);font-size:0.9rem;font-weight:700;width:24px;text-align:center;flex-shrink:0;}
 .ranking-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:800;color:#fff;flex-shrink:0;}
 .ranking-name{font-weight:800;font-size:0.9rem;flex:1;}
@@ -656,7 +656,10 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .btn-copy:active{transform:translateY(0) scale(0.98);}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);z-index:var(--z-modal);display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);z-index:var(--z-modal);display:none;justify-content:center;padding:20px;overflow-y:auto;}
+/* Fix scroll: overlay rolável + centralização por margin:auto — modais altos
+   (ex.: Personalizar Perfil) roláveis sem cortar topo/base em telas baixas */
+.modal-overlay > *{margin:auto;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:760px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
 .modal-title{font-size:var(--fz-lg);font-weight:900;margin-bottom:20px;letter-spacing:-0.02em;}
@@ -783,7 +786,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 }
 
 /* USER MANAGEMENT CARDS */
-.user-mgmt-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);transition:all 0.2s;}
+.user-mgmt-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);transition:all 0.2s;}
 .user-mgmt-card.inactive{opacity:0.6;border-style:dashed;}
 .user-mgmt-card-header{display:flex;align-items:center;gap:12px;}
 .user-mgmt-av{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;color:#fff;flex-shrink:0;}
@@ -894,7 +897,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 
 /* ── COMPACT STATS CARDS ── */
 .stats-row-compact{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
-.stat-card-compact{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);}
+.stat-card-compact{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);}
 .stat-icon{width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:8px;color:var(--muted);}
 .stat-icon svg{width:18px;height:18px;}
 /* Timer stat cards: ocultar ícone */
