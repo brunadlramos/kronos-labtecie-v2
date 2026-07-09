@@ -22,6 +22,12 @@ import {
 import { showToast, setSyncStatus, trapFocus, releaseFocus } from './ui.js';
 import { resolveSeriesColors } from './colors.js';   // Bloco B: regra de cor gestor-first
 
+// Craft: desenho dos gráficos um pouco mais suave/premium (easing global do Chart.js)
+if(typeof Chart !== 'undefined' && Chart.defaults?.animation){
+  Chart.defaults.animation.duration = 850;
+  Chart.defaults.animation.easing = 'easeOutQuart';
+}
+
 export function renderMyHistory(){
   const searchFilter = (document.getElementById('myRecordsSearch')?.value||'').toLowerCase().trim();
   const fromVal = document.getElementById('myRecordsDateFrom')?.value;

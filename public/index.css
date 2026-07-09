@@ -1581,6 +1581,10 @@ textarea:focus-visible,
   #page-dashboard.active .dash-section:nth-of-type(2){ animation-delay:.07s; }
   #page-dashboard.active .dash-section:nth-of-type(3){ animation-delay:.14s; }
   #page-dashboard.active .dash-section:nth-of-type(4){ animation-delay:.20s; }
+
+  /* Gráficos: as linhas de cards "sobem" em sequência (depois o Chart.js desenha) */
+  #page-graficos.active .cards-row{ animation: craftRise .55s cubic-bezier(.22,.61,.36,1) both; }
+  #page-graficos.active .cards-row:nth-of-type(2){ animation-delay:.1s; }
 }
 
 
