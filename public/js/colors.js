@@ -67,16 +67,40 @@ function pickBase(colors) {
   return (!common || common === DEFAULT_GRAY) ? BRAND : common;
 }
 
+// Distribui uma rampa entre índices, do maior valor (tom mais forte) ao menor.
+function assignRamp(out, idxs, base, values) {
+  const ramp = rampFromBase(base, idxs.length);
+  idxs.slice()
+    .sort((a, b) => (Number(values?.[b]) || 0) - (Number(values?.[a]) || 0))
+    .forEach((origIdx, rank) => { out[origIdx] = ramp[rank]; });
+}
+
 // ── API principal ────────────────────────────────────────────────────────────────
 // colors: cores já resolvidas (podem incluir o default cinza)
 // values: números na mesma ordem, usados p/ ordenar a hierarquia (opcional)
+// Regra: projetos que COMPARTILHAM a mesma cor são espalhados em tons distinguíveis
+// daquela família (ordenados por valor); cores únicas do gestor são preservadas.
 // Retorna as cores na ORDEM ORIGINAL de entrada.
 export function resolveSeriesColors(colors, values) {
-  if (!isUniform(colors)) return colors.slice();   // gestor diferenciou → respeita
-  const ramp = rampFromBase(pickBase(colors), colors.length);
-  const order = colors.map((_, i) => i)
-    .sort((a, b) => (Number(values?.[b]) || 0) - (Number(values?.[a]) || 0));
-  const out = new Array(colors.length);
-  order.forEach((origIdx, rank) => { out[origIdx] = ramp[rank]; });
+  const out = colors.slice();
+  // agrupa índices por cor (normalizada)
+  const groups = new Map();
+  colors.forEach((c, i) => {
+    const key = normHex(c);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(i);
+  });
+
+  // conjunto realmente uniforme (uma cor só) → rampa a partir da base (cinza→marca)
+  if (groups.size <= 1) {
+    assignRamp(out, colors.map((_, i) => i), pickBase(colors), values);
+    return out;
+  }
+
+  // múltiplas cores → tinta cada grupo com ≥2 membros; cor única = respeita
+  for (const idxs of groups.values()) {
+    if (idxs.length < 2) continue;
+    assignRamp(out, idxs, colors[idxs[0]] || BRAND, values);
+  }
   return out;
 }
