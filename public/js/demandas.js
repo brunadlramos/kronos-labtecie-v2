@@ -3,7 +3,7 @@
 //          Inconsistências, Mural, Desafio, Relatório
 
 import { app as state } from './state.js';
-import { ICONS }        from './icons.js';
+import { ICONS, medalIcon } from './icons.js';
 import {
   escH, dKey, dateKey, todayKey, fmtDur, fmtTime, fmtDate, fmtShortDate,
   getWeekDays, getMonthWeeks
@@ -537,7 +537,7 @@ export function render4Weeks(){
     </div>`;
   const rankEl = document.getElementById('rankingList4w');
   if(rankEl) rankEl.innerHTML =
-    ranking.map((c,i)=>_rankItem(c, i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`, i===0)).join('') +
+    ranking.map((c,i)=>_rankItem(c, medalIcon(i+1), i===0)).join('') +
     gestores.map(c=>_rankItem(c, '__GESTAO__', false)).join('');
 }
 

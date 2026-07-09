@@ -535,7 +535,10 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 .collab-card-rank.gold{color:#F59E0B;}
 .collab-card-rank.silver{color:#94A3B8;}
 .collab-card-rank.bronze{color:#B45309;}
-.collab-card.capped{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset;}
+.collab-card.capped{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange) inset,0 0 18px -6px rgba(241,90,36,0.45);}
+/* Bloco G3b: micro-celebração — glow dourado suave "respirando" no card de 100%/dia */
+@keyframes card100glow{0%,100%{box-shadow:0 0 0 1px var(--orange) inset,0 0 14px -8px rgba(241,90,36,0.38);}50%{box-shadow:0 0 0 1px var(--orange) inset,0 0 24px -4px rgba(241,90,36,0.6);}}
+@media (prefers-reduced-motion: no-preference){.collab-card.capped{animation:card100glow 3s ease-in-out infinite;}}
 .cap-toggle{flex-shrink:0;align-self:flex-start;font-family:var(--mono);font-size:0.6rem;font-weight:800;letter-spacing:0.02em;padding:3px 7px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
 .cap-toggle:hover{border-color:var(--orange-border);color:var(--orange);}
 .cap-toggle.on{background:var(--orange);border-color:var(--orange);color:#fff;}
@@ -840,6 +843,8 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .conquista-badge.crown{background:rgba(241,90,36,0.1);border:1px solid rgba(241,90,36,0.3);color:var(--orange);}
 .conquista-badge.target{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22C55E;}
 .conquista-badge.star{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:#3B82F6;}
+/* Bloco G3a: ícone SVG dentro do badge de conquista herda a cor da classe */
+.conquista-badge svg{width:12px;height:12px;flex-shrink:0;}
 
 
 

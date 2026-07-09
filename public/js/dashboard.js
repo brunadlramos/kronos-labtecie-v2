@@ -2,7 +2,7 @@
 // Helpers de cálculo compartilhados + renders do Dashboard, Online, Meu Dashboard e RH
 
 import { app as state } from './state.js';
-import { ICONS } from './icons.js';
+import { ICONS, medalIcon } from './icons.js';
 import { resolveSeriesColors } from './colors.js';   // Bloco B: regra de cor gestor-first
 import {
   dKey, dateKey, todayKey, getWeekDays, getMonthWeeks,
@@ -226,20 +226,20 @@ export function getConquistas(collabKey, refDate) {
   viewDay.setHours(0,0,0,0);
   let streak = 0;
   for(let i=1;i<=7;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(calcDay(collabKey,dKey(d)).percTotal>=100)streak++;else break;}
-  if(streak>=3) conquistas.push({cls:'fire',icon:'🔥',label:`Em chamas! ${streak}d`});
+  if(streak>=3) conquistas.push({cls:'fire',icon:ICONS.fire,label:`Em chamas! ${streak}d`});
   const todayData = calcDay(collabKey, dKey(today));
-  if(todayData.percTotal>=120) conquistas.push({cls:'lightning',icon:'⚡',label:'Relâmpago!'});
+  if(todayData.percTotal>=120) conquistas.push({cls:'lightning',icon:ICONS.zap,label:'Relâmpago!'});
   const days = getWeekDays(0);
   const weekTotals = Object.keys(state.COLLABS).filter(k=>isRankable(k)).map(k=>({key:k,total:days.reduce((s,d)=>s+calcDay(k,dKey(d)).percTotal,0)}));
   weekTotals.sort((a,b)=>b.total-a.total);
-  if(weekTotals.length&&weekTotals[0].key===collabKey&&weekTotals[0].total>0) conquistas.push({cls:'crown',icon:'👑',label:'Rei da semana!'});
+  if(weekTotals.length&&weekTotals[0].key===collabKey&&weekTotals[0].total>0) conquistas.push({cls:'crown',icon:ICONS.crown,label:'Rei da semana!'});
   let consistent = 0;
   for(let i=1;i<=7;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(d.getDay()===0)continue;if(calcDay(collabKey,dKey(d)).percTotal>=80)consistent++;else break;}
-  if(consistent>=5) conquistas.push({cls:'target',icon:'🎯',label:'Consistente!'});
+  if(consistent>=5) conquistas.push({cls:'target',icon:ICONS.target,label:'Consistente!'});
   // KRN-031: Estrela do dia — usa o dia visualizado no dashboard
   const todayTotals = Object.keys(state.COLLABS).filter(k=>isRankable(k)).map(k=>({key:k,perc:calcDay(k,dKey(viewDay)).percTotal}));
   todayTotals.sort((a,b)=>b.perc-a.perc);
-  if(todayTotals.length&&todayTotals[0].key===collabKey&&todayTotals[0].perc>0) conquistas.push({cls:'star',icon:'⭐',label:'Estrela do dia!'});
+  if(todayTotals.length&&todayTotals[0].key===collabKey&&todayTotals[0].perc>0) conquistas.push({cls:'star',icon:ICONS.star,label:'Estrela do dia!'});
   return conquistas;
 }
 
@@ -248,7 +248,7 @@ export function renderConquistasBadges(collabKey, refDate) {
   const conquistas = getConquistas(collabKey, refDate);
   if(!conquistas.length) return '';
   return `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px;">
-    ${conquistas.map(c=>`<span class="conquista-badge ${c.cls}">${c.icon} ${c.label}</span>`).join('')}
+    ${conquistas.map(c=>`<span class="conquista-badge ${c.cls}">${c.icon}<span>${c.label}</span></span>`).join('')}
   </div>`;
 }
 
@@ -286,7 +286,11 @@ export function renderDashboardOnline() {
   if(!container) return;
   const keys = Object.keys(state.activeTimers);
   if(!keys.length) {
-    container.innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;font-weight:600;border:1.5px dashed var(--border);border-radius:var(--radius-sm);">Nenhum colaborador com timer ativo no momento.</div>`;
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">${ICONS.clock}</div>
+      <div class="empty-title">Ninguém trabalhando agora</div>
+      <div class="empty-text">Quando alguém iniciar o timer, aparece aqui em tempo real.</div>
+    </div>`;
     return;
   }
   container.innerHTML = keys.map(k=>{
@@ -380,7 +384,7 @@ export function renderDashCards() {
   results.sort((a,b) => b.percTotal - a.percTotal); // ranking do card SEMPRE pela % real
   const rankedHtml = results.map((c,i)=>{
     const rank = i+1;
-    const rankIcon = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
+    const rankIcon = medalIcon(rank);
     const rankCls = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     const capped = isCapped(c.key, tk);
     const dispTotal = (capped && c.count > 0) ? capValue(c.percTotal) : c.percTotal;  // piso de 100% só na EXIBIÇÃO e só em dia COM registros
@@ -496,7 +500,7 @@ export function renderWeekTable() {
     const m = {}; active.forEach((c,r)=>m[c.key]=r+1);
     return m;
   });
-  const dayRankIcons = ['🥇','🥈','🥉'];
+  // rank do dia via medalIcon(dr)
 
   // Linhas de GESTORES: aparecem na tabela (para os gestores verem a % uns dos outros e dos
   // colaboradores), mas NUNCA entram no ranking, no destaque diário nem na média do time.
@@ -535,7 +539,7 @@ export function renderWeekTable() {
     let drBadge = '';
     if(withDayRank){
       const dr = dayRankMaps[i][c.key];
-      drBadge = dr<=3 ? `<span style="font-size:0.65rem;line-height:1;">${dayRankIcons[dr-1]}</span>` : `<span style="font-size:0.6rem;color:var(--muted);font-weight:700">#${dr}</span>`;
+      drBadge = dr<=3 ? `<span style="font-size:0.65rem;line-height:1;">${medalIcon(dr)}</span>` : `<span style="font-size:0.6rem;color:var(--muted);font-weight:700">#${dr}</span>`;
     }
     const sub = d.capped ? `<span class="cell-sub" style="color:var(--orange);font-weight:700" title="Piso de 100% ativo (real ${d.percTotal.toFixed(0)}%)">✓ piso 100%</span>` : `<span class="cell-sub">${d.percTime.toFixed(0)}%t +${d.percAmount.toFixed(0)}%a</span>`;
     return `<td class="${cls}" style="${todayStyle}"><div class="cell-multi"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><span class="cell-total" style="color:${color}">${d.eff.toFixed(1)}%</span>${drBadge}</div>${sub}</div></td>`;
@@ -547,7 +551,7 @@ export function renderWeekTable() {
   // Linhas na ORDEM do ranking (1º, 2º, 3º…) — `sorted` já está por weekTotalReal.
   const rankedRows = sorted.map(c=>{
     const rank = rankMap[c.key];
-    return `<tr>${_avatarCell(c)}${_cellsFor(c,true)}${_avgCell(c)}<td>${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`}</td></tr>`;
+    return `<tr>${_avatarCell(c)}${_cellsFor(c,true)}${_avgCell(c)}<td>${medalIcon(rank)}</td></tr>`;
   }).join('');
   const gestorRows = [...gestorData].sort((a,b)=>b.avg-a.avg).map(c=>
     `<tr style="opacity:0.92;">${_avatarCell(c)}${_cellsFor(c,false)}${_avgCell(c)}<td><span style="font-size:0.56rem;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px;">Gestão</span></td></tr>`
@@ -815,7 +819,7 @@ export async function renderDashDestaques(){
   cont.innerHTML = `<div class="table-wrap"><table class="week-table"><thead>${_dashHead(days,'Equipe','Destaque')}</thead><tbody>${
     lines.map(({eq,top}) => `<tr>
       <td class="name-col"><div class="cell-name">${escH(state.EQUIPE_LABELS[eq]||eq)}</div></td>
-      <td><div class="cell-collab"><div class="cell-av" style="background:${top.color}">${escH(_initials(top.label))}</div><div class="cell-name">🥇 ${escH(top.label)}</div></div></td>
+      <td><div class="cell-collab"><div class="cell-av" style="background:${top.color}">${escH(_initials(top.label))}</div><div class="cell-name">${medalIcon(1)} ${escH(top.label)}</div></div></td>
       ${top.dayData.map(_dashCell).join('')}
       <td><span class="cell-total" style="color:var(--orange)">${top.avg.toFixed(1)}%</span></td>
     </tr>`).join('')
@@ -956,7 +960,11 @@ export function renderOnline() {
   if(!container) return;
   const keys = Object.keys(state.activeTimers);
   if(!keys.length){
-    container.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted);font-size:0.82rem;font-weight:600;border:1.5px dashed var(--border);border-radius:var(--radius-sm);">Nenhum colaborador com timer ativo no momento.</div>`;
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">${ICONS.clock}</div>
+      <div class="empty-title">Ninguém trabalhando agora</div>
+      <div class="empty-text">Quando alguém iniciar o timer, aparece aqui em tempo real.</div>
+    </div>`;
     return;
   }
   container.innerHTML = keys.map(k=>{
