@@ -128,3 +128,35 @@ export function releaseFocus() {
   _prevFocus?.focus();
   _prevFocus = null;
 }
+
+// ── enhanceA11y ─────────────────────────────────────────────────────────────────
+// Bloco A (acessibilidade): dá semântica de teclado aos elementos que funcionam
+// como botão mas foram escritos como <div onclick>. Não altera o HTML nem o CSS —
+// apenas injeta role/tabindex e ativa Enter/Espaço. Idempotente e reversível.
+const A11Y_SEL = [
+  '.nav-item', '.ferr-card', '.sidebar-user',
+  '.import-drop-zone', '#trelloDropZone',
+  '.avatar-opt', '.mural-title', '.dash-tab-btn'
+].join(',');
+
+export function enhanceA11y() {
+  // 1) Estampa role/tabindex nos divs-botão estáticos (nav, ferramentas, avatares…)
+  document.querySelectorAll(A11Y_SEL).forEach(el => {
+    if (el.tagName === 'BUTTON' || el.tagName === 'A') return;
+    if (!el.hasAttribute('role'))     el.setAttribute('role', 'button');
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+  });
+  // 2) Ativação por teclado — delegado (cobre também elementos re-renderizados)
+  if (!document.__a11yKeyBound) {
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      // Não interceptar controles nativos (já respondem sozinhos)
+      if (['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      const btn = e.target.closest('[role="button"]');
+      if (!btn) return;
+      e.preventDefault();
+      btn.click();
+    });
+    document.__a11yKeyBound = true;
+  }
+}

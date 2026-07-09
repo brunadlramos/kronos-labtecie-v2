@@ -53,7 +53,7 @@ import {
 } from './js/auth.js';
 import {
   initUI, showPage, showToast, setSyncStatus,
-  renderCurrentPage, renderDebounced
+  renderCurrentPage, renderDebounced, enhanceA11y
 } from './js/ui.js';
 import {
   initTimer, LATE_CUTOFF_HOUR, LATE_CUTOFF_MINUTE,
@@ -1659,6 +1659,7 @@ function updateCollabSelects(){
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 initUI({ renderPage });
+enhanceA11y();   // Bloco A: semântica de teclado nos divs-botão (nav, ferramentas…)
 
 // Registra funções auxiliares no timer.js (evita import circular)
 initTimer({ getSelectedTags, clearTags, setTags, assertCanWrite });

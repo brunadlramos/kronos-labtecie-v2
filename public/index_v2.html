@@ -550,7 +550,7 @@
 
       <!-- ══ PAGE: TIMER (colaborador) ══ -->
       <div class="page active" id="page-timer">
-        <div class="section-heading">Registro de Horas</div>
+        <h2 class="section-heading">Registro de Horas</h2>
         <div class="section-sub" id="timerSubtitle">Registre seu tempo de trabalho</div>
         <!-- sync movido para topbar -->
         <div id="syncDot" style="display:none;"></div><span id="syncText" style="display:none;"></span>
@@ -625,7 +625,7 @@
 
       <!-- ══ PAGE: MEUS REGISTROS ══ -->
       <div class="page" id="page-meuhistorico">
-        <div class="section-heading">Meus Registros</div>
+        <h2 class="section-heading">Meus Registros</h2>
         <div class="section-sub">Histórico completo dos seus registros</div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
           <input type="text" class="filter-select" id="myRecordsSearch" placeholder="Buscar..." oninput="_debouncedRenderMyHistory()" style="min-width:180px;height:34px;">
@@ -641,7 +641,7 @@
       <!-- ══ PAGE: DASHBOARD ══ -->
       <div class="page" id="page-dashboard">
         <div class="equipe-filter-bar" id="equipe-filter-dashboard" aria-label="Selecionar equipe"></div>
-        <div class="section-heading">Dashboard</div>
+        <h2 class="section-heading">Dashboard</h2>
         <div class="section-sub">Visão completa da equipe em tempo real</div>
         <span id="syncDot2" style="display:none"></span><span id="syncText2" style="display:none"></span>
 
@@ -734,7 +734,7 @@
 
       <!-- ══ PAGE: ONLINE NOW ══ -->
       <div class="page" id="page-online">
-        <div class="section-heading">Em Andamento Agora</div>
+        <h2 class="section-heading">Em Andamento Agora</h2>
         <div class="section-sub">Colaboradores com timer ativo neste momento</div>
         <div id="onlineBody" class="online-cards-grid"></div>
       </div>
@@ -742,7 +742,7 @@
       <!-- ══ PAGE: DEMANDAS ══ -->
       <div class="page" id="page-demandas">
         <div class="equipe-filter-bar" id="equipe-filter-demandas" aria-label="Selecionar equipe"></div>
-        <div class="section-heading">Relatório de Demandas</div>
+        <h2 class="section-heading">Relatório de Demandas</h2>
         <div class="section-sub">Todas as tarefas registradas com detalhes completos</div>
         <div class="section-bar">
           <div class="section-bar-actions">
@@ -793,7 +793,7 @@
 
       <!-- ══ PAGE: PROJETOS ══ -->
       <div class="page" id="page-projetos">
-        <div class="section-heading">Demandas por Projeto</div>
+        <h2 class="section-heading">Demandas por Projeto</h2>
         <div class="section-sub">Contagem e horas totais por tipo de projeto</div>
         <div class="date-nav">
           <button class="date-nav-btn" onclick="changeProjDay(-1)" aria-label="Dia anterior">&#8249;</button>
@@ -807,7 +807,7 @@
       <!-- ══ PAGE: GRÁFICOS ══ -->
       <div class="page" id="page-graficos">
         <div class="equipe-filter-bar" id="equipe-filter-graficos" aria-label="Selecionar equipe"></div>
-        <div class="section-heading">Gráficos</div>
+        <h2 class="section-heading">Gráficos</h2>
         <div class="section-sub">Análise visual do desempenho da equipe</div>
 
         <!-- Controles de filtro de data -->
@@ -839,7 +839,7 @@
       <!-- ══ PAGE: HISTÓRICO 4 SEMANAS ══ -->
       <div class="page" id="page-historico4s">
         <div class="equipe-filter-bar" id="equipe-filter-historico4s" aria-label="Selecionar equipe"></div>
-        <div class="section-heading">Histórico Mensal</div>
+        <h2 class="section-heading">Histórico Mensal</h2>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
           <button class="date-nav-btn" onclick="changeHist4Month(-1)" aria-label="Mês anterior">&#8249;</button>
           <span id="hist4MonthLabel" style="font-family:var(--mono);font-size:0.85rem;font-weight:700;min-width:180px;text-align:center;text-transform:capitalize;color:var(--text);"></span>
@@ -856,7 +856,7 @@
       <!-- ══ PAGE: INDICADORES DE AJUSTE ══ -->
       <div class="page" id="page-indicadores">
         <div class="equipe-filter-bar" id="equipe-filter-indicadores" aria-label="Selecionar equipe"></div>
-        <div class="section-heading">Indicadores de Ajuste</div>
+        <h2 class="section-heading">Indicadores de Ajuste</h2>
         <div class="section-sub">Avaliação de qualidade dos cards do Kanban</div>
 
         <!-- Filtros -->
@@ -955,7 +955,7 @@
 
       <!-- ══ PAGE: KANBAN ══ -->
       <div class="page" id="page-kanban">
-        <div class="section-heading">Fluxo de Demandas</div>
+        <h2 class="section-heading">Fluxo de Demandas</h2>
         <div class="section-sub">Acompanhe e gerencie o fluxo de disciplinas da equipe</div>
         <div class="equipe-filter-bar" id="equipe-filter-kanban" aria-label="Selecionar equipe"></div>
         <div class="kanban-search-bar" style="justify-content:space-between;">
@@ -995,7 +995,7 @@
         <div class="equipe-filter-bar" id="equipe-filter-usuarios" aria-label="Selecionar equipe"></div>
         <div id="approvalSection"></div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
-          <div class="section-heading" style="margin-bottom:0;">Gestão de Colaboradores</div>
+          <h2 class="section-heading" style="margin-bottom:0;">Gestão de Colaboradores</h2>
           <button class="btn-sm success" id="btnNovoColab" onclick="openNovoColabModal()" style="display:none;">+ Novo Colaborador</button>
         </div>
         <div class="section-sub">Ative ou inative colaboradores. Registros históricos são sempre preservados.</div>
@@ -1004,7 +1004,7 @@
         <!-- Configuração de jornada — visível apenas para gestora -->
         <div id="usuariosConfigArea" style="margin-top:24px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <div class="section-heading" style="margin-bottom:0;font-size:1.1rem;">Configuração de Jornada</div>
+            <h2 class="section-heading" style="margin-bottom:0;font-size:1.1rem;">Configuração de Jornada</h2>
             <button class="btn-sm" onclick="document.getElementById('usuariosConfigArea').removeAttribute('data-loaded');renderUsuarios();" title="Recarregar">↺ Recarregar</button>
           </div>
           <div class="section-sub" style="margin-bottom:16px;">Configure horas diárias individuais. Útil para estagiários e jornadas reduzidas.</div>
@@ -1013,7 +1013,7 @@
 
       <!-- ══ PAGE: RELATÓRIO ══ -->
       <div class="page" id="page-relatorio">
-        <div class="section-heading">Relatório Semanal</div>
+        <h2 class="section-heading">Relatório Semanal</h2>
         <div class="section-sub">Geração do relatório de produção para reunião com a diretoria</div>
 
         <!-- Navegação de semana -->
@@ -1074,7 +1074,7 @@
       <!-- PAGE: MEU DASHBOARD (colaborador) -->
       <div class="page" id="page-meu-dashboard">
 
-        <div class="section-heading" id="meuDashHeading">Meu Dashboard</div>
+        <h2 class="section-heading" id="meuDashHeading">Meu Dashboard</h2>
         <div class="section-sub" id="meuDashSub">Seus indicadores da semana</div>
 
         <!-- Linha 1: Cards de resumo do dia -->
@@ -1160,7 +1160,7 @@
 
       <!-- ══ PAGE: FERRAMENTAS ══ -->
       <div class="page" id="page-ferramentas">
-        <div class="section-heading">Ferramentas</div>
+        <h2 class="section-heading">Ferramentas</h2>
         <div class="section-sub">Central de ferramentas de gestão e importação</div>
         <div class="ferramentas-hub" id="ferramentasHub" style="margin-top:24px;">
 
@@ -1225,7 +1225,7 @@
 
       <!-- ══ PAGE: INCONSISTÊNCIAS ══ -->
       <div class="page" id="page-inconsistencias">
-        <div class="section-heading">Inconsistências</div>
+        <h2 class="section-heading">Inconsistências</h2>
         <div class="section-sub">Registros ausentes, muito curtos ou acima do limite nos últimos 7 dias</div>
         <div id="inconList" style="margin-top:20px;display:flex;flex-direction:column;gap:8px;"></div>
       </div>
@@ -1234,7 +1234,7 @@
       <div class="page" id="page-arquivo">
         <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div>
-            <div class="section-heading" style="margin-bottom:2px;">Arquivo Morto</div>
+            <h2 class="section-heading" style="margin-bottom:2px;">Arquivo Morto</h2>
             <div class="section-sub">Disciplinas concluídas e arquivadas por módulo</div>
           </div>
         </div>
@@ -1270,7 +1270,7 @@
 
       <!-- ══ PAGE: IMPORTAR ══ -->
       <div class="page" id="page-importar">
-        <div class="section-heading">Importadores</div>
+        <h2 class="section-heading">Importadores</h2>
         <div class="section-sub">Importe registros de horas via CSV, Trello ou avaliações históricas</div>
 
         <!-- Abas -->

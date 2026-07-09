@@ -1492,5 +1492,22 @@ body.dark .k-col-trello-badge{
   .topbar-icon-btn, .k-card button, .toast-close { min-width: 42px; min-height: 42px; }
 }
 
+/* ── BLOCO A · Foco visível global (acessibilidade de teclado) ─────────────────
+   Antes só existiam 2 regras :focus-visible no app inteiro. Usuários de teclado
+   ficavam sem indicação de onde estavam. Regra única para todo elemento interativo
+   — inclui os divs que agora recebem role="button" via enhanceA11y().
+   :focus-visible só dispara em navegação por teclado, nunca no clique de mouse. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
 
 
