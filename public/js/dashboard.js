@@ -3,6 +3,7 @@
 
 import { app as state } from './state.js';
 import { ICONS } from './icons.js';
+import { resolveSeriesColors } from './colors.js';   // Bloco B: regra de cor gestor-first
 import {
   dKey, dateKey, todayKey, getWeekDays, getMonthWeeks,
   fmtDur, fmtTime, fmtDate, fmtShortDate, escH
@@ -635,7 +636,7 @@ export function renderMeuDashboard() {
     const projKeys = Object.keys(projMs).filter(p => projMs[p]>0);
     const pieLabels = projKeys.map(p => state.PROJECTS[p]?.label || p);
     const pieData = projKeys.map(p => parseFloat((projMs[p]/3600000).toFixed(2)));
-    const pieColors = projKeys.map(p => state.PROJECTS[p]?.color || '#94A3B8');
+    const pieColors = resolveSeriesColors(projKeys.map(p => state.PROJECTS[p]?.color || '#94A3B8'), pieData);
 
     if(state.mdCharts.pie) state.mdCharts.pie.destroy();
     if(projKeys.length){

@@ -20,6 +20,7 @@ import {
   isActive, renderMeuDashboard, isCapped, capValue, isRankable
 } from './dashboard.js';
 import { showToast, setSyncStatus, trapFocus, releaseFocus } from './ui.js';
+import { resolveSeriesColors } from './colors.js';   // Bloco B: regra de cor gestor-first
 
 export function renderMyHistory(){
   const searchFilter = (document.getElementById('myRecordsSearch')?.value||'').toLowerCase().trim();
@@ -399,9 +400,10 @@ export function renderCharts(){
   getEntriesForDay(chartsDk).forEach(e=>{projHours[e.project]=(projHours[e.project]||0)+e.duration/3600000;});
   const pizzaKeys=Object.keys(projHours).filter(k=>projHours[k]>0);
   if(pizzaKeys.length&&document.getElementById('chartPizza')){
+    const pizzaColors=resolveSeriesColors(pizzaKeys.map(k=>state.PROJECTS[k]?.color||'#94A3B8'), pizzaKeys.map(k=>projHours[k]));
     state.charts.pizza=new Chart(document.getElementById('chartPizza'),{
       type:'doughnut',
-      data:{labels:pizzaKeys.map(k=>state.PROJECTS[k]?.label||k),datasets:[{data:pizzaKeys.map(k=>projHours[k].toFixed(2)),backgroundColor:pizzaKeys.map(k=>state.PROJECTS[k]?.color||'#94A3B8'),borderWidth:2,borderColor:cp.surface}]},
+      data:{labels:pizzaKeys.map(k=>state.PROJECTS[k]?.label||k),datasets:[{data:pizzaKeys.map(k=>projHours[k].toFixed(2)),backgroundColor:pizzaColors,borderWidth:2,borderColor:cp.surface}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},color:cp.legend}}}}
     });
   }
@@ -430,14 +432,16 @@ export function renderCharts(){
   }
   if(document.getElementById('chartBarras')){
     const topProjs=Object.keys(state.PROJECTS).filter(k=>days.some(d=>getEntriesForDay(dKey(d)).some(e=>e.project===k))).slice(0,5);
+    const barTotals=topProjs.map(k=>days.reduce((s,d)=>s+getEntriesForDay(dKey(d)).filter(e=>e.project===k).reduce((a,e)=>a+e.duration/3600000,0),0));
+    const barColors=resolveSeriesColors(topProjs.map(k=>state.PROJECTS[k]?.color||'#94A3B8'), barTotals);
     state.charts.barras=new Chart(document.getElementById('chartBarras'),{
       type:'bar',
       data:{
         labels:days.map(d=>fmtShortDate(d)),
-        datasets:topProjs.map(k=>({
+        datasets:topProjs.map((k,i)=>({
           label:state.PROJECTS[k].label,
           data:days.map(d=>(getEntriesForDay(dKey(d)).filter(e=>e.project===k).reduce((s,e)=>s+e.duration/3600000,0)).toFixed(2)),
-          backgroundColor:state.PROJECTS[k].color+'CC',borderRadius:4
+          backgroundColor:barColors[i]+'CC',borderRadius:4
         }))
       },
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},color:cp.legend}}},scales:{x:{stacked:false,ticks:{color:cp.tick,font:{size:10}}},y:{stacked:false,ticks:{color:cp.tick,font:{size:10}},grid:{color:cp.grid}}}}
