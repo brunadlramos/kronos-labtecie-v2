@@ -5,7 +5,7 @@ import { app as state } from './state.js';
 import { ICONS }        from './icons.js';
 import {
   escH, fmtDur, fmtTime, fmtDate, fmtShortDate,
-  dKey, todayKey, getWeekDays
+  dKey, todayKey, getWeekDays, celebrate
 } from './utils.js';
 import {
   db, usersRef, entriesRef, approvalRequestsRef, notifsRef,
@@ -196,7 +196,7 @@ export function renderApprovals(){
           <div style="font-size:0.65rem;margin-top:2px;color:var(--orange);font-weight:700;">${typeLabel}</div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button onclick="approveEntry('${r._key}')" style="padding:6px 16px;border-radius:8px;border:none;background:var(--success);color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;" aria-label="Aprovar solicitação de ${escH(col.label)}">Aprovar</button>
+          <button onclick="approveEntry('${r._key}', event)" style="padding:6px 16px;border-radius:8px;border:none;background:var(--success);color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;" aria-label="Aprovar solicitação de ${escH(col.label)}">Aprovar</button>
           <button onclick="rejectEntry('${r._key}')"  style="padding:6px 16px;border-radius:8px;border:none;background:var(--danger);color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;" aria-label="Recusar solicitação de ${escH(col.label)}">Recusar</button>
         </div>
       </div>`;
@@ -204,7 +204,7 @@ export function renderApprovals(){
   </div>`;
 }
 
-window.approveEntry = async key => {
+window.approveEntry = async (key, ev) => {
   const req = state.allApprovals[key]; if(!req) return;
   try {
     // Suporta formato V2 (entryKey) e V1 legado (state.editingId)
@@ -229,6 +229,7 @@ window.approveEntry = async key => {
       });
     }
     showToast('Aprovado ✓', req.type==='delete' ? 'Exclusão realizada.' : 'Lançamento salvo com sucesso.');
+    celebrate(ev?.clientX ?? window.innerWidth/2, ev?.clientY ?? window.innerHeight*0.4);
   } catch(e) {
     showToast('Erro','Não foi possível aprovar. Verifique sua conexão.');
     console.error('[approveEntry]', e);

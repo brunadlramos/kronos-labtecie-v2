@@ -31,7 +31,7 @@ import {
   debounce, escH, sanitizeUrl,
   fmtDur, fmtTime, fmtDate, fmtShortDate,
   dKey, dateKey, todayKey,
-  getWeekDays, getMonthWeeks
+  getWeekDays, getMonthWeeks, celebrate
 } from './js/utils.js';
 import { app as state } from './js/state.js';
 import {
@@ -639,7 +639,7 @@ window.doLogout = () => {
 
 // ── CAP DIA (piso de 100%) ────────────────────────────────────────────────────
 // Marca/desmarca capDia/{dk}/{collabKey}. Só gestão (regra do RTDB também valida).
-window.toggleCapDia = async (collabKey, dk) => {
+window.toggleCapDia = async (collabKey, dk, ev) => {
   if(!(state.isManager || ['gestora','admin','coordenador'].includes(state.userPapel))) return;
   if(!collabKey || !dk) return;
   const node = child(capDiaRef, `${dk}/${collabKey}`);
@@ -647,6 +647,7 @@ window.toggleCapDia = async (collabKey, dk) => {
   try {
     if(on) await set(node, true);
     else   await remove(node);
+    if(on) celebrate(ev?.clientX ?? window.innerWidth/2, ev?.clientY ?? window.innerHeight/2);   // Craft: comemora ao bater 100%/dia
     try { registrarLog('capDia', `${on?'Ativou':'Removeu'} piso 100%`, `${collabKey} · ${dk}`); } catch(e){}
   } catch(e) {
     console.warn('[toggleCapDia]', e);

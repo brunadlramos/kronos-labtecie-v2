@@ -400,7 +400,7 @@ export function renderDashCards() {
     const capped = isCapped(c.key, tk);
     const dispTotal = (capped && c.count > 0) ? capValue(c.percTotal) : c.percTotal;  // piso de 100% só na EXIBIÇÃO e só em dia COM registros
     const onVac = c.onVacation;
-    const capBtn = (canCap && !onVac) ? `<button class="cap-toggle ${capped?'on':''}" title="${capped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${c.key}','${tk}')">100%${capped?' ✓':''}</button>` : '';
+    const capBtn = (canCap && !onVac) ? `<button class="cap-toggle ${capped?'on':''}" title="${capped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${c.key}','${tk}',event)">100%${capped?' ✓':''}</button>` : '';
     const vacBadge = onVac ? `<span style="font-size:0.6rem;font-weight:800;color:#fff;background:var(--orange);border-radius:100px;padding:2px 8px;white-space:nowrap;">Férias</span>` : '';
     return `<div class="collab-card${capped?' capped':''}">
       <div class="collab-card-header">
@@ -429,7 +429,7 @@ export function renderDashCards() {
     const gCapped = gIsCapped && me.count > 0;
     const gDisp = gCapped ? capValue(me.percTotal) : me.percTotal;
     const gCapBtn = (isSelf && canCap)
-      ? `<button class="cap-toggle ${gIsCapped?'on':''}" title="${gIsCapped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${gk}','${tk}')">100%${gIsCapped?' ✓':''}</button>`
+      ? `<button class="cap-toggle ${gIsCapped?'on':''}" title="${gIsCapped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${gk}','${tk}',event)">100%${gIsCapped?' ✓':''}</button>`
       : (gCapped ? `<span style="font-size:0.58rem;font-weight:800;color:var(--orange);" title="Piso de 100% ativo">✓ 100%</span>` : '');
     const tag = isSelf
       ? `<span style="font-size:0.6rem;color:var(--orange);font-weight:800;">(você)</span>`
