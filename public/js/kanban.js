@@ -5,7 +5,7 @@ import { app as state } from './state.js';
 import { ICONS }        from './icons.js';
 import {
   escH, dKey, fmtDur, fmtTime, fmtDate, fmtShortDate,
-  todayKey, getWeekDays, sanitizeUrl, resizeImageToDataURL
+  todayKey, getWeekDays, sanitizeUrl, resizeImageToDataURL, celebrate
 } from './utils.js';
 import {
   db, kanbanRef, entriesRef, approvalRequestsRef, notifsRef,
@@ -531,6 +531,7 @@ window.kDrop = async (e, colId) => {
     // ✅ AUDIT: updatedAt e modifiedBy registrados em toda movimentação
     await set(child(kanbanRef, droppedKey), { ...card, column: colId, history: hist, updatedAt: now_drop, modifiedBy: state.currentUser?.email||'desconhecido' });
     showToast('Card movido', `→ ${kColLabel(colId)}`);
+    if(colId==='concluido') celebrate(e.clientX, e.clientY);   // Craft: celebra ao arrastar p/ Concluído
     registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(colId)}`);
   } catch (err) {
     console.error('Kanban move error:', err);
@@ -724,6 +725,8 @@ window.cancelKanbanTimer = ()=>{
 
 window.concludeKanbanCard = async(key)=>{
   const card=state.kanbanCards[key]; if(!card) return;
+  const _el=document.getElementById('kcard-'+key);   // Craft: celebração no ponto do card
+  if(_el){ const r=_el.getBoundingClientRect(); celebrate(r.left+r.width/2, r.top+r.height/2); }
   const now=Date.now();
   // ✅ FIX BUG 3: state.currentCollabKey em vez de state.currentUser
   const hist=[...(card.history||[]),{action:'Concluído',by:state.currentCollabKey,ts:now}];

@@ -139,3 +139,38 @@ export function countUp(el, target, { decimals = 0, suffix = '', prefix = '', du
     if(p < 1) requestAnimationFrame(step);
   })(start);
 }
+
+// ── Craft: micro-celebração (brinde de partículas) ─────────────────────────────
+// Dispara um burst curto de partículas em (x,y) — usado ao concluir. Canvas
+// temporário, auto-removido. Respeita prefers-reduced-motion.
+export function celebrate(x, y, opts = {}){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = opts.colors || ['#F15A24','#FF8C42','#22C55E','#E3A008'];
+  const n = opts.count || 16;
+  const cv = document.createElement('canvas');
+  cv.width = window.innerWidth; cv.height = window.innerHeight;
+  cv.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:100000;';
+  document.body.appendChild(cv);
+  const ctx = cv.getContext('2d');
+  const parts = Array.from({length:n}, () => {
+    const a = Math.random()*Math.PI*2, sp = 2.5 + Math.random()*4.5;
+    return { x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 2.5,
+             r:2 + Math.random()*2.5, c:colors[(Math.random()*colors.length)|0], life:1 };
+  });
+  const t0 = performance.now(); let last = t0;
+  (function frame(now){
+    const dt = Math.min(2.2, (now - last)/16); last = now;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    let alive = false;
+    for(const p of parts){
+      p.vy += 0.16*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.life -= 0.017*dt;
+      if(p.life > 0){ alive = true;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+      }
+    }
+    if(alive && now - t0 < 1300) requestAnimationFrame(frame);
+    else cv.remove();
+  })(t0);
+}
