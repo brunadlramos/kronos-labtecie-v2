@@ -581,7 +581,9 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 .pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:6px;animation:pulse 1.5s infinite;}
 
 /* WEEKLY TABLE */
-.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1.5px solid var(--border);}
+/* Bloco D: tabela é conteúdo, não grupo de cards — ganha sua própria "casa"
+   (card branco + sombra) já que a seção agora é transparente */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow);}
 table.week-table{width:100%;border-collapse:collapse;font-family:var(--font);font-size:0.72rem;}
 table.week-table thead{background:var(--surface2);}
 table.week-table th{padding:10px 12px;text-align:center;color:var(--muted);font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1.5px solid var(--border);white-space:nowrap;}
@@ -955,9 +957,10 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .k-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:grab;transition:all 0.18s;animation:kCardIn 0.2s ease;position:relative;}
 .k-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .k-card.dragging{opacity:0.45;cursor:grabbing;}
-/* Card urgente: borda e faixa vermelhas */
-.k-card.urgent{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger) inset;}
-.k-card.urgent::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:var(--radius-sm) 0 0 var(--radius-sm);background:var(--danger);}
+/* Card urgente: borda vermelha com destaque espesso à esquerda.
+   (Antes usava ::before + inset, que desalinhavam nos cantos arredondados
+   e deixavam acabamento torto na lateral esquerda.) */
+.k-card.urgent{border-color:var(--danger);border-left-width:4px;}
 .k-card-urgent-badge{font-size:0.55rem;font-weight:800;padding:2px 6px;border-radius:4px;background:var(--danger-bg,rgba(239,68,68,0.12));border:1px solid var(--danger);color:var(--danger);letter-spacing:0.03em;}
 @keyframes kCardIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .k-card-name{font-size:0.8rem;font-weight:800;line-height:1.3;margin-bottom:7px;cursor:pointer;}
