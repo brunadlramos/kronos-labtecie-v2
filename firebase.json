@@ -10,9 +10,7 @@
       "**/node_modules/**",
       "*.md",
       "index.html",
-      "index.js",
-      "login_beta.html",
-      "login_beta.js"
+      "index.js"
     ],
     "rewrites": [
       { "source": "**", "destination": "/index_v2.html" }
