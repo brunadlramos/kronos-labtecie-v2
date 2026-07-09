@@ -38,6 +38,8 @@ export function isRankable(collabKey) {
 // Rótulos/cores dos tipos de folga (espelha FOLGA_TIPOS de index_v2.js) — usados nas tabelas
 const FOLGA_TIPO_LABELS = { feriado:'Feriado', atestado:'Atestado', dayoff:'Day off' };
 const FOLGA_TIPO_CORES  = { feriado:'#f15a24', atestado:'#ef4444', dayoff:'#3b82f6' };
+// Bloco C: valor zero/vazio nunca em cor de destaque — cinza calmo evita "alarme" visual
+const pctColor = (v, base = 'var(--orange)') => (Number(v) > 0 ? base : 'var(--muted)');
 
 // ── calcAmount ─────────────────────────────────────────────────────────────────
 // pesoOverride: peso "congelado" gravado no registro (e.peso). Quando presente, tem
@@ -208,9 +210,10 @@ export function avatarInner(av){
 export function chartPalette() {
   const dark = document.body.classList.contains('dark');
   return {
-    tick:   dark ? '#9090AA' : '#8B7E78',
-    grid:   dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-    legend: dark ? '#9090AA' : '#8B7E78',
+    tick:    dark ? '#9090AA' : '#8B7E78',
+    grid:    dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    legend:  dark ? '#9090AA' : '#8B7E78',
+    surface: dark ? '#1A1A24' : '#FFFFFF',   // Bloco C: canvas nao entende var(--surface)
   };
 }
 
@@ -392,7 +395,7 @@ export function renderDashCards() {
       <div class="collab-card-stats">
         <div><div class="ccs-label">% Tempo</div><div class="ccs-value" style="color:var(--text)">${c.percTime.toFixed(1)}%</div></div>
         <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${c.percAmount.toFixed(1)}%</div></div>
-        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${dispTotal.toFixed(1)}%${(capped && c.percTotal < CAP_FLOOR)?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${c.percTotal.toFixed(0)}%)</span>`:''}</div></div>
+        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:${pctColor(dispTotal)}">${dispTotal.toFixed(1)}%${(capped && c.percTotal < CAP_FLOOR)?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${c.percTotal.toFixed(0)}%)</span>`:''}</div></div>
       </div>
       <div class="bar-label"><span>Meta (${_fmtMetaLabel(c.goalMs)})</span><span>${dispTotal.toFixed(1)}%</span></div>
       <div class="bar-track"><div class="bar-fill ${dispTotal>=100?'over':''}" style="width:${Math.min(dispTotal,100)}%"></div></div>
@@ -424,7 +427,7 @@ export function renderDashCards() {
       <div class="collab-card-stats">
         <div><div class="ccs-label">% Tempo</div><div class="ccs-value">${me.percTime.toFixed(1)}%</div></div>
         <div><div class="ccs-label">% Amt</div><div class="ccs-value" style="color:var(--success)">+${me.percAmount.toFixed(1)}%</div></div>
-        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:var(--orange)">${gDisp.toFixed(1)}%${(gCapped && me.percTotal < CAP_FLOOR)?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${me.percTotal.toFixed(0)}%)</span>`:''}</div></div>
+        <div><div class="ccs-label">% Total</div><div class="ccs-value" style="color:${pctColor(gDisp)}">${gDisp.toFixed(1)}%${(gCapped && me.percTotal < CAP_FLOOR)?`<span style="font-size:0.55rem;color:var(--muted);font-weight:700"> (real ${me.percTotal.toFixed(0)}%)</span>`:''}</div></div>
       </div>
       <div class="bar-label"><span>Meta (${_fmtMetaLabel(me.goalMs)})</span><span>${gDisp.toFixed(1)}%</span></div>
       <div class="bar-track"><div class="bar-fill ${gDisp>=100?'over':''}" style="width:${Math.min(gDisp,100)}%"></div></div>
@@ -538,7 +541,7 @@ export function renderWeekTable() {
   }).join('');
 
   const _avatarCell = c => `<td class="name-col"><div class="cell-collab"><div class="cell-av" style="background:${getCollabAvatar(c.key).color};font-size:${getCollabAvatar(c.key).isEmoji?'0.8rem':'0.52rem'}">${getCollabAvatar(c.key).display}</div><div class="cell-name">${c.label}</div></div></td>`;
-  const _avgCell = c => `<td><div class="cell-multi"><span class="cell-total" style="color:var(--orange)">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td>`;
+  const _avgCell = c => `<td><div class="cell-multi"><span class="cell-total" style="color:${pctColor(c.avg)}">${c.avg.toFixed(1)}%</span><span class="cell-sub">${c.dayData.filter(d=>d.count>0).length}d</span></div></td>`;
 
   // Linhas na ORDEM do ranking (1º, 2º, 3º…) — `sorted` já está por weekTotalReal.
   const rankedRows = sorted.map(c=>{
@@ -548,7 +551,8 @@ export function renderWeekTable() {
   const gestorRows = [...gestorData].sort((a,b)=>b.avg-a.avg).map(c=>
     `<tr style="opacity:0.92;">${_avatarCell(c)}${_cellsFor(c,false)}${_avgCell(c)}<td><span style="font-size:0.56rem;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px;">Gestão</span></td></tr>`
   ).join('');
-  const summaryRow = `<tr class="summary-row"><td class="name-col">Média do time</td>${daySums.map(v=>`<td>${v===null?'&mdash;':v.toFixed(1)+'%'}</td>`).join('')}<td>${(()=>{ const ac = tableData.filter(c=>c.dayData.some(d=>d.count>0)); return (ac.length ? ac.reduce((s,c)=>s+c.avg,0)/ac.length : 0).toFixed(1); })()}%</td><td>—</td></tr>`;
+  const _teamAvg = (()=>{ const ac = tableData.filter(c=>c.dayData.some(d=>d.count>0)); return ac.length ? ac.reduce((s,c)=>s+c.avg,0)/ac.length : 0; })();
+  const summaryRow = `<tr class="summary-row"><td class="name-col">Média do time</td>${daySums.map(v=>`<td style="color:${(v===null||v===0)?'var(--muted)':'var(--orange)'}">${v===null?'&mdash;':v.toFixed(1)+'%'}</td>`).join('')}<td style="color:${pctColor(_teamAvg)}">${_teamAvg.toFixed(1)}%</td><td>—</td></tr>`;
   tbody.innerHTML = rankedRows + gestorRows + summaryRow;
 }
 
@@ -637,7 +641,7 @@ export function renderMeuDashboard() {
     if(projKeys.length){
       state.mdCharts.pie = new Chart(pieCtx, {
         type: 'doughnut',
-        data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: pieColors, borderWidth: 2, borderColor: 'var(--surface)' }] },
+        data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: pieColors, borderWidth: 2, borderColor: chartPalette().surface }] },
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: {
