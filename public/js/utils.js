@@ -120,3 +120,22 @@ export function resizeImageToDataURL(file, max = 128, quality = 0.72){
     reader.readAsDataURL(file);
   });
 }
+
+// ── Craft: count-up de números ─────────────────────────────────────────────────
+// Anima o texto de `el` do valor atual até `target`. No-op se não mudou (evita
+// re-animar em re-render idêntico). Respeita prefers-reduced-motion.
+export function countUp(el, target, { decimals = 0, suffix = '', prefix = '', duration = 650 } = {}){
+  if(!el) return;
+  const to  = Number(target);
+  const fmt = v => prefix + v.toFixed(decimals) + suffix;
+  if(!isFinite(to)){ el.textContent = prefix + String(target) + suffix; return; }
+  const from = parseFloat(String(el.textContent).replace(/[^0-9.-]/g,'')) || 0;
+  if(from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches){ el.textContent = fmt(to); return; }
+  const start = performance.now();
+  const ease  = t => 1 - Math.pow(1 - t, 3);   // easeOutCubic
+  (function step(now){
+    const p = Math.min(1, (now - start) / duration);
+    el.textContent = fmt(from + (to - from) * ease(p));
+    if(p < 1) requestAnimationFrame(step);
+  })(start);
+}

@@ -6,7 +6,7 @@ import { ICONS, medalIcon } from './icons.js';
 import { resolveSeriesColors } from './colors.js';   // Bloco B: regra de cor gestor-first
 import {
   dKey, dateKey, todayKey, getWeekDays, getMonthWeeks,
-  fmtDur, fmtTime, fmtDate, fmtShortDate, escH
+  fmtDur, fmtTime, fmtDate, fmtShortDate, escH, countUp
 } from './utils.js';
 import { db } from './firebase-refs.js';
 import { ref, get, query, orderByChild, startAt, endAt }
@@ -579,8 +579,8 @@ export function renderMeuDashboard() {
   const countEl = document.getElementById('mdHojeCount');
   const percEl = document.getElementById('mdHojePerc');
   if(hojeEl) hojeEl.textContent = `${th}h ${String(tm).padStart(2,'0')}m`;
-  if(countEl) countEl.textContent = todayData.count;
-  if(percEl){ percEl.textContent = `${todayData.percTotal.toFixed(1)}%`; percEl.style.color = todayData.percTotal>=90?'var(--success)':'var(--danger)'; }
+  if(countEl) countUp(countEl, todayData.count);
+  if(percEl){ countUp(percEl, todayData.percTotal, {decimals:1, suffix:'%'}); percEl.style.color = todayData.percTotal>=90?'var(--success)':'var(--danger)'; }
 
   const days = getWeekDays(state.mdWeekOffset);
   const tk = todayKey();

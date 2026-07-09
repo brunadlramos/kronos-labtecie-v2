@@ -1565,6 +1565,22 @@ textarea:focus-visible,
     from{ transform:rotate(0) translateX(var(--orbit-r,24px)); }
     to{ transform:rotate(360deg) translateX(var(--orbit-r,24px)); }
   }
+
+  /* Dashboard: pulso radar "ao vivo" no ponto de quem está trabalhando agora */
+  .online-card-av::after{ animation: livePulse 2.2s ease-out infinite; }
+  @keyframes livePulse{
+    0%  { box-shadow:0 0 0 0 rgba(34,197,94,.5); }
+    70% { box-shadow:0 0 0 7px rgba(34,197,94,0); }
+    100%{ box-shadow:0 0 0 0 rgba(34,197,94,0); }
+  }
+
+  /* Entrada em cascata: Dashboard e Meu Dashboard (mesmo easing do Timer) */
+  #page-dashboard.active .dash-section,
+  #page-meu-dashboard.active .stats-row-compact,
+  #page-meu-dashboard.active .chart-card{ animation: craftRise .5s cubic-bezier(.22,.61,.36,1) both; }
+  #page-dashboard.active .dash-section:nth-of-type(2){ animation-delay:.07s; }
+  #page-dashboard.active .dash-section:nth-of-type(3){ animation-delay:.14s; }
+  #page-dashboard.active .dash-section:nth-of-type(4){ animation-delay:.20s; }
 }
 
 
