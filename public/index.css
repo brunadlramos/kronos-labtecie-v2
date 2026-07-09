@@ -1518,5 +1518,19 @@ textarea:focus-visible,
   border-radius: var(--radius-xs);
 }
 
+/* ── BLOCO F · Respiro contextual nos fluxos primários ─────────────────────────
+   Mais ar em Timer e Meu Dashboard (onde a marca respira), mantendo a densidade
+   nas telas de tabela (Usuários, Relatório, tabela semanal…). */
+@media (pointer: fine) {
+  /* controles um pouco mais confortáveis só no desktop; no toque seguem 42px */
+  #page-timer, #page-meu-dashboard { --ctrl-h: 38px; }
+}
+#page-timer .timer-card       { padding: 28px; margin-bottom: 28px; }
+#page-timer .add-manual-btn   { padding: 13px 16px; margin-bottom: 28px; }
+#page-timer .section-bar      { margin-bottom: 20px; }
+#page-timer .section-sub,
+#page-meu-dashboard .section-sub { margin-bottom: 28px; }
+#page-meu-dashboard .cards-row   { gap: 20px; }
+
 
 
