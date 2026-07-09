@@ -42,6 +42,17 @@ const FOLGA_TIPO_CORES  = { feriado:'#f15a24', atestado:'#ef4444', dayoff:'#3b82
 // Bloco C: valor zero/vazio nunca em cor de destaque — cinza calmo evita "alarme" visual
 const pctColor = (v, base = 'var(--orange)') => (Number(v) > 0 ? base : 'var(--muted)');
 
+// Craft: números do Meu Dashboard "sobem" ao ABRIR a tela (não a cada refresh de fundo)
+document.addEventListener('kronos:page:show', (e) => {
+  if(e.detail?.id !== 'meu-dashboard') return;
+  requestAnimationFrame(() => {
+    const perc = document.getElementById('mdHojePerc');
+    const cnt  = document.getElementById('mdHojeCount');
+    if(perc){ const t = parseFloat(perc.textContent) || 0; perc.textContent = '0.0%'; countUp(perc, t, {decimals:1, suffix:'%', duration:800}); }
+    if(cnt){  const t = parseInt(cnt.textContent)  || 0; cnt.textContent  = '0';     countUp(cnt,  t, {duration:800}); }
+  });
+});
+
 // ── calcAmount ─────────────────────────────────────────────────────────────────
 // pesoOverride: peso "congelado" gravado no registro (e.peso). Quando presente, tem
 // prioridade sobre o peso atual do projeto — permite "aplicar só aos futuros" sem
@@ -579,8 +590,8 @@ export function renderMeuDashboard() {
   const countEl = document.getElementById('mdHojeCount');
   const percEl = document.getElementById('mdHojePerc');
   if(hojeEl) hojeEl.textContent = `${th}h ${String(tm).padStart(2,'0')}m`;
-  if(countEl) countUp(countEl, todayData.count);
-  if(percEl){ countUp(percEl, todayData.percTotal, {decimals:1, suffix:'%'}); percEl.style.color = todayData.percTotal>=90?'var(--success)':'var(--danger)'; }
+  if(countEl) countEl.textContent = todayData.count;
+  if(percEl){ percEl.textContent = `${todayData.percTotal.toFixed(1)}%`; percEl.style.color = todayData.percTotal>=90?'var(--success)':'var(--danger)'; }
 
   const days = getWeekDays(state.mdWeekOffset);
   const tk = todayKey();

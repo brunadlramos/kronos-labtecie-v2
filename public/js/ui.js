@@ -23,6 +23,7 @@ export function showPage(id, clickedEl) {
   _ctx.renderPage(id);
   // Notifica o pan do kanban quando a página fica ativa
   if (id === 'kanban') setTimeout(() => document.dispatchEvent(new Event('kronos:page:kanban')), 100);
+  document.dispatchEvent(new CustomEvent('kronos:page:show', { detail: { id } }));
 }
 
 // ── renderCurrentPage / renderDebounced ───────────────────────────────────────
