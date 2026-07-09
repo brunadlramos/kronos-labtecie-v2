@@ -380,7 +380,7 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 .card-sub{font-size:0.72rem;color:var(--muted);font-weight:600;margin-top:4px;}
 
 /* TIMER CARD */
-.timer-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;transition:border-color 0.3s;}
+.timer-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;box-shadow:var(--shadow-md);transition:border-color 0.3s,box-shadow 0.3s;}
 .timer-card.running{border-color:var(--orange);animation:timerGlow 2.5s ease-in-out infinite;}
 @keyframes timerGlow{
   0%,100%{box-shadow:0 0 0 3px rgba(241,90,36,0.08);}
@@ -441,7 +441,7 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 
 /* ENTRIES */
 .entries-list{display:flex;flex-direction:column;gap:10px;}
-.entry-item{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;display:flex;align-items:flex-start;gap:12px;animation:slideIn 0.2s ease;transition:all 0.2s;}
+.entry-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;display:flex;align-items:flex-start;gap:12px;animation:slideIn 0.2s ease;transition:all 0.2s;}
 .entry-item:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);transform:translateY(-1px);}
 @keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .entry-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px;}
@@ -526,7 +526,7 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 
 /* COLLAB CARDS (dashboard) */
 .collab-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px;}
-.collab-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);transition:all 0.2s;}
+.collab-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);transition:all 0.2s;}
 .collab-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);}
 .collab-card-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .collab-card-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:800;color:#fff;flex-shrink:0;}
@@ -550,7 +550,7 @@ body.dark .btn-theme:hover{border-color:var(--orange);color:var(--orange);}
 /* ONLINE NOW — grid de cards (substituiu a tabela) */
 .online-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
 .online-card{
-  background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
   padding:16px 18px;display:flex;flex-direction:column;gap:10px;transition:all 0.2s;
 }
 .online-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow);}
@@ -622,7 +622,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .incon-sub{font-size:0.72rem;color:var(--muted);font-weight:600;margin-top:2px;}
 
 /* CHARTS */
-.chart-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
 .chart-title{font-size:0.78rem;font-weight:800;color:var(--text);margin-bottom:16px;letter-spacing:-0.01em;}
 .chart-wrap{position:relative;}
 
@@ -903,7 +903,8 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .cal-filter-input:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light);}
 
 /* ── DASHBOARD MERGED PAGE ── */
-.dash-section{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;}
+/* Bloco D: seção vira agrupador transparente — os cards internos flutuam sobre o fundo (hierarquia por elevação, não caixa-dentro-de-caixa) */
+.dash-section{background:transparent;border:none;border-radius:var(--radius);padding:0;margin-bottom:24px;}
 .dash-section-title{font-size:0.72rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
 
 /* ── KANBAN ── */
@@ -951,7 +952,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .k-col-count{font-family:var(--mono);font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:100px;background:var(--orange-light);color:var(--orange);}
 .k-col-body{background:var(--surface2);border:1.5px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:8px;flex:1;display:flex;flex-direction:column;gap:7px;transition:background 0.2s;overflow-y:auto;overflow-x:hidden;}
 .k-col-body.drag-over{background:var(--orange-light);border-color:var(--orange-border);}
-.k-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:grab;transition:all 0.18s;animation:kCardIn 0.2s ease;position:relative;}
+.k-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:grab;transition:all 0.18s;animation:kCardIn 0.2s ease;position:relative;}
 .k-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .k-card.dragging{opacity:0.45;cursor:grabbing;}
 /* Card urgente: borda e faixa vermelhas */
