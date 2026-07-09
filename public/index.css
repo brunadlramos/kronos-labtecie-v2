@@ -1518,5 +1518,45 @@ textarea:focus-visible,
 #page-meu-dashboard .section-sub { margin-bottom: 28px; }
 #page-meu-dashboard .cards-row   { gap: 20px; }
 
+/* ══════════ CRAFT PASS · TIMER ══════════════════════════════════════════════
+   Camada de acabamento: movimento com intenção + micro-interações + um momento
+   assinatura "espaço/tempo" (Kronos = deus do tempo). CSS puro, sem tocar no JS
+   (o estado .running já é ligado pelo timer.js). Motion decorativo é guardado
+   por prefers-reduced-motion. */
+
+/* Micro-interações (press/hover) — valem em qualquer preferência de movimento */
+.btn-start{position:relative;}
+.btn-start:active{transform:scale(0.9);}
+.add-manual-btn:active{transform:scale(0.99);}
+.stat-card-compact{transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;}
+.stat-card-compact:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--orange-border);}
+/* Timer correndo: brilho suave no display — sensação de "tempo vivo" */
+.timer-display.running{text-shadow:0 0 14px rgba(241,90,36,.35);}
+
+@media (prefers-reduced-motion: no-preference){
+  /* Entrada em cascata ao abrir o Timer (blocos "sobem" em sequência) */
+  #page-timer.active .section-heading,
+  #page-timer.active .timer-card:not(.running),
+  #page-timer.active .add-manual-btn,
+  #page-timer.active .stats-row-compact,
+  #page-timer.active .section-bar{ animation: craftRise .5s cubic-bezier(.22,.61,.36,1) both; }
+  #page-timer.active .timer-card:not(.running){ animation-delay:.05s; }
+  #page-timer.active .add-manual-btn { animation-delay:.12s; }
+  #page-timer.active .stats-row-compact{ animation-delay:.18s; }
+  #page-timer.active .section-bar    { animation-delay:.24s; }
+  @keyframes craftRise{ from{opacity:0;transform:translateY(14px);} to{opacity:1;transform:none;} }
+
+  /* ✦ ASSINATURA KRONOS: um ponto orbita o play enquanto o timer corre — o tempo
+     "girando". Sutil, com leve brilho, como uma lua/ponteiro em órbita. */
+  .btn-start.running::after{
+    content:'';position:absolute;left:calc(50% - 3px);top:-7px;
+    width:6px;height:6px;border-radius:50%;
+    background:var(--orange);box-shadow:0 0 8px 1px rgba(241,90,36,.85);
+    transform-origin:3px 31px;
+    animation:kronosOrbit 2.4s linear infinite;
+  }
+  @keyframes kronosOrbit{ to{ transform:rotate(360deg); } }
+}
+
 
 
