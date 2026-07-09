@@ -401,7 +401,7 @@ export function renderCharts(){
   if(pizzaKeys.length&&document.getElementById('chartPizza')){
     state.charts.pizza=new Chart(document.getElementById('chartPizza'),{
       type:'doughnut',
-      data:{labels:pizzaKeys.map(k=>state.PROJECTS[k]?.label||k),datasets:[{data:pizzaKeys.map(k=>projHours[k].toFixed(2)),backgroundColor:pizzaKeys.map(k=>state.PROJECTS[k]?.color||'#94A3B8'),borderWidth:2,borderColor:'var(--surface)'}]},
+      data:{labels:pizzaKeys.map(k=>state.PROJECTS[k]?.label||k),datasets:[{data:pizzaKeys.map(k=>projHours[k].toFixed(2)),backgroundColor:pizzaKeys.map(k=>state.PROJECTS[k]?.color||'#94A3B8'),borderWidth:2,borderColor:cp.surface}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},color:cp.legend}}}}
     });
   }
