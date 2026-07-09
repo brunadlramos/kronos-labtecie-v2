@@ -66,33 +66,16 @@ body.dark .cell-total { color: inherit; }
 body.dark .badge { color: var(--text); background: var(--surface2); border-color: var(--border); }
 body.dark .entry-task { color: var(--text); }
 body.dark .entry-duration { color: var(--text); }
-body.dark .entry-obs { color: var(--muted); }
-body.dark .card-value { color: var(--text); }
 body.dark .section-bar-title { color: var(--text); }
-body.dark .ccs-label { color: var(--muted); }
 body.dark .ccs-value { color: var(--text); }
-body.dark .k-col-title { color: var(--text); }
 body.dark .k-card-name { color: var(--text); }
-body.dark .k-card-assignee { color: var(--muted); }
-body.dark .k-timer-task { color: var(--text); }
 body.dark .collab-card-name { color: var(--text); }
 body.dark .online-name { color: var(--text); }
-body.dark .online-task { color: var(--muted); }
 body.dark .incon-text { color: var(--text); }
-body.dark .date-nav-label { color: var(--text); }
 body.dark .proj-name { color: var(--text); }
-body.dark .mural-post-text { color: var(--text); }
-body.dark .stat-info-value { color: var(--text); }
-body.dark .ferr-card-title { color: var(--text); }
-body.dark .ferr-card-desc { color: var(--muted); }
 body.dark .modal-title { color: var(--text); }
-body.dark .task-input { color: var(--text); }
 body.dark .task-input::placeholder { color: var(--muted); }
-body.dark .obs-input { color: var(--text); }
-body.dark .summary-text-box { color: var(--text); }
-body.dark .cell-name { color: var(--text); }
 body.dark .demands-table td { color: var(--text); }
-body.dark .k-card-obs { color: var(--muted); }
 body.dark .user-mgmt-name { color: var(--text); }
 body.dark .user-stat-value { color: var(--text); }
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
