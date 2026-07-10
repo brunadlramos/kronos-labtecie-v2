@@ -907,6 +907,12 @@ table.week-table tr:hover td{background:var(--orange-light);}
 /* ── DASHBOARD MERGED PAGE ── */
 /* Bloco D: seção vira agrupador transparente — os cards internos flutuam sobre o fundo (hierarquia por elevação, não caixa-dentro-de-caixa) */
 .dash-section{background:transparent;border:none;border-radius:var(--radius);padding:0;margin-bottom:24px;}
+/* Usabilidade: atalhos rápidos no topo da Dashboard (1 clique p/ as análises) */
+.dash-shortcuts{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 22px;}
+.dash-shortcut{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:100px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:0.8rem;font-weight:700;cursor:pointer;box-shadow:var(--shadow);transition:transform var(--motion-micro) ease, box-shadow var(--motion-micro) ease, border-color var(--motion-micro) ease, color var(--motion-micro) ease;}
+.dash-shortcut:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--orange-border);color:var(--orange);}
+.dash-shortcut:active{transform:translateY(0) scale(.98);}
+.dash-shortcut svg{width:16px;height:16px;flex-shrink:0;}
 .dash-section-title{font-size:0.72rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
 
 /* ── KANBAN ── */

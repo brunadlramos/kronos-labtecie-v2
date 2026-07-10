@@ -611,6 +611,7 @@ onAuthStateChanged(auth, async user => {
   if(state.isManager || state.userPapel==='coordenador'){
     const bf=document.getElementById('btnDashFeriados'); if(bf) bf.style.display='inline-flex';
   }
+  window.restoreNavGroups?.();   // Usabilidade: restaura o grupo "Gestão" aberto se o usuário deixou
 
   const cs=document.getElementById('collabSelect');
   if(cs && state.currentCollabKey && state.COLLABS[state.currentCollabKey]) cs.value=state.currentCollabKey;

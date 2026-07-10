@@ -1961,13 +1961,43 @@ window.clearKanbanFilters=()=>{
 // ── SIDEBAR GROUPS ────────────────────────────────────────────────────────────
 window.toggleNavGroup = (titleEl)=>{
   const body = titleEl.nextElementSibling;
-  const isOpen = titleEl.classList.contains('open');
-  if(isOpen){
-    titleEl.classList.remove('open');
-    body.style.display='none';
+  const willOpen = !titleEl.classList.contains('open');
+  titleEl.classList.toggle('open', willOpen);
+  if(body) body.style.display = willOpen ? 'block' : 'none';
+  // Usabilidade: lembra o estado do grupo entre sessões (fim do re-expandir diário)
+  const gid = titleEl.closest('.nav-group')?.id || 'group';
+  try { localStorage.setItem('kronos_nav_'+gid, willOpen ? '1' : '0'); } catch(e){}
+};
+
+// Restaura os grupos colapsáveis que o usuário deixou abertos (chamado no boot).
+window.restoreNavGroups = ()=>{
+  document.querySelectorAll('.nav-item-group').forEach(title=>{
+    const gid = title.closest('.nav-group')?.id || 'group';
+    let open = false;
+    try { open = localStorage.getItem('kronos_nav_'+gid) === '1'; } catch(e){}
+    if(open && !title.classList.contains('open')){
+      title.classList.add('open');
+      const body = title.nextElementSibling;
+      if(body) body.style.display = 'block';
+    }
+  });
+};
+
+// Usabilidade: navega para uma página como se clicasse no item da sidebar —
+// expande o grupo pai se estiver fechado e destaca o item correto. Usado pelos
+// atalhos rápidos da Dashboard.
+window.goToPage = (id)=>{
+  const navItem = [...document.querySelectorAll('.nav-item')]
+    .find(n => (n.getAttribute('onclick')||'').includes(`showPage('${id}'`));
+  if(navItem){
+    const groupBody = navItem.closest('.nav-group-body');
+    if(groupBody && getComputedStyle(groupBody).display === 'none'){
+      const title = groupBody.previousElementSibling;
+      if(title) window.toggleNavGroup(title);
+    }
+    window.showPage(id, navItem);
   } else {
-    titleEl.classList.add('open');
-    body.style.display='block';
+    window.showPage(id);
   }
 };
 
