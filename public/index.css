@@ -32,6 +32,8 @@
   --z-topbar:40;--z-dropdown:50;--z-sidebar:100;--z-modal:200;--z-toast:100000;
   /* Third-party brand colors */
   --trello-bg:#E8F0FE;--trello-color:#0052CC;--trello-border:#C7D9F8;
+  /* Motion system (craft) — duração/easing compartilhados por todo o app */
+  --ease-out:cubic-bezier(.22,.61,.36,1);--motion-enter:.5s;--motion-micro:.18s;
 }
 body.dark{
   --bg:#0F0F14;--surface:#1A1A24;--surface2:#242436;--border:#2E2E42;
@@ -1525,11 +1527,17 @@ textarea:focus-visible,
 #page-meu-dashboard .section-sub { margin-bottom: 28px; }
 #page-meu-dashboard .cards-row   { gap: 20px; }
 
-/* ══════════ CRAFT PASS · TIMER ══════════════════════════════════════════════
-   Camada de acabamento: movimento com intenção + micro-interações + um momento
-   assinatura "espaço/tempo" (Kronos = deus do tempo). CSS puro, sem tocar no JS
-   (o estado .running já é ligado pelo timer.js). Motion decorativo é guardado
-   por prefers-reduced-motion. */
+/* ══════════ MOTION SYSTEM (CRAFT) ═══════════════════════════════════════════
+   Camada de acabamento coesa em todo o app. Todo motion decorativo é guardado
+   por prefers-reduced-motion.
+
+   TOKENS (em :root):   --motion-enter (.5s) · --motion-micro (.18s) · --ease-out
+   PRIMITIVAS CSS:      craftRise (entrada em cascata) · kronosOrbit (--orbit-r) ·
+                        livePulse (radar "ao vivo")
+   PRIMITIVAS JS (utils.js): countUp(el,target) · celebrate(x,y)
+   ASSINATURA:          órbita = "o tempo girando" (Kronos = deus do tempo);
+                        reaparece no play do Timer e no loader do login.
+   Reutilizável e pronto p/ portar ao React. */
 
 /* Micro-interações (press/hover) — valem em qualquer preferência de movimento */
 .btn-start{position:relative;}
@@ -1546,7 +1554,7 @@ textarea:focus-visible,
   #page-timer.active .timer-card:not(.running),
   #page-timer.active .add-manual-btn,
   #page-timer.active .stats-row-compact,
-  #page-timer.active .section-bar{ animation: craftRise .5s cubic-bezier(.22,.61,.36,1) both; }
+  #page-timer.active .section-bar{ animation: craftRise var(--motion-enter) var(--ease-out) both; }
   #page-timer.active .timer-card:not(.running){ animation-delay:.05s; }
   #page-timer.active .add-manual-btn { animation-delay:.12s; }
   #page-timer.active .stats-row-compact{ animation-delay:.18s; }
@@ -1577,13 +1585,13 @@ textarea:focus-visible,
   /* Entrada em cascata: Dashboard e Meu Dashboard (mesmo easing do Timer) */
   #page-dashboard.active .dash-section,
   #page-meu-dashboard.active .stats-row-compact,
-  #page-meu-dashboard.active .chart-card{ animation: craftRise .5s cubic-bezier(.22,.61,.36,1) both; }
+  #page-meu-dashboard.active .chart-card{ animation: craftRise var(--motion-enter) var(--ease-out) both; }
   #page-dashboard.active .dash-section:nth-of-type(2){ animation-delay:.07s; }
   #page-dashboard.active .dash-section:nth-of-type(3){ animation-delay:.14s; }
   #page-dashboard.active .dash-section:nth-of-type(4){ animation-delay:.20s; }
 
   /* Gráficos: as linhas de cards "sobem" em sequência (depois o Chart.js desenha) */
-  #page-graficos.active .cards-row{ animation: craftRise .55s cubic-bezier(.22,.61,.36,1) both; }
+  #page-graficos.active .cards-row{ animation: craftRise var(--motion-enter) var(--ease-out) both; }
   #page-graficos.active .cards-row:nth-of-type(2){ animation-delay:.1s; }
 }
 
