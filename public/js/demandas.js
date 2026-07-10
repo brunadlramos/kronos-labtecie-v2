@@ -470,6 +470,14 @@ window.goHist4Current = ()=>{
   state.hist4Month = new Date().getMonth();
   render4Weeks();
 };
+// Escalabilidade #6: pular direto para qualquer mês/ano (não só ◀▶)
+window.jumpHist4 = (val)=>{
+  if(!val) return;
+  const [y,m] = val.split('-').map(Number);
+  if(!y || !m) return;
+  state.hist4Year = y; state.hist4Month = m - 1;
+  render4Weeks();
+};
 
 // getMonthWeeks → js/utils.js
 
@@ -482,6 +490,8 @@ export function render4Weeks(){
   const monthLabel = new Date(y,m,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
   const labelEl = document.getElementById('hist4MonthLabel');
   if(labelEl) labelEl.textContent = monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+  const pickEl = document.getElementById('hist4MonthPicker');   // #6: mantém o seletor em sincronia
+  if(pickEl) pickEl.value = `${y}-${String(m+1).padStart(2,'0')}`;
 
   // F10: subtítulo "<mês> — N semanas" removido (não é necessário)
   const numWeeks = weeks.length;   // ainda usado no ranking ("N sem.")

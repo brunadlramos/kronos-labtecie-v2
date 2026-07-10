@@ -110,9 +110,10 @@ const MS_PER_DAY        = 86400000;
 const MS_PER_HOUR       = 3600000;
 const MS_PER_WEEK       = 604800000;
 const ENTRIES_LIVE_DAYS = 180;
-// Escalabilidade #1: cap na carga do colaborador (~1 ano). Evita baixar todos os
-// registros de sempre; histórico completo fica sob demanda (window.loadFullMyHistory).
-const COLLAB_ENTRIES_LIMIT = 1500;
+// Escalabilidade #1: cap na carga do colaborador (~6 meses — cobre o trimestre
+// atual + o anterior, alinhado ao fluxo trimestral). Evita baixar todos os registros
+// de sempre; histórico completo fica sob demanda (window.loadFullMyHistory).
+const COLLAB_ENTRIES_LIMIT = 800;
 const DEFAULT_DAILY_GOAL_HOURS = 9;
 // LATE_CUTOFF_HOUR/MIN → js/timer.js
 

@@ -846,6 +846,9 @@
           <span id="hist4MonthLabel" style="font-family:var(--mono);font-size:0.85rem;font-weight:700;min-width:180px;text-align:center;text-transform:capitalize;color:var(--text);"></span>
           <button class="date-nav-btn" onclick="changeHist4Month(1)" aria-label="Próximo mês">&#8250;</button>
           <button class="btn-sm" onclick="goHist4Current()" style="margin-left:4px;">Mês atual</button>
+          <input type="month" id="hist4MonthPicker" onchange="jumpHist4(this.value)" title="Pular para um mês/ano específico" aria-label="Pular para mês e ano" style="height:34px;margin-left:8px;font-family:var(--font);font-size:0.8rem;border:1.5px solid var(--border);border-radius:var(--ctrl-r);background:var(--surface);color:var(--text);padding:0 8px;cursor:pointer;">
+
+
         </div>
         <div class="section-sub" id="hist4Sub" style="margin-top:0;margin-bottom:16px;"></div>
         <div class="chart-card" style="margin-bottom:20px;"><div class="chart-title">Médias semanais por colaborador</div><div class="chart-wrap" style="height:300px;"><canvas id="chartMensal"></canvas></div></div>
