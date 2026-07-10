@@ -99,8 +99,7 @@ export async function renderCfgColaboradores(targetEl){
             <button class="btn-sm" onclick="cfgSaveColaborador('${uid}')">${ICONS.save} Salvar</button>
             <button class="btn-sm" onclick="openAusenciasModal('${uid}')" title="Ausências recorrentes (ex.: estágio)" style="font-size:0.7rem;">⏰ Ausências${Array.isArray(u.ausencias)&&u.ausencias.length?` (${u.ausencias.length})`:''}</button>
             <button class="btn-sm" onclick="openFeriasModal('${uid}')" title="Períodos de férias" style="font-size:0.7rem;">Férias${Array.isArray(u.ferias)&&u.ferias.length?` (${u.ferias.length})`:''}</button>
-            <label class="btn-sm" style="cursor:pointer;font-size:0.7rem;" title="Foto do colaborador">📷 Foto<input type="file" accept="image/*" onchange="cfgUploadColabFoto('${escH(u.key||uid)}', this)" style="display:none;"></label>
-            ${u.email?`<button class="btn-sm" onclick="cfgResetPassword('${escH(u.email)}')" title="Redefinir senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
+            ${u.email?`<button class="btn-sm" onclick="cfgResetPassword('${escH(u.email)}')" title="Enviar e-mail de redefinição de senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
           </td>
         </tr>`).join('')}
       </tbody>

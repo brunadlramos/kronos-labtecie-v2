@@ -1008,14 +1008,10 @@
         <div id="approvalSection"></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:8px;" id="usuariosGrid"></div>
 
-        <!-- Configuração de jornada — visível apenas para gestora -->
-        <div id="usuariosConfigArea" style="margin-top:24px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <h2 class="section-heading" style="margin-bottom:0;font-size:1.1rem;">Configuração de Jornada</h2>
-            <button class="btn-sm" onclick="document.getElementById('usuariosConfigArea').removeAttribute('data-loaded');renderUsuarios();" title="Recarregar">↺ Recarregar</button>
-          </div>
-          <div class="section-sub" style="margin-bottom:16px;">Configure horas diárias individuais. Útil para estagiários e jornadas reduzidas.</div>
-        </div>
+        <!-- Configuração avançada (jornada/ausências/férias/senha/etc.) — recolhida por padrão.
+             A tabela renderiza escondida em usuariosConfigArea; o botão revela quando preciso. -->
+        <button class="btn-sm" id="btnToggleCfgAvancada" onclick="toggleCfgAvancada()" style="margin-top:24px;display:none;">⚙ Configuração avançada ▾</button>
+        <div id="usuariosConfigArea" style="margin-top:12px;display:none;"></div>
       </div>
 
       <!-- ══ PAGE: RELATÓRIO ══ -->

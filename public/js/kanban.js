@@ -2018,6 +2018,11 @@ document.addEventListener('kronos:page:show', (e)=>{
   const page = document.getElementById('page-'+id);
   const heading = page?.querySelector('.section-heading');
   if(!heading) return;
+  // O título pode estar dentro de um wrapper (ex.: título + botão numa linha flex).
+  // Sobe até o bloco que é filho DIRETO da página, p/ inserir o cluster ABAIXO da
+  // linha inteira do título — não dentro dela.
+  let block = heading;
+  while(block.parentElement && block.parentElement !== page) block = block.parentElement;
   page.querySelectorAll('.analysis-nav').forEach(el=>el.remove());
   const nav = document.createElement('div');
   nav.className = 'analysis-nav dash-shortcuts';
@@ -2027,7 +2032,7 @@ document.addEventListener('kronos:page:show', (e)=>{
       ? `<span class="dash-shortcut active" aria-current="page">${p.icon}${p.label}</span>`
       : `<button class="dash-shortcut" onclick="goToPage('${p.id}')" title="Abrir ${p.label}">${p.icon}${p.label}</button>`
   ).join('');
-  let anchor = heading;
+  let anchor = block;
   if(anchor.nextElementSibling?.classList.contains('section-sub')) anchor = anchor.nextElementSibling;
   anchor.insertAdjacentElement('afterend', nav);
 });

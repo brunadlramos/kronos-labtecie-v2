@@ -53,10 +53,12 @@ export async function renderUsuarios(){
   // (o coordenador analisa; a gravação segue restrita a gestora/admin pelas regras).
   // RH é SOMENTE LEITURA: pula a config editável e mostra só a visão consolidada abaixo.
   if((state.isManager || state.isAuditor) && !state.isRH){
+    const cfgBtn = document.getElementById('btnToggleCfgAvancada');
+    if(cfgBtn) cfgBtn.style.display = 'inline-flex';
     const cfgArea = document.getElementById('usuariosConfigArea');
     if(cfgArea && !cfgArea.dataset.loaded){
       cfgArea.dataset.loaded = '1';
-      await renderCfgColaboradores(cfgArea);
+      await renderCfgColaboradores(cfgArea);   // renderiza escondido; o botão revela
     }
   }
 
@@ -85,7 +87,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID, avatarsMap = nu
   if(!filtered.length)
     return `<div style="color:var(--muted);font-size:0.82rem;padding:20px 0;">Nenhum colaborador cadastrado.</div>`;
 
-  return filtered.map(([uid,u])=>{
+  const _card = ([uid,u])=>{
     const key      = u.key || uid;
     const initials = u.iniciais || (u.nome||key).slice(0,2).toUpperCase();
     const color    = u.cor || '#94A3B8';
@@ -118,8 +120,40 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID, avatarsMap = nu
         <div class="user-stat"><div class="user-stat-label">Horas no mês</div><div class="user-stat-value">${mh}h ${String(mm2).padStart(2,'0')}m</div></div>
       </div>
     </div>`;
-  }).join('');
+  };
+  // Separa ATIVOS (em destaque) de INATIVOS (seção recolhida "Inativos (N) ▾")
+  const actives   = filtered.filter(([,u]) => u.ativo !== false);
+  const inactives = filtered.filter(([,u]) => u.ativo === false);
+  let html = actives.map(_card).join('');
+  if(inactives.length){
+    const sfx = String(equipeId).replace(/[^a-zA-Z0-9_-]/g,'') || 'eq';
+    html += `<div style="grid-column:1/-1;margin-top:8px;">
+        <button class="btn-sm" id="btnInativos_${sfx}" onclick="toggleInativos('${sfx}')" style="color:var(--muted);">Inativos (${inactives.length}) ▾</button>
+      </div>
+      <div id="inativosBox_${sfx}" style="grid-column:1/-1;display:none;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">${inactives.map(_card).join('')}</div>
+      </div>`;
+  }
+  return html;
 }
+// Recolhe/expande a lista de colaboradores inativos.
+window.toggleInativos = (sfx)=>{
+  const box = document.getElementById('inativosBox_'+sfx);
+  const btn = document.getElementById('btnInativos_'+sfx);
+  if(!box) return;
+  const willOpen = box.style.display === 'none';
+  box.style.display = willOpen ? 'block' : 'none';
+  if(btn) btn.textContent = btn.textContent.replace(/[▾▴]\s*$/, willOpen ? '▴' : '▾');
+};
+// Recolhe/expande a tabela de configuração avançada (jornada/ausências/férias/senha/etc.)
+window.toggleCfgAvancada = ()=>{
+  const area = document.getElementById('usuariosConfigArea');
+  const btn  = document.getElementById('btnToggleCfgAvancada');
+  if(!area) return;
+  const willOpen = area.style.display === 'none';
+  area.style.display = willOpen ? 'block' : 'none';
+  if(btn) btn.textContent = '⚙ Configuração avançada ' + (willOpen ? '▴' : '▾');
+};
 
 async function _renderUsuariosAdmin(grid, canEdit = true){
   const equipes = state.userEquipes?.length ? state.userEquipes : Object.keys(state.EQUIPE_LABELS);
