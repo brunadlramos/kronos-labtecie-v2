@@ -2032,9 +2032,8 @@ document.addEventListener('kronos:page:show', (e)=>{
       ? `<span class="dash-shortcut active" aria-current="page">${p.icon}${p.label}</span>`
       : `<button class="dash-shortcut" onclick="goToPage('${p.id}')" title="Abrir ${p.label}">${p.icon}${p.label}</button>`
   ).join('');
-  let anchor = block;
-  if(anchor.nextElementSibling?.classList.contains('section-sub')) anchor = anchor.nextElementSibling;
-  anchor.insertAdjacentElement('afterend', nav);
+  // Sempre logo abaixo do bloco do título — mesma posição em todas as telas.
+  block.insertAdjacentElement('afterend', nav);
 });
 
 // ── AVATAR SYSTEM ─────────────────────────────────────────────────────────────

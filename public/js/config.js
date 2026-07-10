@@ -48,7 +48,7 @@ export async function renderCfgColaboradores(targetEl){
   <div class="dash-section">
     <div class="dash-section-title"><span>Configuração de Colaboradores</span></div>
     <div style="overflow-x:auto;">
-    <table class="demands-table" style="min-width:860px;">
+    <table class="demands-table cfg-colab-table" style="min-width:920px;">
       <thead><tr>
         <th>Nome</th><th>E-mail</th><th>Papel</th><th>Cor</th>
         <th title="Horas por dia útil">H/Dia</th>
@@ -158,6 +158,8 @@ window.cfgSaveColaborador = async function(uid){
   if(horasDia !== null)   state.COLLAB_HOURS[key] = {...(state.COLLAB_HOURS[key]||{}), horasDia};
   if(horasSemana !== null) state.COLLAB_HOURS[key] = {...(state.COLLAB_HOURS[key]||{}), horasSemana};
   showToast('Salvo',`${nome} atualizado.`);
+  // Atualiza os cards na hora (ex.: desativar move o card para a seção "Inativos").
+  if(window.renderUsuarios) window.renderUsuarios();
 };
 
 // Gestão define a foto de um colaborador (base64 reduzido, sem Storage)
