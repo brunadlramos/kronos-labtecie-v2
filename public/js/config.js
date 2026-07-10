@@ -60,7 +60,7 @@ export async function renderCfgColaboradores(targetEl){
         <th>Ações</th>
       </tr></thead>
       <tbody>
-        ${Object.entries(data).map(([uid,u])=>`<tr>
+        ${(()=>{ const _row = ([uid,u]) => `<tr>
           <td><input class="filter-select" value="${escH(u.nome||u.key||uid)}" id="unm_${uid}" style="width:120px;height:var(--ctrl-h)"></td>
           <td style="font-size:0.75rem;color:var(--muted);white-space:nowrap">${escH(u.email||'')}</td>
           <td><select class="filter-select" id="upl_${uid}" style="width:110px" ${_canPromover()?'':'disabled title="Apenas o coordenador altera o cargo. A gestão só ativa a curadoria."'}>
@@ -101,7 +101,17 @@ export async function renderCfgColaboradores(targetEl){
             <button class="btn-sm" onclick="openFeriasModal('${uid}')" title="Períodos de férias" style="font-size:0.7rem;">Férias${Array.isArray(u.ferias)&&u.ferias.length?` (${u.ferias.length})`:''}</button>
             ${u.email?`<button class="btn-sm" onclick="cfgResetPassword('${escH(u.email)}')" title="Enviar e-mail de redefinição de senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
           </td>
-        </tr>`).join('')}
+        </tr>`;
+          const _all = Object.entries(data);
+          const _act = _all.filter(([,u])=>u.ativo!==false);
+          const _ina = _all.filter(([,u])=>u.ativo===false);
+          let _o = _act.map(_row).join('');
+          if(_ina.length){
+            _o += `<tr><td colspan="11" style="padding:16px 10px 6px;font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);background:var(--surface2);border-bottom:1.5px solid var(--border);">Inativos (${_ina.length})</td></tr>`;
+            _o += _ina.map(_row).join('');
+          }
+          return _o;
+        })()}
       </tbody>
     </table>
     </div>

@@ -2023,7 +2023,7 @@ document.addEventListener('kronos:page:show', (e)=>{
   // linha inteira do título — não dentro dela.
   let block = heading;
   while(block.parentElement && block.parentElement !== page) block = block.parentElement;
-  page.querySelectorAll('.analysis-nav').forEach(el=>el.remove());
+  page.querySelectorAll('.analysis-nav, .analysis-nav-spacer').forEach(el=>el.remove());
   const nav = document.createElement('div');
   nav.className = 'analysis-nav dash-shortcuts';
   nav.setAttribute('aria-label','Navegação entre análises');
@@ -2032,8 +2032,20 @@ document.addEventListener('kronos:page:show', (e)=>{
       ? `<span class="dash-shortcut active" aria-current="page">${p.icon}${p.label}</span>`
       : `<button class="dash-shortcut" onclick="goToPage('${p.id}')" title="Abrir ${p.label}">${p.icon}${p.label}</button>`
   ).join('');
-  // Sempre logo abaixo do bloco do título — mesma posição em todas as telas.
-  block.insertAdjacentElement('afterend', nav);
+  // Abaixo do subtítulo (mesma posição em todas as telas). Nas telas sem subtítulo,
+  // insere um espaçador em branco pra o cluster ficar na mesma altura visual.
+  let anchor = block;
+  if(block.nextElementSibling?.classList.contains('section-sub')){
+    anchor = block.nextElementSibling;
+  } else {
+    const spacer = document.createElement('div');
+    spacer.className = 'section-sub analysis-nav-spacer';
+    spacer.setAttribute('aria-hidden','true');
+    spacer.innerHTML = '&nbsp;';
+    block.insertAdjacentElement('afterend', spacer);
+    anchor = spacer;
+  }
+  anchor.insertAdjacentElement('afterend', nav);
 });
 
 // ── AVATAR SYSTEM ─────────────────────────────────────────────────────────────

@@ -121,30 +121,10 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID, avatarsMap = nu
       </div>
     </div>`;
   };
-  // Separa ATIVOS (em destaque) de INATIVOS (seção recolhida "Inativos (N) ▾")
-  const actives   = filtered.filter(([,u]) => u.ativo !== false);
-  const inactives = filtered.filter(([,u]) => u.ativo === false);
-  let html = actives.map(_card).join('');
-  if(inactives.length){
-    const sfx = String(equipeId).replace(/[^a-zA-Z0-9_-]/g,'') || 'eq';
-    html += `<div style="grid-column:1/-1;margin-top:8px;">
-        <button class="btn-sm" id="btnInativos_${sfx}" onclick="toggleInativos('${sfx}')" style="color:var(--muted);">Inativos (${inactives.length}) ▾</button>
-      </div>
-      <div id="inativosBox_${sfx}" style="grid-column:1/-1;display:none;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">${inactives.map(_card).join('')}</div>
-      </div>`;
-  }
-  return html;
+  // Inativos NÃO aparecem como card — ficam só na tabela de config avançada
+  // (numa seção separada). Aqui a grade mostra apenas os ativos.
+  return filtered.filter(([,u]) => u.ativo !== false).map(_card).join('');
 }
-// Recolhe/expande a lista de colaboradores inativos.
-window.toggleInativos = (sfx)=>{
-  const box = document.getElementById('inativosBox_'+sfx);
-  const btn = document.getElementById('btnInativos_'+sfx);
-  if(!box) return;
-  const willOpen = box.style.display === 'none';
-  box.style.display = willOpen ? 'block' : 'none';
-  if(btn) btn.textContent = btn.textContent.replace(/[▾▴]\s*$/, willOpen ? '▴' : '▾');
-};
 // Recolhe/expande a tabela de configuração avançada (jornada/ausências/férias/senha/etc.)
 window.toggleCfgAvancada = ()=>{
   const area = document.getElementById('usuariosConfigArea');
