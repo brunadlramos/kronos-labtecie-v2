@@ -107,8 +107,8 @@ export async function renderCfgColaboradores(targetEl){
           const _ina = _all.filter(([,u])=>u.ativo===false);
           let _o = _act.map(_row).join('');
           if(_ina.length){
-            _o += `<tr><td colspan="11" style="padding:16px 10px 6px;font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);background:var(--surface2);border-bottom:1.5px solid var(--border);">Inativos (${_ina.length})</td></tr>`;
-            _o += _ina.map(_row).join('');
+            _o += `<tr class="cfg-inativos-toggle" onclick="toggleCfgInativos()" style="cursor:pointer;" title="Mostrar/ocultar inativos"><td colspan="11" style="padding:14px 10px 8px;font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);background:var(--surface2);border-bottom:1.5px solid var(--border);">Inativos (${_ina.length}) <span id="cfgInativosArrow">▾</span></td></tr>`;
+            _o += _ina.map(e => _row(e).replace('<tr>', '<tr class="cfg-inativa-row" style="display:none">')).join('');
           }
           return _o;
         })()}
@@ -170,6 +170,16 @@ window.cfgSaveColaborador = async function(uid){
   showToast('Salvo',`${nome} atualizado.`);
   // Atualiza os cards na hora (ex.: desativar move o card para a seção "Inativos").
   if(window.renderUsuarios) window.renderUsuarios();
+};
+
+// Mostra/oculta as linhas de colaboradores inativos na tabela de config avançada.
+window.toggleCfgInativos = ()=>{
+  const rows = document.querySelectorAll('.cfg-inativa-row');
+  if(!rows.length) return;
+  const willOpen = rows[0].style.display === 'none';
+  rows.forEach(r => { r.style.display = willOpen ? '' : 'none'; });
+  const arrow = document.getElementById('cfgInativosArrow');
+  if(arrow) arrow.textContent = willOpen ? '▴' : '▾';
 };
 
 // Gestão define a foto de um colaborador (base64 reduzido, sem Storage)
