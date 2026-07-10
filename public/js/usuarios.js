@@ -537,8 +537,10 @@ window.exportDemandasCSV = ()=>{
   const collabFilter=document.getElementById('filterCollabD')?.value||'';
   let data=getEntriesArray().map(([k,e])=>({...e,_key:k}));
   if(dateStart || dateEnd){
-    const startTs = dateStart ? new Date(dateStart+'T00:00:00').getTime() : 0;
-    const endTs   = dateEnd   ? new Date(dateEnd+'T23:59:59').getTime()   : Infinity;
+    // Se só um campo (de/até) for preenchido, filtra apenas aquele dia.
+    const _from = dateStart || dateEnd, _to = dateEnd || dateStart;
+    const startTs = new Date(_from+'T00:00:00').getTime();
+    const endTs   = new Date(_to  +'T23:59:59').getTime();
     data=data.filter(e=>e.startTime>=startTs && e.startTime<=endTs);
   }
   if(collabFilter)data=data.filter(e=>e.collab===collabFilter);

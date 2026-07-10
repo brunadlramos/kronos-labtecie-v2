@@ -32,9 +32,10 @@ export function renderMyHistory(){
   const searchFilter = (document.getElementById('myRecordsSearch')?.value||'').toLowerCase().trim();
   const fromVal = document.getElementById('myRecordsDateFrom')?.value;
   const toVal   = document.getElementById('myRecordsDateTo')?.value;
-
-  const fromTs = fromVal ? new Date(fromVal + 'T00:00:00').getTime() : null;
-  const toTs   = toVal   ? new Date(toVal   + 'T23:59:59').getTime() : null;
+  // Se só um campo (de/até) for preenchido, filtra apenas aquele dia.
+  const _from = fromVal || toVal, _to = toVal || fromVal;
+  const fromTs = _from ? new Date(_from + 'T00:00:00').getTime() : null;
+  const toTs   = _to   ? new Date(_to   + 'T23:59:59').getTime() : null;
 
   // Sempre mostra os registros do próprio usuário logado
   const collabKey = state.currentCollabKey;
@@ -230,8 +231,10 @@ export function renderDemandas(resetPage=false){
   const searchFilter=(document.getElementById('filterSearchD')?.value||'').toLowerCase().trim();
   let data=getEntriesArray().map(([k,e])=>({...e,_key:k}));
   if(dateStart || dateEnd){
-    const startTs = dateStart ? new Date(dateStart+'T00:00:00').getTime() : 0;
-    const endTs   = dateEnd   ? new Date(dateEnd+'T23:59:59').getTime()   : Infinity;
+    // Se só um campo (de/até) for preenchido, filtra apenas aquele dia.
+    const _from = dateStart || dateEnd, _to = dateEnd || dateStart;
+    const startTs = new Date(_from+'T00:00:00').getTime();
+    const endTs   = new Date(_to  +'T23:59:59').getTime();
     data=data.filter(e=>{
       const ts = e.startTime;
       return ts >= startTs && ts <= endTs;
