@@ -913,6 +913,8 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .dash-shortcut:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--orange-border);color:var(--orange);}
 .dash-shortcut:active{transform:translateY(0) scale(.98);}
 .dash-shortcut svg{width:16px;height:16px;flex-shrink:0;}
+.dash-shortcut.active{background:var(--orange-light);border-color:var(--orange-border);color:var(--orange);cursor:default;box-shadow:none;}
+.dash-shortcut.active:hover{transform:none;box-shadow:none;color:var(--orange);}
 .dash-section-title{font-size:0.72rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
 
 /* ── KANBAN ── */
