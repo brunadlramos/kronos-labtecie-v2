@@ -634,6 +634,7 @@
           <span style="font-size:0.75rem;color:var(--muted);font-weight:600;white-space:nowrap;">Até</span>
           <input type="date" class="filter-select" id="myRecordsDateTo" onchange="window.renderMyHistory()" style="height:34px;">
           <button class="btn-sm" onclick="document.getElementById('myRecordsDateFrom').value='';document.getElementById('myRecordsDateTo').value='';document.getElementById('myRecordsSearch').value='';window.renderMyHistory()" style="height:34px;" aria-label="Limpar filtros">✕ Limpar</button>
+          <button class="btn-sm" id="btnLoadFullHistory" onclick="window.loadFullMyHistory()" style="height:34px;" title="Por padrão carregamos seus registros mais recentes. Clique para buscar todo o histórico.">Carregar histórico completo</button>
         </div>
         <div class="entries-list" id="entriesList2"></div>
       </div>

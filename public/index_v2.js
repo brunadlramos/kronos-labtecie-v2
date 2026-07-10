@@ -110,6 +110,9 @@ const MS_PER_DAY        = 86400000;
 const MS_PER_HOUR       = 3600000;
 const MS_PER_WEEK       = 604800000;
 const ENTRIES_LIVE_DAYS = 180;
+// Escalabilidade #1: cap na carga do colaborador (~1 ano). Evita baixar todos os
+// registros de sempre; histórico completo fica sob demanda (window.loadFullMyHistory).
+const COLLAB_ENTRIES_LIMIT = 1500;
 const DEFAULT_DAILY_GOAL_HOURS = 9;
 // LATE_CUTOFF_HOUR/MIN → js/timer.js
 
@@ -348,7 +351,9 @@ function startDataListeners(){
   const _isPlainCollab = !state.isManager && !state.isAuditor && !!state.currentCollabKey;
   let _entriesQuery;
   if(_isPlainCollab){
-    _entriesQuery = query(entriesRef, orderByChild('collab'), equalTo(state.currentCollabKey));
+    _entriesQuery = state._loadFullHistory
+      ? query(entriesRef, orderByChild('collab'), equalTo(state.currentCollabKey))
+      : query(entriesRef, orderByChild('collab'), equalTo(state.currentCollabKey), limitToLast(COLLAB_ENTRIES_LIMIT));
   } else {
     const _liveStart = Date.now() - ENTRIES_LIVE_DAYS * MS_PER_DAY;
     _entriesQuery = query(entriesRef, orderByChild('startTime'), startAt(_liveStart));
@@ -403,7 +408,7 @@ function startDataListeners(){
   },(err)=>console.warn('[V2] capDia:', err));
 
   if(_unsubNotifs) _unsubNotifs();
-  const _notifsQuery = query(notifsRef, orderByChild('to'), equalTo(state.currentCollabKey));
+  const _notifsQuery = query(notifsRef, orderByChild('to'), equalTo(state.currentCollabKey), limitToLast(50));   // Escalabilidade #4: cap de notificações (últimas 50)
   _unsubNotifs = onValue(_notifsQuery,(snap)=>{
     setAllNotifs(snap.val()||{});
   },(err)=>console.warn('[V2] notifs:', err));
@@ -460,6 +465,18 @@ function startDataListeners(){
     renderDebounced();
   }, err => console.warn('[V2] folgas:', err));
 }
+
+// Escalabilidade #1: traz o histórico COMPLETO do colaborador sob demanda (sem o
+// cap de ${COLLAB_ENTRIES_LIMIT}). Sem regressão: por padrão carrega o recente,
+// e quem precisa do passado clica no botão em "Meus Registros".
+window.loadFullMyHistory = () => {
+  if(state._loadFullHistory) return;
+  state._loadFullHistory = true;
+  const btn = document.getElementById('btnLoadFullHistory');
+  if(btn){ btn.disabled = true; btn.textContent = 'Carregando histórico…'; }
+  startDataListeners();
+  showToast('Histórico completo', 'Trazendo todos os seus registros…');
+};
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 // // timer state → app.* in state.js (timer.js) → migrated to app.* (state.js)
