@@ -428,7 +428,7 @@ export function renderDashCards() {
     const gIsCapped = isCapped(gk, tk);
     const gCapped = gIsCapped && me.count > 0;
     const gDisp = gCapped ? capValue(me.percTotal) : me.percTotal;
-    const gCapBtn = (isSelf && canCap)
+    const gCapBtn = canCap
       ? `<button class="cap-toggle ${gIsCapped?'on':''}" title="${gIsCapped?'Piso de 100% ativo — clique para reverter':'Garantir piso de 100% neste dia'}" onclick="window.toggleCapDia('${gk}','${tk}',event)">100%${gIsCapped?' ✓':''}</button>`
       : (gCapped ? `<span style="font-size:0.58rem;font-weight:800;color:var(--orange);" title="Piso de 100% ativo">✓ 100%</span>` : '');
     const tag = isSelf
