@@ -997,12 +997,15 @@
       <!-- ══ PAGE: USUÁRIOS ══ -->
       <div class="page" id="page-usuarios">
         <div class="equipe-filter-bar" id="equipe-filter-usuarios" aria-label="Selecionar equipe"></div>
-        <div id="approvalSection"></div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
           <h2 class="section-heading" style="margin-bottom:0;">Gestão de Colaboradores</h2>
           <button class="btn-sm success" id="btnNovoColab" onclick="openNovoColabModal()" style="display:none;">+ Novo Colaborador</button>
         </div>
         <div class="section-sub">Ative ou inative colaboradores. Registros históricos são sempre preservados.</div>
+        <!-- Aprovações pendentes: bloco de atenção, agora ABAIXO do título (o injetor
+             do cluster de fluxo ancora no subtítulo, então fica entre eles).
+             Margem só quando há conteúdo (#approvalSection:not(:empty) no CSS). -->
+        <div id="approvalSection"></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:8px;" id="usuariosGrid"></div>
 
         <!-- Configuração de jornada — visível apenas para gestora -->

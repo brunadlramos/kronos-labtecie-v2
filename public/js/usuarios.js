@@ -169,10 +169,7 @@ export function renderApprovals(){
     .sort((a,b) => a.requestedAt - b.requestedAt);
 
   if(!pending.length){
-    section.innerHTML = `<div class="dash-section" style="margin-bottom:24px;">
-      <div class="dash-section-title"><span>Aprovações Pendentes</span></div>
-      <div style="text-align:center;color:var(--muted);font-size:0.82rem;padding:20px 0;">Nenhuma aprovação pendente ✓</div>
-    </div>`;
+    section.innerHTML = '';   // Sem pendências: bloco some (página limpa, foco nos cards).
     return;
   }
 
