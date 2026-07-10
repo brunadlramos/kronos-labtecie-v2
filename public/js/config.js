@@ -115,10 +115,6 @@ export async function renderCfgColaboradores(targetEl){
       </tbody>
     </table>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:10px;line-height:1.6;">
-      ${ICONS.warning} <strong>H/Dia</strong> define a meta diária individual. Deixe vazio para usar a meta global configurada em Metas.
-      Útil para estagiários, meio período ou jornadas reduzidas.
-    </p>
   </div>`;
 }
 
