@@ -20,7 +20,7 @@
 // index_v2.js (este arquivo) — orquestra boot, auth, listeners e renderPage
 
 // Firebase SDK — funções usadas diretamente em index_v2.js
-import { getAuth, onAuthStateChanged }
+import { getAuth, onAuthStateChanged, updatePassword }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, push, set, update, get, remove, child, onValue, query, orderByChild, startAt, limitToLast, equalTo }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
@@ -494,6 +494,89 @@ let _unsubFolgas = null;
 
 state.viewDate.setHours(0,0,0,0); state.projDate.setHours(0,0,0,0);
 
+// ── FORÇAR CRIAÇÃO DE NOVA SENHA NO 1º ACESSO ─────────────────────────────────
+// Muitos colaboradores ainda usavam a senha padrão (0123456). A partir desta data,
+// todo usuário (exceto admin) precisa criar uma senha pessoal no primeiro acesso.
+// Marcamos quem já trocou em /pwdReset/<uid>. Para DESATIVAR no futuro: FORCE_PWD_RESET_SINCE = 0.
+const FORCE_PWD_RESET_SINCE = new Date(2026, 6, 12, 0, 0, 0).getTime(); // 12/07/2026 00:00 (mês 6 = julho)
+const PWD_PADRAO = '0123456';
+
+async function _enforcePasswordReset(user){
+  if(!FORCE_PWD_RESET_SINCE || Date.now() < FORCE_PWD_RESET_SINCE) return true; // ainda inativo
+  let papel = null;
+  try { papel = (await get(ref(db, `usuarios/${user.uid}/papel`))).val(); } catch(e){ /* sem perfil: bootV2 trata */ }
+  if(papel === 'admin') return true;               // admin isento
+  let resetAt = 0;
+  try { resetAt = (await get(ref(db, `pwdReset/${user.uid}`))).val() || 0; } catch(e){}
+  if(resetAt >= FORCE_PWD_RESET_SINCE) return true; // já criou senha após o corte
+  return await _showPwdResetGate(user);
+}
+
+// Overlay bloqueante: cria nova senha via updatePassword (usuário acabou de autenticar).
+// Resolve true = pode seguir pro boot; false = saiu/redirecionou.
+// opts.demo = true → só demonstra a tela/validação, NÃO troca senha (para validação no preview).
+function _showPwdResetGate(user, opts){
+  const demo = !!(opts && opts.demo);
+  return new Promise(resolve => {
+    const gate = document.getElementById('pwdGate');
+    const loading = document.getElementById('appLoading');
+    if(!gate){ resolve(true); return; }            // fail-open: sem overlay, não trava o acesso
+    if(loading) loading.classList.add('hidden');
+    gate.style.display = 'flex';
+
+    const $ = id => document.getElementById(id);
+    const npEl = $('pwdGateNew'), cpEl = $('pwdGateConfirm'), errEl = $('pwdGateErr'), btn = $('pwdGateBtn');
+    const showErr = m => { if(errEl){ errEl.textContent = m; errEl.style.display = m ? 'block' : 'none'; } };
+
+    const showChk = $('pwdGateShow');
+    if(showChk) showChk.onchange = ()=>{ const t = showChk.checked ? 'text':'password'; if(npEl) npEl.type=t; if(cpEl) cpEl.type=t; };
+
+    const submit = async ()=>{
+      showErr('');
+      const np = (npEl?.value||''), cp = (cpEl?.value||'');
+      if(np.length < 6){ showErr('A senha precisa ter pelo menos 6 caracteres.'); npEl?.focus(); return; }
+      if(np === PWD_PADRAO){ showErr('Escolha uma senha diferente da padrão (0123456).'); npEl?.focus(); return; }
+      if(np !== cp){ showErr('As senhas não coincidem.'); cpEl?.focus(); return; }
+      if(demo){ gate.style.display='none'; alert('✅ Demonstração: em produção, a nova senha seria salva agora e você entraria no Kronos normalmente.'); resolve(true); return; }
+      btn.disabled = true; btn.textContent = 'Salvando…';
+      try{
+        await updatePassword(user, np);
+        await set(ref(db, `pwdReset/${user.uid}`), Date.now());
+        gate.style.display = 'none';
+        if(loading) loading.classList.remove('hidden');
+        resolve(true);
+      }catch(e){
+        const code = e.code || '';
+        btn.disabled = false; btn.textContent = 'Salvar e continuar';
+        if(code === 'auth/requires-recent-login'){
+          showErr('Por segurança, entre novamente para criar sua senha. Redirecionando…');
+          setTimeout(async ()=>{ try{ await signOut(auth); }catch(_){} window.location.href='login_v2.html'; }, 1800);
+          resolve(false);
+        } else if(code === 'auth/weak-password'){
+          showErr('Senha fraca. Use pelo menos 6 caracteres.');
+        } else {
+          showErr('Não foi possível salvar a senha. Verifique sua conexão e tente novamente.');
+          console.error('[pwdGate]', code, e.message);
+        }
+      }
+    };
+
+    if(btn) btn.onclick = submit;
+    if(cpEl) cpEl.onkeydown = e => { if(e.key==='Enter') submit(); };
+    const logoutBtn = $('pwdGateLogout');
+    if(logoutBtn) logoutBtn.onclick = async ()=>{
+      if(demo){ gate.style.display='none'; resolve(true); return; }   // demo: só fecha
+      try{ await signOut(auth); }catch(_){} window.location.href='login_v2.html';
+    };
+    setTimeout(()=>npEl?.focus(), 100);
+  });
+}
+
+// Modo demonstração do gate de senha (validação no preview): abra com ?pwdgate=demo
+if(new URLSearchParams(location.search).get('pwdgate') === 'demo'){
+  document.addEventListener('DOMContentLoaded', ()=>_showPwdResetGate(null, { demo:true }));
+}
+
 // ── AUTH + BOOT V2 ────────────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
   if(!user){
@@ -504,6 +587,10 @@ onAuthStateChanged(auth, async user => {
     return;
   }
   state.currentUser = user;
+
+  // Força criação de senha pessoal no 1º acesso (exceto admin) — bloqueia o boot até concluir
+  const pwdOk = await _enforcePasswordReset(user);
+  if(!pwdOk) return;
 
   // Boot: identifica equipe, carrega config dinamicamente
   const booted = await bootV2(user);

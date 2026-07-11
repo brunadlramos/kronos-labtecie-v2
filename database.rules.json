@@ -16,6 +16,15 @@
       ".write": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'"
     },
 
+    "pwdReset": {
+      ".read": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin')",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isNumber()"
+      }
+    },
+
     "error_logs": {
       ".read": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'",
       ".indexOn": ["ts", "level", "resolved"],

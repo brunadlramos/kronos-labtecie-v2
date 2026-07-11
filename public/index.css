@@ -126,6 +126,49 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
   color:var(--muted);font-weight:500;letter-spacing:0.04em;
 }
 
+/* ── GATE: FORÇAR NOVA SENHA NO 1º ACESSO ── */
+.pwd-gate{
+  position:fixed;inset:0;z-index:100000;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  background:var(--bg);
+}
+.pwd-gate-card{
+  width:100%;max-width:380px;
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:32px 28px;text-align:center;
+  box-shadow:0 18px 50px rgba(0,0,0,0.18);
+}
+.pwd-gate-icon{font-size:2rem;margin-bottom:10px;}
+.pwd-gate-card h2{font-size:1.15rem;font-weight:800;color:var(--text);margin:0 0 8px;}
+.pwd-gate-card p{font-size:0.85rem;color:var(--muted);line-height:1.45;margin:0 0 20px;}
+.pwd-gate-input{
+  width:100%;box-sizing:border-box;margin-bottom:10px;
+  padding:11px 13px;font-size:0.9rem;
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);
+}
+.pwd-gate-input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light);}
+.pwd-gate-show{
+  display:flex;align-items:center;gap:6px;justify-content:flex-start;
+  font-size:0.78rem;color:var(--muted);margin:2px 0 14px;cursor:pointer;
+}
+.pwd-gate-show input{cursor:pointer;}
+.pwd-gate-err{
+  font-size:0.8rem;color:var(--danger);background:var(--danger-bg);border:1px solid var(--danger-border);
+  border-radius:8px;padding:8px 10px;margin-bottom:12px;text-align:left;
+}
+.pwd-gate-btn{
+  width:100%;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;
+  background:var(--orange);color:#fff;border:none;border-radius:10px;
+  transition:filter 0.15s ease;
+}
+.pwd-gate-btn:hover{filter:brightness(1.05);}
+.pwd-gate-btn:disabled{opacity:0.6;cursor:default;}
+.pwd-gate-logout{
+  width:100%;margin-top:10px;padding:8px;font-size:0.8rem;font-weight:600;cursor:pointer;
+  background:none;color:var(--muted);border:none;
+}
+.pwd-gate-logout:hover{color:var(--text);text-decoration:underline;}
+
 /* Layout começa invisível — JS remove a classe hidden do #appLoading e faz o layout aparecer */
 .layout{display:flex;min-height:100vh;opacity:0;transition:opacity 0.3s ease;}
 .layout.ready{opacity:1;}

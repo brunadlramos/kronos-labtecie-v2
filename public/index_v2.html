@@ -40,6 +40,21 @@
   </div>
 </div>
 
+<!-- ── GATE: FORÇAR CRIAÇÃO DE NOVA SENHA NO 1º ACESSO ──────────────────────── -->
+<div id="pwdGate" class="pwd-gate" role="dialog" aria-modal="true" aria-labelledby="pwdGateTitle" style="display:none;">
+  <div class="pwd-gate-card">
+    <div class="pwd-gate-icon" aria-hidden="true">🔒</div>
+    <h2 id="pwdGateTitle">Crie sua nova senha</h2>
+    <p>Por segurança, defina uma senha pessoal para continuar. Você usará esta senha nos próximos acessos ao Kronos.</p>
+    <input type="password" id="pwdGateNew" class="pwd-gate-input" placeholder="Nova senha (mín. 6 caracteres)" autocomplete="new-password" aria-label="Nova senha">
+    <input type="password" id="pwdGateConfirm" class="pwd-gate-input" placeholder="Confirme a nova senha" autocomplete="new-password" aria-label="Confirme a nova senha">
+    <label class="pwd-gate-show"><input type="checkbox" id="pwdGateShow"> Mostrar senha</label>
+    <div id="pwdGateErr" class="pwd-gate-err" role="alert" style="display:none;"></div>
+    <button id="pwdGateBtn" class="pwd-gate-btn">Salvar e continuar</button>
+    <button id="pwdGateLogout" class="pwd-gate-logout">Sair</button>
+  </div>
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- MODAL -->
