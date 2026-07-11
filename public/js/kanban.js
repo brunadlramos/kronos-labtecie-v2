@@ -1153,13 +1153,25 @@ window.openKanbanDetail=(key)=>{
   const _kdm = document.getElementById('kanbanDetailModal'); _kdm?.classList.add('open'); if(_kdm) trapFocus(_kdm);
   // ✅ FIX: listeners adicionados após abrir — evita problema de onclick em módulos ES
 
-  // Botão Arquivar — oculto para cards já arquivados; abre modal de escolha para os demais
+  // Botão Arquivar — para cards já arquivados vira "Desarquivar" (só gestora)
   const archiveBtn = document.getElementById('kdArchiveBtn');
   if(archiveBtn){
-    archiveBtn.style.display = isArchived ? 'none' : '';
+    // arquivado: só mostra p/ gestora (única que pode desarquivar); ativo: sempre
+    archiveBtn.style.display = (isArchived && !state.isManager) ? 'none' : '';
     const newArchBtn = archiveBtn.cloneNode(true);
     archiveBtn.parentNode.replaceChild(newArchBtn, archiveBtn);
-    if(!isArchived){
+    if(isArchived){
+      // Card no Arquivo Morto/Lixeira → botão vira "Desarquivar"
+      newArchBtn.style.borderColor = 'rgba(245,158,11,0.4)';
+      newArchBtn.style.color = 'var(--orange)';
+      const _txt = [...newArchBtn.childNodes].find(n=>n.nodeType===3 && n.textContent.trim());
+      if(_txt) _txt.textContent = ' Desarquivar'; else newArchBtn.append(' Desarquivar');
+      newArchBtn.addEventListener('click', ()=>{
+        if(!key){ showToast('Erro','Card não identificado. Feche e abra novamente.'); return; }
+        closeKanbanDetail();
+        unarchiveKanbanCard(key);
+      });
+    } else {
       newArchBtn.addEventListener('click', ()=>{
         if(!key){ showToast('Erro','Card não identificado. Feche e abra novamente.'); return; }
         openArchiveChoiceModal(key);
