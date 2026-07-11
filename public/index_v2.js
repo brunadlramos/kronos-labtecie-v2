@@ -498,7 +498,7 @@ state.viewDate.setHours(0,0,0,0); state.projDate.setHours(0,0,0,0);
 // Muitos colaboradores ainda usavam a senha padrão (0123456). A partir desta data,
 // todo usuário (exceto admin) precisa criar uma senha pessoal no primeiro acesso.
 // Marcamos quem já trocou em /pwdReset/<uid>. Para DESATIVAR no futuro: FORCE_PWD_RESET_SINCE = 0.
-const FORCE_PWD_RESET_SINCE = new Date(2026, 6, 12, 0, 0, 0).getTime(); // 12/07/2026 00:00 (mês 6 = julho)
+const FORCE_PWD_RESET_SINCE = new Date(2026, 6, 11, 0, 0, 0).getTime(); // 11/07/2026 00:00 (mês 6 = julho)
 const PWD_PADRAO = '0123456';
 
 async function _enforcePasswordReset(user){
