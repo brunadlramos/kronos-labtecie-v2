@@ -895,21 +895,23 @@ window.addKanbanComment = async()=>{
   const key=window._detailCardKey; if(!key) return;
   const input=document.getElementById('kdCommentInput');
   const text=input?.value.trim(); if(!text) return;
-  const card=state.kanbanCards[key]; if(!card) return;
+  const {card, ref:tRef, arq}=_cardAndRef(key); if(!card) return;
   const comments={...(card.comments||{})};
   const newKey='c'+Date.now();
   comments[newKey]={text,by:state.currentCollabKey,ts:Date.now()};
-  await set(child(kanbanRef, key),{...card,comments});
+  await set(child(tRef, key),{...card,comments});
+  if(arq) state.arquivoCards[key]={...card,comments};   // sem listener no arquivo: atualiza cache
   input.value='';
   renderKanbanComments({...card,comments});
 };
 
 window.deleteKanbanComment = async(commentKey)=>{
   const key=window._detailCardKey; if(!key) return;
-  const card=state.kanbanCards[key]; if(!card) return;
+  const {card, ref:tRef, arq}=_cardAndRef(key); if(!card) return;
   const comments={...(card.comments||{})};
   delete comments[commentKey];
-  await set(child(kanbanRef, key),{...card,comments});
+  await set(child(tRef, key),{...card,comments});
+  if(arq) state.arquivoCards[key]={...card,comments};
   renderKanbanComments({...card,comments});
 };
 
@@ -1439,6 +1441,8 @@ window.renderMeusIndicadores = ()=>{
   if(!section) return;
   if(!state.avaliacaoAtiva){ section.style.display='none'; return; }
   const key = state.currentCollabKey;
+  // Escalabilidade #2: indicadores agregam o arquivo morto (lazy) — garante carregado e re-renderiza
+  if(!state._arquivoLoaded && window._ensureArquivoLoaded){ window._ensureArquivoLoaded().then(()=>window.renderMeusIndicadores?.()); return; }
   const all = _indGetAllCards().filter(c=>c.assignee===key && c.ajuste_diagramacao);
   section.style.display = '';
   const resumoEl = document.getElementById('mdAvaliacoesResumo');
@@ -1518,6 +1522,8 @@ window.renderIndicadores = ()=>{
   const tipoF  = document.getElementById('indTipoFilter')?.value||'diagramacao';
   const field  = tipoF==='curadoria'?'ajuste_curadoria':'ajuste_diagramacao';
 
+  // Escalabilidade #2: indicadores agregam o arquivo morto (lazy) — garante carregado e re-renderiza
+  if(!state._arquivoLoaded && window._ensureArquivoLoaded){ window._ensureArquivoLoaded().then(()=>window.renderIndicadores?.()); return; }
   const all = _indGetAllCards();
 
   // Filtro de mês por updatedAt
@@ -1868,15 +1874,12 @@ window.kdAddLinkRow = ()=>{
 // Salva links imediatamente com os valores fornecidos
 window.kdSaveLinksNow = async(links)=>{
   const key = state.currentKanbanDetailId; if(!key) return;
-  const card = state.kanbanCards[key]; if(!card) return;
+  const {card, ref:tRef, arq} = _cardAndRef(key); if(!card) return;
   const clean = links.filter(l=>l && l.trim());
   try{
-    await set(child(kanbanRef, key),{
-      ...card,
-      links: clean,
-      modifiedBy: state.currentUser?.email||'desconhecido',
-      updatedAt: Date.now()
-    });
+    const updated = { ...card, links: clean, modifiedBy: state.currentUser?.email||'desconhecido', updatedAt: Date.now() };
+    await set(child(tRef, key), updated);
+    if(arq) state.arquivoCards[key] = updated;   // sem listener no arquivo: atualiza cache
     kdRenderLinks(clean);
     showToast('Link salvo','Link adicionado com sucesso.');
   }catch(err){
@@ -2203,6 +2206,60 @@ function getModForDate(ts){
   return state.MODS.find(mod=>mod.months?.includes(m)) || state.MODS.find(mod=>mod.id!=='TRELLO') || state.MODS[0];
 }
 
+// ── Escalabilidade #2/#3 — arquivo morto em nó separado + ano ──────────────────
+// O nó `kanban` guarda só os cards ATIVOS do board (+lixeira efêmera). Os arquivados
+// vivem no nó `arquivo`, carregado sob demanda (lazy). Cada arquivado tem `archiveYear`.
+function _archiveYearOf(card){
+  const ts = card.archivedAt || card.createdAt || Date.now();
+  return new Date(ts).getFullYear();
+}
+// module base (sem ano): trello→TRELLO, MODn preservado, resto→arquivo_geral
+function _baseModule(card){
+  if(card.importedFrom==='trello') return 'TRELLO';
+  if(typeof card.module==='string' && /^MOD\d$/.test(card.module)) return card.module;
+  return 'arquivo_geral';
+}
+// move um card ATIVO (kanban) → nó arquivo (arquiva de verdade)
+async function moveCardToArquivo(key, cardData){
+  const data = {...cardData, archived:true, archiveYear:_archiveYearOf(cardData), module:_baseModule(cardData)};
+  await set(child(arquivoRef, key), data);
+  await remove(child(kanbanRef, key));
+  state.arquivoCards[key] = data;
+  delete state.kanbanCards[key];
+  return data;
+}
+// move um card do nó arquivo → kanban (desarquiva)
+async function moveCardToKanban(key, cardData){
+  const data = {...cardData};
+  delete data.archiveYear;
+  await set(child(kanbanRef, key), data);
+  await remove(child(arquivoRef, key));
+  state.kanbanCards[key] = data;
+  delete state.arquivoCards[key];
+  return data;
+}
+// Localiza um card e o ref correto (kanban ativo vs arquivo morto no nó separado).
+function _cardAndRef(key){
+  if(state.kanbanCards[key]) return { card: state.kanbanCards[key], ref: kanbanRef, arq: false };
+  const a = state.arquivoCards?.[key] || window._arquivoCards?.[key];
+  if(a) return { card: a, ref: arquivoRef, arq: true };
+  return { card: null, ref: kanbanRef, arq: false };
+}
+// Lazy-load do arquivo morto: um único get() sob demanda, cacheado em state.
+let _arquivoLoadPromise = null;
+window._ensureArquivoLoaded = function(force){
+  if(state._arquivoLoaded && !force) return Promise.resolve(state.arquivoCards);
+  if(_arquivoLoadPromise && !force) return _arquivoLoadPromise;
+  _arquivoLoadPromise = get(arquivoRef).then(snap=>{
+    state.arquivoCards = snap.val()||{};
+    window._arquivoCards = state.arquivoCards;
+    state._arquivoLoaded = true;
+    _arquivoLoadPromise = null;
+    return state.arquivoCards;
+  }).catch(e=>{ _arquivoLoadPromise=null; console.warn('[arquivo lazy-load]', e); return {}; });
+  return _arquivoLoadPromise;
+};
+
 async function checkArquivoMigration(){
   // Usa cache em state para evitar leitura Firebase a cada chamada
   let dias = 15, colunaDestino = 'auto', colunaKanban = 'concluido';
@@ -2226,13 +2283,15 @@ async function checkArquivoMigration(){
   const cutoff = Date.now() - dias * 24 * 60 * 60 * 1000;
   for(const [key,card] of Object.entries(state.kanbanCards)){
     if(card.column === colunaKanban && card.updatedAt && card.updatedAt < cutoff && !card.archived){
+      const now = Date.now();
       let modId;
       if(colunaDestino === 'auto') {
-        modId = getModForDate(card.createdAt||Date.now()).id;
+        modId = getModForDate(card.createdAt||now).id;
       } else {
         modId = colunaDestino;
       }
-      await set(child(kanbanRef, key),{...card,archived:true,archivedAt:Date.now(),module:modId});
+      // Escalabilidade #2: move p/ o nó arquivo (moveCardToArquivo aplica archiveYear/module base)
+      await moveCardToArquivo(key, {...card, archivedAt:now, module:modId});
     }
   }
 }
@@ -2244,6 +2303,8 @@ window._updateArquivoDropdown = (query)=>{
   if(!drop) return;
   const q = (query||'').toLowerCase().trim();
   if(!q){ drop.classList.remove('visible'); return; }
+  // Escalabilidade #2: a busca varre o arquivo morto → garante carregado (uma vez) e re-executa
+  if(!state._arquivoLoaded){ window._ensureArquivoLoaded().then(()=>window._updateArquivoDropdown(query)); return; }
 
   const matches = getArchivedCards()
     .filter(c=>(c.name||'').toLowerCase().includes(q))
@@ -2283,34 +2344,54 @@ window._goToArquivoCard = (key, name)=>{
 };
 
 export function initArquivoListener() {
-  return onValue(arquivoRef,(snap)=>{ state.arquivoCards=snap.val()||{}; window._arquivoCards=state.arquivoCards; if(document.getElementById('page-arquivo')?.classList.contains('active')) renderArquivo(); });
+  // Escalabilidade #2: o arquivo morto NÃO é mais carregado no boot (nem listener persistente).
+  // Carrega sob demanda via _ensureArquivoLoaded (ao abrir a aba Arquivo ou buscar no Kanban).
+  // Aqui só reseta o cache ao (re)inicializar a equipe.
+  state.arquivoCards = {};
+  window._arquivoCards = {};
+  state._arquivoLoaded = false;
+  _arquivoLoadPromise = null;
+  return ()=>{};
 }
 
 function getArchivedCards(){
-  const archived = Object.entries(state.kanbanCards).filter(([,c])=>c.archived).map(([k,c])=>({...c,_key:k}));
-  return [...archived,...Object.entries(state.arquivoCards).map(([k,c])=>({...c,_key:k}))];
+  // Arquivados vivem SÓ no nó arquivo (lazy). Lixeira (efêmera) segue no kanban e é lida à parte.
+  return Object.entries(state.arquivoCards).map(([k,c])=>({...c,_key:k}));
 }
 
 window.renderArquivo = ()=>{
   const board = document.getElementById('arquivoBoard'); if(!board) return;
+  // Escalabilidade #2: garante o arquivo carregado sob demanda (lazy) antes de renderizar
+  if(!state._arquivoLoaded){
+    board.innerHTML = `<div style="padding:40px;color:var(--muted);font-size:0.85rem;">Carregando arquivo morto…</div>`;
+    window._ensureArquivoLoaded().then(()=>window.renderArquivo());
+    return;
+  }
   _refreshArquivoTypeFilter();
   const modFilter    = document.getElementById('arquivoModFilter')?.value||'';
   const collabFilter = document.getElementById('arquivoCollabFilter')?.value||'';
   const typeFilter   = document.getElementById('arquivoTypeFilter')?.value||'';
   const search       = (document.getElementById('arquivoSearch')?.value||'').toLowerCase().trim();
-  // Deep archive: cards com > 60 dias no arquivo não são renderizados por padrão
-  const DEEP_ARCHIVE_MS = 60 * 24 * 60 * 60 * 1000;
-  const showOld = document.getElementById('arquivoShowOld')?.dataset.show === '1';
-  const cutoffDeep = Date.now() - DEEP_ARCHIVE_MS;
   const allRaw = getArchivedCards();
-  const all = showOld ? allRaw : allRaw.filter(c=>(c.archivedAt||c.updatedAt||0) >= cutoffDeep);
-  const hiddenCount = allRaw.length - all.length;
-  // Atualiza label do botão com contagem oculta
-  const btnOld = document.getElementById('arquivoShowOld');
-  if(btnOld && hiddenCount > 0 && !showOld){
-    btnOld.textContent = `🗃 Mostrar cards antigos (+60 dias) — ${hiddenCount} oculto${hiddenCount>1?'s':''}`;
+  const _yearOf = c => c.archiveYear || new Date(c.archivedAt||c.createdAt||Date.now()).getFullYear();
+  // Escalabilidade #3: eixo ANO — popula o seletor e escopa o arquivo pelo ano escolhido
+  // (substitui o antigo esconde-cards-antigos de 60 dias, que ocultava tudo silenciosamente).
+  const years = [...new Set(allRaw.map(_yearOf))].sort((a,b)=>b-a);
+  const yearSel = document.getElementById('arquivoYearFilter');
+  if(yearSel){
+    const cur = yearSel.value;
+    yearSel.innerHTML = years.length ? years.map(y=>`<option value="${y}">${y}</option>`).join('') : `<option value="">—</option>`;
+    if(cur && years.includes(+cur)) yearSel.value = cur;
+    else if(years.length) yearSel.value = String(years[0]);
   }
-  const mods = modFilter ? state.MODS.filter(m=>m.id===modFilter) : state.MODS;
+  const selYear = yearSel && yearSel.value ? +yearSel.value : (years[0]||null);
+  const all = allRaw.filter(c=>_yearOf(c)===selYear);
+  // Coluna TRELLO virtual quando houver cards importados do Trello (config da equipe pode não ter TRELLO)
+  const hasTrello = all.some(c=>c.importedFrom==='trello');
+  const baseMods = modFilter ? state.MODS.filter(m=>m.id===modFilter) : state.MODS;
+  const mods = (hasTrello && !state.MODS.some(m=>m.id==='TRELLO') && !modFilter)
+    ? [{id:'TRELLO',label:'Importados do Trello',color:'#0052CC'}, ...baseMods]
+    : baseMods;
   cleanLixeira();
 
   const lixeiraCards = Object.entries(state.kanbanCards)
@@ -2442,7 +2523,9 @@ window.kArchiveToMorto = async(key, modId)=>{
   const now = Date.now();
   const hist = [...(card.history||[]),{action:'Arquivado no Arquivo Morto',modulo:targetMod,by:state.currentCollabKey,ts:now}];
   try{
-    await set(child(kanbanRef,key),{...card,archived:true,archivedAt:now,module:targetMod,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    // Escalabilidade #2: move p/ o nó arquivo (moveCardToArquivo aplica archiveYear/module base)
+    await moveCardToArquivo(key,{...card,archivedAt:now,module:targetMod,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    window.renderArquivo?.();
     showToast('Arquivado','Card movido para o Arquivo Morto.');
   }catch(e){
     showToast('Erro','Falha ao arquivar. Tente novamente.');
@@ -2484,9 +2567,9 @@ window.arquivarConcluidosTrello = async()=>{
         by: state.currentCollabKey||state.currentUser?.email||'gestora',
         ts: now
       }];
-      await set(child(kanbanRef, key),{
+      // Escalabilidade #2: move p/ o nó arquivo
+      await moveCardToArquivo(key, {
         ...card,
-        archived: true,
         archivedAt: now,
         module: 'TRELLO',
         history: hist,
@@ -2520,7 +2603,9 @@ window.clearLixeira = async()=>{
 // ✅ NOVO: Desarquivar card — escolher coluna destino
 window.unarchiveKanbanCard = async(key)=>{
   if(!state.isManager){ showToast('Sem permissão','Apenas a gestora pode desarquivar.'); return; }
-  const card = state.kanbanCards[key]; if(!card) return;
+  // Card pode estar na lixeira (nó kanban) ou no arquivo morto (nó arquivo, lazy)
+  const fromArquivo = !!state.arquivoCards?.[key];
+  const card = state.kanbanCards[key] || state.arquivoCards?.[key]; if(!card) return;
   const cols = state.K_COLS.filter(c=>c.id!=='lixeira'&&c.id!=='concluido');
   const opts = cols.map((c,i)=>`${i+1}. ${c.label}`).join('\n');
   const resp = prompt(`Para qual coluna deseja mover "${card.name||'card'}"?\n\n${opts}\n\nDigite o número:`);
@@ -2529,9 +2614,13 @@ window.unarchiveKanbanCard = async(key)=>{
   if(isNaN(idx)||idx<0||idx>=cols.length){ showToast('Inválido','Número de coluna inválido.'); return; }
   const destCol = cols[idx].id;
   const now = Date.now();
-  const hist = [...(card.history||[]),{action:'unarchived',from:'lixeira',to:destCol,by:state.currentUser?.email||'?',at:now}];
+  const hist = [...(card.history||[]),{action:'unarchived',from:card.column||(fromArquivo?'arquivo':'lixeira'),to:destCol,by:state.currentUser?.email||'?',at:now}];
+  const restored = {...card,column:destCol,archived:false,archivedAt:null,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'};
   try{
-    await set(child(kanbanRef, key),{...card,column:destCol,archived:false,archivedAt:null,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    // Escalabilidade #2: se veio do arquivo morto, MOVE de volta p/ o kanban; se era lixeira, atualiza no lugar
+    if(fromArquivo) await moveCardToKanban(key, restored);
+    else await set(child(kanbanRef, key), restored);
+    window.renderArquivo?.();
     showToast('Card restaurado',`"${escH(card.name||'card')}" movido para ${cols[idx].label}.`);
   }catch(err){
     showToast('Erro','Falha ao desarquivar. Tente novamente.');

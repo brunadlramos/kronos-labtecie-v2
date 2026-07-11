@@ -635,10 +635,12 @@ function _avBuscarCard(nomeBusca, colabKey){
 }
 
 // ── Passo 1: Analisar ────────────────────────────────────────────────────────
-window.avAnalisar = ()=>{
+window.avAnalisar = async ()=>{
   if(!state.isManager){ showToast('Sem permissão','Exclusivo da gestora.'); return; }
   const texto = document.getElementById('avTextoInput')?.value||'';
   if(!texto.trim()){ showToast('⚠️ Vazio','Cole os registros antes de analisar.'); return; }
+  // Escalabilidade #2: o arquivo morto é lazy — garante carregado p/ casar avaliações de arquivados
+  await window._ensureArquivoLoaded?.();
 
   _avRegistros = _avParseTexto(texto);
   if(!_avRegistros.length){ showToast('⚠️ Nenhum registro','Verifique o formato — cada bloco deve começar com REGISTRO!'); return; }

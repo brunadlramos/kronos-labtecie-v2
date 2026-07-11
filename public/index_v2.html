@@ -1245,6 +1245,7 @@
         <!-- Filtros à ESQUERDA; engrenagem isolada à DIREITA (mesmo padrão do Fluxo de Demandas) -->
         <div class="kanban-search-bar" style="justify-content:space-between;margin:16px 0 12px;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-start;flex:1;">
+            <select id="arquivoYearFilter" class="filter-select" onchange="window.renderArquivo()" style="min-width:100px;" title="Ano do arquivo"></select>
             <select id="arquivoModFilter" class="filter-select" onchange="window.renderArquivo()" style="min-width:160px;">
               <option value="">Todos os módulos</option>
             </select>
