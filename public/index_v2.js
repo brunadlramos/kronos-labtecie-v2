@@ -790,6 +790,19 @@ window.toggleCapDiaAll = async () => {
 // específico (folgas/{iso}/{collabKey}). getDailyGoalMs zera a meta conforme o caso.
 const FOLGA_TIPOS  = { feriado:'Feriado', atestado:'Atestado', dayoff:'Day off' };
 const FOLGA_CORES  = { feriado:'#f15a24', atestado:'#ef4444', dayoff:'#3b82f6' };
+
+// Intervalo de datas (feriados/folgas por período — ex.: atestado de 14 dias).
+// Trabalha em horário LOCAL ao meio-dia p/ evitar drift de fuso/DST.
+function _isoToLocalDate(iso){ const [y,m,d]=String(iso).split('-').map(Number); return new Date(y, m-1, d, 12, 0, 0); }
+function _dateToIso(dt){ const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), d=String(dt.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
+function _isoRange(startIso, endIso){
+  const out=[]; const cur=_isoToLocalDate(startIso), end=_isoToLocalDate(endIso);
+  let guard=0;
+  while(cur<=end && guard++<400){ out.push(_dateToIso(cur)); cur.setDate(cur.getDate()+1); }
+  return out;
+}
+function _fmtIsoBR(iso){ const [y,m,d]=String(iso).split('-'); return `${d}/${m}/${y}`; }
+
 window.openHolidaysModal = () => {
   let modal = document.getElementById('holidaysModal');
   if(!modal){
@@ -800,13 +813,23 @@ window.openHolidaysModal = () => {
     document.body.appendChild(modal);
   }
   const canEdit = state.isManager;
-  // Lista unificada: feriados da equipe (todos) + folgas/atestados por colaborador
-  const rows = [];
-  Object.entries(state.allHolidays||{}).forEach(([iso,h])=>rows.push({iso, scope:'all', type:h.type||'feriado', label:h.label||'Feriado'}));
+  // Lista unificada: feriados da equipe (todos) + folgas/atestados por colaborador.
+  // Registros lançados como INTERVALO compartilham um `grp` → exibidos/removidos como um bloco só.
+  const flat = [];
+  Object.entries(state.allHolidays||{}).forEach(([iso,h])=>flat.push({iso, scope:'all', type:h.type||'feriado', label:h.label||'Feriado', grp:h.grp||null}));
   Object.entries(state.allFolgas||{}).forEach(([iso,byCollab])=>{
-    Object.entries(byCollab||{}).forEach(([ck,f])=> f && rows.push({iso, scope:'collab', collab:ck, type:f.type||'atestado', label:f.label||'Folga'}));
+    Object.entries(byCollab||{}).forEach(([ck,f])=> f && flat.push({iso, scope:'collab', collab:ck, type:f.type||'atestado', label:f.label||'Folga', grp:f.grp||null}));
   });
-  rows.sort((a,b)=> a.iso.localeCompare(b.iso) || a.scope.localeCompare(b.scope) || (a.collab||'').localeCompare(b.collab||''));
+  const groups = {}, rows = [];
+  flat.forEach(r=>{
+    if(r.grp){ const k=r.grp+'|'+(r.collab||''); (groups[k]=groups[k]||[]).push(r); }
+    else rows.push({...r, startIso:r.iso, endIso:r.iso, count:1});
+  });
+  Object.values(groups).forEach(g=>{
+    g.sort((a,b)=>a.iso.localeCompare(b.iso));
+    rows.push({...g[0], startIso:g[0].iso, endIso:g[g.length-1].iso, count:g.length});
+  });
+  rows.sort((a,b)=> a.startIso.localeCompare(b.startIso) || a.scope.localeCompare(b.scope) || (a.collab||'').localeCompare(b.collab||''));
   const collabOpts = Object.keys(state.COLLABS||{}).filter(k=>isActive(k))
     .sort((a,b)=>(state.COLLABS[a].label||a).localeCompare(state.COLLABS[b].label||b))
     .map(k=>`<option value="${escH(k)}">${escH(state.COLLABS[k].label||k)}</option>`).join('');
@@ -821,7 +844,8 @@ window.openHolidaysModal = () => {
       </div>
       ${canEdit ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div><label for="holidayDateInput" style="${fldLbl};display:block;">Data</label><input id="holidayDateInput" type="date" style="${fld}"></div>
+        <div><label for="holidayDateInput" style="${fldLbl};display:block;">Data início</label><input id="holidayDateInput" type="date" style="${fld}"></div>
+        <div><label for="holidayEndInput" style="${fldLbl};display:block;">Data fim <span style="text-transform:none;font-weight:600;opacity:0.7;">(opcional)</span></label><input id="holidayEndInput" type="date" style="${fld}"></div>
         <div><label for="holidayTypeInput" style="${fldLbl};display:block;">Tipo</label><select id="holidayTypeInput" style="${fld}">${tipoOpts}</select></div>
         <div><label for="holidayScopeInput" style="${fldLbl};display:block;">Abrangência</label>
           <select id="holidayScopeInput" style="${fld}" onchange="document.getElementById('holidayCollabWrap').style.display=this.value==='collab'?'block':'none'">
@@ -841,14 +865,18 @@ window.openHolidaysModal = () => {
       ${rows.length ? rows.map(r=>{
         const cor = FOLGA_CORES[r.type]||'#94A3B8';
         const quem = r.scope==='all' ? 'Toda a equipe' : (state.COLLABS[r.collab]?.label||r.collab);
-        const onRemove = r.scope==='all' ? `window.removeHoliday('${escH(r.iso)}')` : `window.removeFolga('${escH(r.iso)}','${escH(r.collab)}')`;
+        const isRange = r.count>1;
+        const onRemove = isRange
+          ? (r.scope==='all' ? `window.removeHolidayGroup('${escH(r.grp)}')` : `window.removeFolgaGroup('${escH(r.grp)}','${escH(r.collab)}')`)
+          : (r.scope==='all' ? `window.removeHoliday('${escH(r.startIso)}')` : `window.removeFolga('${escH(r.startIso)}','${escH(r.collab)}')`);
+        const periodo = isRange ? `${_fmtIsoBR(r.startIso)} → ${_fmtIsoBR(r.endIso)} · ${r.count} dias` : _fmtIsoBR(r.startIso);
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;gap:10px;">
           <div style="min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <span style="font-size:0.58rem;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:100px;background:${cor}22;color:${cor};border:1px solid ${cor}55;">${FOLGA_TIPOS[r.type]||r.type}</span>
               <span style="font-size:0.82rem;font-weight:700;">${escH(r.label)}</span>
             </div>
-            <div style="font-size:0.68rem;color:var(--muted);margin-top:3px;">${r.iso} · ${escH(quem)}</div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:3px;">${periodo} · ${escH(quem)}</div>
           </div>
           ${canEdit ? `<button onclick="${onRemove}" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:6px;padding:3px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">Remover</button>` : ''}
         </div>`;
@@ -857,21 +885,31 @@ window.openHolidaysModal = () => {
 };
 
 window.addHoliday = async () => {
-  const iso = document.getElementById('holidayDateInput')?.value;
-  if(!iso){ showToast('Data obrigatória','Selecione uma data.'); return; }
+  const startIso = document.getElementById('holidayDateInput')?.value;
+  if(!startIso){ showToast('Data obrigatória','Selecione a data de início.'); return; }
+  const endIso = document.getElementById('holidayEndInput')?.value || startIso;   // fim vazio = só o dia de início
+  if(endIso < startIso){ showToast('Datas invertidas','A data de fim não pode ser anterior à de início.'); return; }
+  const isos = _isoRange(startIso, endIso);
+  if(isos.length > 366){ showToast('Período muito longo','Lance no máximo 366 dias por vez.'); return; }
   const type  = document.getElementById('holidayTypeInput')?.value || 'feriado';
   const scope = document.getElementById('holidayScopeInput')?.value || 'all';
   const label = (document.getElementById('holidayLabelInput')?.value.trim() || FOLGA_TIPOS[type] || 'Feriado').slice(0,50);
+  const isRange = isos.length > 1;
   const meta = { label, type, setBy: state.currentUser?.email||'', setAt: Date.now() };
+  // grp: liga os dias de um mesmo lançamento p/ exibir/remover como bloco (só quando é intervalo)
+  if(isRange) meta.grp = `${scope}_${type}_${startIso}_${Date.now()}`;
   try {
     if(scope==='collab'){
       const collab = document.getElementById('holidayCollabInput')?.value;
       if(!collab){ showToast('Colaborador obrigatório','Selecione o colaborador.'); return; }
-      await set(child(folgasRef, `${iso}/${collab}`), meta);
-      showToast('✅ Registrado', `${label} de ${state.COLLABS[collab]?.label||collab} em ${iso}.`);
+      const updates = {}; isos.forEach(iso=>updates[`${iso}/${collab}`] = meta);
+      await update(folgasRef, updates);
+      const nome = state.COLLABS[collab]?.label||collab;
+      showToast('✅ Registrado', isRange ? `${label} de ${nome}: ${isos.length} dias (${_fmtIsoBR(startIso)} → ${_fmtIsoBR(endIso)}).` : `${label} de ${nome} em ${_fmtIsoBR(startIso)}.`);
     } else {
-      await set(child(holidaysRef, iso), meta);
-      showToast('✅ Registrado', `${label} (${iso}) para toda a equipe.`);
+      const updates = {}; isos.forEach(iso=>updates[iso] = meta);
+      await update(holidaysRef, updates);
+      showToast('✅ Registrado', isRange ? `${label}: ${isos.length} dias (${_fmtIsoBR(startIso)} → ${_fmtIsoBR(endIso)}) p/ a equipe.` : `${label} (${_fmtIsoBR(startIso)}) p/ toda a equipe.`);
     }
     setTimeout(()=>window.openHolidaysModal(), 200);
   } catch(e){ showToast('Erro','Não foi possível salvar. Verifique sua conexão.'); }
@@ -887,10 +925,35 @@ window.removeHoliday = async (iso) => {
 };
 
 window.removeFolga = async (iso, collab) => {
-  if(!confirm(`Remover a folga/atestado de ${state.COLLABS[collab]?.label||collab} em ${iso}?`)) return;
+  if(!confirm(`Remover a folga/atestado de ${state.COLLABS[collab]?.label||collab} em ${_fmtIsoBR(iso)}?`)) return;
   try {
     await remove(child(folgasRef, `${iso}/${collab}`));
-    showToast('Registro removido', iso);
+    showToast('Registro removido', _fmtIsoBR(iso));
+    setTimeout(()=>window.openHolidaysModal(), 200);
+  } catch(e){ showToast('Erro','Não foi possível remover.'); }
+};
+
+// Remoção em bloco de um lançamento por intervalo (mesmo grp).
+window.removeHolidayGroup = async (grp) => {
+  const isos = Object.entries(state.allHolidays||{}).filter(([,h])=>h && h.grp===grp).map(([iso])=>iso);
+  if(!isos.length) return;
+  if(!confirm(`Remover este registro de ${isos.length} dia(s) (toda a equipe)?`)) return;
+  try {
+    const updates = {}; isos.forEach(iso=>updates[iso] = null);
+    await update(holidaysRef, updates);
+    showToast('Registro removido', `${isos.length} dia(s).`);
+    setTimeout(()=>window.openHolidaysModal(), 200);
+  } catch(e){ showToast('Erro','Não foi possível remover.'); }
+};
+
+window.removeFolgaGroup = async (grp, collab) => {
+  const isos = Object.entries(state.allFolgas||{}).filter(([,byC])=>byC && byC[collab] && byC[collab].grp===grp).map(([iso])=>iso);
+  if(!isos.length) return;
+  if(!confirm(`Remover este registro de ${isos.length} dia(s) de ${state.COLLABS[collab]?.label||collab}?`)) return;
+  try {
+    const updates = {}; isos.forEach(iso=>updates[`${iso}/${collab}`] = null);
+    await update(folgasRef, updates);
+    showToast('Registro removido', `${isos.length} dia(s).`);
     setTimeout(()=>window.openHolidaysModal(), 200);
   } catch(e){ showToast('Erro','Não foi possível remover.'); }
 };
