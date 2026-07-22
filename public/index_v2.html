@@ -264,6 +264,7 @@
       <div><div class="modal-label" style="margin-bottom:5px;">Etapa atual</div><div id="kdColumn" style="font-weight:800;color:var(--orange);font-size:0.88rem;"></div></div>
       <div><div class="modal-label" style="margin-bottom:5px;">Horas registradas</div><div id="kdHours" style="font-family:var(--mono);font-size:0.95rem;font-weight:500;color:var(--success);"></div></div>
       <div><div class="modal-label" style="margin-bottom:5px;">Criado em</div><div id="kdCreated" style="font-family:var(--mono);font-size:0.75rem;color:var(--muted);"></div></div>
+      <div><div class="modal-label" style="margin-bottom:5px;">Concluído em</div><div id="kdConcludedWrap" style="display:flex;align-items:center;gap:6px;"><span id="kdConcluded" style="font-family:var(--mono);font-size:0.75rem;color:var(--muted);"></span><button id="kdEditConcludedBtn" onclick="kdEditConcluded()" title="Editar data de conclusão" aria-label="Editar data de conclusão" style="display:none;background:none;border:none;color:var(--orange);cursor:pointer;font-size:0.85rem;padding:0 2px;line-height:1;">✏️</button></div></div>
     </div>
     <!-- ✅ Links inline — visível e editável para todos diretamente no detalhe -->
     <div id="kdLinksSection" style="margin-bottom:14px;">
@@ -724,8 +725,9 @@
               </div>
               <select id="dashDemandasCollab" class="filter-select" onchange="renderDashDemandasWeek()" style="font-size:0.78rem;">
                 <option value="">Todos os colaboradores</option>
-                
+
               </select>
+              <button class="btn-sm success" onclick="exportDashDemandasExcel()" title="Baixar as demandas exibidas em uma planilha Excel (.xlsx)" style="font-size:0.78rem;">⬇ Exportar Excel</button>
             </div>
           </div>
           <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
@@ -775,7 +777,7 @@
             <select class="filter-select" id="filterProjD" onchange="renderDemandas(true)">
               <option value="">Todos os projetos</option>
             </select>
-            <button class="btn-sm success" onclick="exportDemandasCSV()">⬇ CSV</button>
+            <button class="btn-sm success" onclick="exportDemandasExcel()" title="Baixar todas as demandas em uma planilha Excel (.xlsx)">⬇ Exportar Excel</button>
           </div>
         </div>
 
@@ -1094,6 +1096,7 @@
 
         <h2 class="section-heading" id="meuDashHeading">Meu Dashboard</h2>
         <div class="section-sub" id="meuDashSub">Seus indicadores da semana</div>
+        <button id="btnMeuFeriados" class="btn-sm" onclick="openHolidaysModal()" title="Registrar folga ou atestado (passa por aprovação da gestão)" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:18px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Solicitar ausência / atestado</button>
 
         <!-- Linha 1: Cards de resumo do dia -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
@@ -1277,6 +1280,17 @@
           <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
             <button class="btn-icon-tool" id="btnArquivoCols" onclick="openArquivoColsModal()" title="Configurar Arquivo Morto" aria-label="Configurar Arquivo Morto" style="display:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
           </div>
+        </div>
+        <!-- Barra de seleção múltipla (só gestora) — selecionar cards e mover para uma coluna -->
+        <div id="arquivoBulkBar" style="display:none;align-items:center;gap:10px;padding:9px 14px;margin:0 0 12px;background:var(--surface2,#f8f4f1);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
+          <span style="font-size:0.8rem;font-weight:700;color:var(--text);">Seleção:</span>
+          <span id="aBulkCount" style="font-size:0.82rem;font-weight:700;color:var(--orange);">Nenhum selecionado</span>
+          <button class="btn-sm" onclick="aClearSelection()">Limpar seleção</button>
+          <span style="flex:1;min-width:8px;"></span>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--muted);white-space:nowrap;">Mover para:
+            <select id="aBulkModSelect" class="filter-select" style="font-size:0.8rem;min-width:150px;"></select>
+          </label>
+          <button class="btn-sm success" id="aBulkMoveBtn" onclick="aMoveSelected()">Mover selecionados</button>
         </div>
         <!-- F8: estado de "mostrar cards antigos" — controle agora vive dentro da config (engrenagem) -->
         <button id="arquivoShowOld" data-show="0" style="display:none;" onclick="this.dataset.show=this.dataset.show==='1'?'0':'1';window.renderArquivo()"></button>

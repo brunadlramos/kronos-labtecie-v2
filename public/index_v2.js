@@ -804,6 +804,8 @@ function _isoRange(startIso, endIso){
 function _fmtIsoBR(iso){ const [y,m,d]=String(iso).split('-'); return `${d}/${m}/${y}`; }
 
 window.openHolidaysModal = () => {
+  // Colaborador comum → modal de SOLICITAÇÃO (vai p/ aprovação da gestão), não o painel de gestão.
+  if(!state.isManager && !state.isAuditor && state.currentCollabKey) return window._openFolgaRequestModal();
   let modal = document.getElementById('holidaysModal');
   if(!modal){
     modal = document.createElement('div');
@@ -956,6 +958,84 @@ window.removeFolgaGroup = async (grp, collab) => {
     showToast('Registro removido', `${isos.length} dia(s).`);
     setTimeout(()=>window.openHolidaysModal(), 200);
   } catch(e){ showToast('Erro','Não foi possível remover.'); }
+};
+
+// ── COLABORADOR: solicitar a própria ausência (vai p/ aprovação da gestão) ────
+// O colaborador NÃO escreve em /folgas (regra só permite gestão). Ele cria um
+// approvalRequest type:'folga'; ao aprovar, a gestora é quem grava a folga.
+window._openFolgaRequestModal = async () => {
+  const meKey = state.currentCollabKey;
+  let modal = document.getElementById('holidaysModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'holidaysModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:1300;display:flex;align-items:center;justify-content:center;';
+    modal.onclick = e => { if(e.target===modal) modal.remove(); };
+    document.body.appendChild(modal);
+  }
+  // minhas solicitações pendentes (busca única ao abrir)
+  let pend = [];
+  try {
+    const snap = await get(query(approvalRequestsRef, orderByChild('requestedBy'), equalTo(meKey)));
+    pend = Object.values(snap.val()||{}).filter(r=>r.type==='folga' && r.status==='pending');
+  } catch(e){ /* silencioso */ }
+  pend.sort((a,b)=>(a.payload?.startIso||'').localeCompare(b.payload?.startIso||''));
+  // minhas ausências já aprovadas (do state.allFolgas), agrupadas por intervalo
+  const flat=[]; Object.entries(state.allFolgas||{}).forEach(([iso,byC])=>{ if(byC && byC[meKey]) flat.push({iso, ...byC[meKey]}); });
+  const groups={}, aprov=[];
+  flat.forEach(r=>{ if(r.grp){ (groups[r.grp]=groups[r.grp]||[]).push(r); } else aprov.push({...r,startIso:r.iso,endIso:r.iso,count:1}); });
+  Object.values(groups).forEach(g=>{ g.sort((a,b)=>a.iso.localeCompare(b.iso)); aprov.push({...g[0],startIso:g[0].iso,endIso:g[g.length-1].iso,count:g.length}); });
+  aprov.sort((a,b)=>b.startIso.localeCompare(a.startIso));
+
+  const fldLbl='font-size:0.65rem;font-weight:800;color:var(--muted);margin-bottom:4px;text-transform:uppercase;';
+  const fld='width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:0.82rem;';
+  const chip = (txt,cor,bg) => `<span style="font-size:0.55rem;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:100px;background:${bg};color:${cor};">${txt}</span>`;
+  const cardRow = (chipHtml,label,per) => `<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;">${chipHtml}<div style="min-width:0;"><div style="font-size:0.8rem;font-weight:700;">${escH(label)}</div><div style="font-size:0.66rem;color:var(--muted);margin-top:2px;">${per}</div></div></div>`;
+  const periodo = (a,b,n) => a===b ? _fmtIsoBR(a) : `${_fmtIsoBR(a)} → ${_fmtIsoBR(b)} · ${n} dias`;
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:24px;width:460px;max-width:95vw;max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:1rem;font-weight:800;">Solicitar ausência</div>
+        <button onclick="document.getElementById('holidaysModal').remove()" aria-label="Fechar" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);"><span aria-hidden="true">✕</span></button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:14px;line-height:1.45;">Registre sua ausência para que a meta desses dias seja zerada. <strong>A solicitação passa pela aprovação da gestão.</strong> O atestado em si deve ser anexado no sistema do RH.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div><label for="folgaReqStart" style="${fldLbl};display:block;">Data início</label><input id="folgaReqStart" type="date" style="${fld}"></div>
+        <div><label for="folgaReqEnd" style="${fldLbl};display:block;">Data fim <span style="text-transform:none;font-weight:600;opacity:0.7;">(opcional)</span></label><input id="folgaReqEnd" type="date" style="${fld}"></div>
+        <div><label for="folgaReqTipo" style="${fldLbl};display:block;">Tipo</label><select id="folgaReqTipo" style="${fld}"><option value="atestado">Atestado</option><option value="dayoff">Day off</option></select></div>
+        <div><label for="folgaReqObs" style="${fldLbl};display:block;">Motivo (opcional)</label><input id="folgaReqObs" type="text" maxlength="60" placeholder="Ex: consulta médica" style="${fld}"></div>
+      </div>
+      <button onclick="window.requestFolga()" style="width:100%;background:var(--orange);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:0.82rem;cursor:pointer;margin-bottom:18px;">Solicitar aprovação</button>
+      ${pend.length ? `<div style="font-size:0.65rem;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Aguardando aprovação</div>
+        ${pend.map(r=>{const p=r.payload||{};return cardRow(chip('Pendente','#92400E','#FEF3C7'), p.label||FOLGA_TIPOS[p.tipo]||'Ausência', periodo(p.startIso,p.endIso,(p.isos||[]).length));}).join('')}` : ''}
+      <div style="font-size:0.65rem;font-weight:800;color:var(--muted);text-transform:uppercase;margin:14px 0 8px;">Minhas ausências aprovadas</div>
+      ${aprov.length ? aprov.map(r=>{const cor=FOLGA_CORES[r.type]||'#94A3B8';return cardRow(chip(FOLGA_TIPOS[r.type]||r.type,cor,cor+'22'), r.label||'Ausência', periodo(r.startIso,r.endIso,r.count));}).join('') : '<div style="text-align:center;color:var(--muted);font-size:0.76rem;padding:10px;">Nenhuma ausência aprovada ainda.</div>'}
+    </div>`;
+};
+
+window.requestFolga = async () => {
+  const meKey = state.currentCollabKey;
+  if(!meKey){ showToast('Ops','Sua conta não está vinculada a um colaborador.'); return; }
+  const startIso = document.getElementById('folgaReqStart')?.value;
+  if(!startIso){ showToast('Data obrigatória','Selecione a data de início.'); return; }
+  const endIso = document.getElementById('folgaReqEnd')?.value || startIso;
+  if(endIso < startIso){ showToast('Datas invertidas','A data de fim não pode ser anterior à de início.'); return; }
+  const isos = _isoRange(startIso, endIso);
+  if(isos.length > 366){ showToast('Período muito longo','No máximo 366 dias por solicitação.'); return; }
+  const tipo = document.getElementById('folgaReqTipo')?.value || 'atestado';
+  const obs = (document.getElementById('folgaReqObs')?.value||'').trim().slice(0,60);
+  const label = obs || FOLGA_TIPOS[tipo] || 'Ausência';
+  const now = Date.now();
+  const grp = `folgareq_${tipo}_${startIso}_${now}`;
+  try {
+    await push(approvalRequestsRef, {
+      type:'folga',
+      payload:{ tipo, label, isos, startIso, endIso, grp, collab: meKey },
+      requestedBy: meKey, requestedByEmail: state.currentUser?.email||'', requestedAt: now, status:'pending'
+    });
+    showToast('✅ Solicitação enviada', isos.length>1 ? `${label}: ${isos.length} dias — aguardando aprovação da gestão.` : `${label} (${_fmtIsoBR(startIso)}) — aguardando aprovação da gestão.`);
+    setTimeout(()=>window._openFolgaRequestModal(), 250);
+  } catch(e){ showToast('Erro','Não foi possível enviar. Verifique sua conexão.'); console.error('[requestFolga]',e); }
 };
 
 // ── HELPERS — importados de js/utils.js ──────────────────────────────────────

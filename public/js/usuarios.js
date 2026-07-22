@@ -8,7 +8,7 @@ import {
   dKey, todayKey, getWeekDays, celebrate
 } from './utils.js';
 import {
-  db, usersRef, entriesRef, approvalRequestsRef, notifsRef,
+  db, usersRef, entriesRef, approvalRequestsRef, notifsRef, folgasRef,
   EQUIPE_ID, _getSecondaryAuth, createUserWithEmailAndPassword, signOut
 } from './firebase-refs.js';
 import { EQUIPE_LABELS, loadCoordenacoes } from './auth.js';
@@ -18,6 +18,7 @@ import {
 import {
   calcDay, calcAmount, getEntriesArray, getEntriesForDay, isActive, getCollabAvatar, avatarInner
 } from './dashboard.js';
+import { downloadXlsx } from './xlsx-lite.js';
 import { renderCfgColaboradores } from './config.js';
 import { showToast, setSyncStatus } from './ui.js';
 import { registrarLog } from './log.js';
@@ -194,6 +195,27 @@ export function renderApprovals(){
     </div>
     ${pending.map(r => {
       const col = state.COLLABS[r.requestedBy] || {label: r.requestedBy||r.requestedByEmail||'?', initials:'?', color:'#94A3B8'};
+      // Solicitação de AUSÊNCIA (folga/atestado) — card próprio; ao aprovar, zera a meta dos dias.
+      if(r.type==='folga'){
+        const fp = r.payload || {};
+        const _br = iso => { const [y,m,d]=String(iso||'').split('-'); return d?`${d}/${m}/${y}`:'?'; };
+        const cor = ({feriado:'#f15a24',atestado:'#ef4444',dayoff:'#3b82f6'})[fp.tipo] || '#94A3B8';
+        const tLab = ({atestado:'Atestado',dayoff:'Day off',feriado:'Feriado'})[fp.tipo] || fp.tipo || 'Ausência';
+        const nd = (fp.isos||[]).length || 1;
+        const per = fp.startIso===fp.endIso ? _br(fp.startIso) : `${_br(fp.startIso)} → ${_br(fp.endIso)} · ${nd} dias`;
+        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="width:32px;height:32px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0">${col.initials||'?'}</div>
+          <div style="flex:1;min-width:160px;">
+            <div style="font-size:0.82rem;font-weight:800">${escH(fp.label||tLab)}</div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:3px;">${escH(col.label)} · ${per}</div>
+            <div style="font-size:0.65rem;margin-top:2px;color:${cor};font-weight:700;">🌴 Ausência (${escH(tLab)}) — zera a meta dos dias</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="approveEntry('${r._key}', event)" style="padding:6px 16px;border-radius:8px;border:none;background:var(--success);color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;" aria-label="Aprovar ausência de ${escH(col.label)}">Aprovar</button>
+            <button onclick="rejectEntry('${r._key}')"  style="padding:6px 16px;border-radius:8px;border:none;background:var(--danger);color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;" aria-label="Recusar ausência de ${escH(col.label)}">Recusar</button>
+          </div>
+        </div>`;
+      }
       const p = r.payload || {};
       const proj = state.PROJECTS[p.project] || {label: p.project||'?'};
       const dateStr = p.startTime ? new Date(p.startTime).toLocaleDateString('pt-BR') : '?';
@@ -218,6 +240,19 @@ export function renderApprovals(){
 window.approveEntry = async (key, ev) => {
   const req = state.allApprovals[key]; if(!req) return;
   try {
+    // Solicitação de AUSÊNCIA: grava a folga em cada dia (a gestora tem permissão) e zera a meta.
+    if(req.type === 'folga'){
+      const p = req.payload || {};
+      const collab = req.requestedBy || p.collab;
+      const meta = { label: p.label||'Ausência', type: p.tipo||'atestado', setBy: state.currentUser?.email||'', setAt: Date.now(), grp: p.grp||null, viaSolicitacao: true };
+      const updates = {}; (p.isos||[]).forEach(iso => updates[`${iso}/${collab}`] = meta);
+      await update(folgasRef, updates);
+      await remove(child(approvalRequestsRef, key));
+      if(collab) await push(notifsRef, { to: collab, title:'Ausência aprovada', msg:`Sua ausência (${p.label||'atestado'}) foi aprovada — a meta desses dias foi zerada.`, from: state.currentCollabKey, ts: Date.now(), read:false });
+      showToast('Aprovado ✓','Ausência lançada — meta ajustada.');
+      celebrate(ev?.clientX ?? window.innerWidth/2, ev?.clientY ?? window.innerHeight*0.4);
+      return;
+    }
     // Suporta formato V2 (entryKey) e V1 legado (state.editingId)
     const targetKey = req.entryKey || req.editingId || null;
     if(req.type === 'delete'){
@@ -256,7 +291,9 @@ window.rejectEntry = async key => {
       await push(notifsRef,{
         to: req.requestedBy,
         title: 'Solicitação recusada',
-        msg: `Sua solicitação referente ao registro de ${dateStr} foi recusada pela gestora.`,
+        msg: req.type==='folga'
+          ? 'Sua solicitação de ausência foi recusada pela gestão.'
+          : `Sua solicitação referente ao registro de ${dateStr} foi recusada pela gestora.`,
         from: state.currentCollabKey, ts: Date.now(), read: false
       });
     }
@@ -541,7 +578,12 @@ window.exportDemandasCSV = ()=>{
     const _from = dateStart || dateEnd, _to = dateEnd || dateStart;
     const startTs = new Date(_from+'T00:00:00').getTime();
     const endTs   = new Date(_to  +'T23:59:59').getTime();
-    data=data.filter(e=>e.startTime>=startTs && e.startTime<=endTs);
+    // Inclui a demanda se o início OU qualquer período (reinício em outro dia) cair no intervalo.
+    data=data.filter(e=>{
+      if(e.startTime>=startTs && e.startTime<=endTs) return true;
+      if(Array.isArray(e.periods) && e.periods.some(p=>p.startTime>=startTs && p.startTime<=endTs)) return true;
+      return false;
+    });
   }
   if(collabFilter)data=data.filter(e=>e.collab===collabFilter);
   const header='Data,Colaborador,Tarefa,Projeto,Início,Fim,Duração,% Amount,Tags,Observação';
@@ -554,6 +596,67 @@ function dlCSV(content,filename){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);
 }
+
+// Exporta o Relat\u00F3rio de Demandas para Excel (.xlsx). Respeita os mesmos filtros
+// da tela (data, colaborador, projeto, busca) e inclui TODAS as demandas de todas
+// as p\u00E1ginas \u2014 n\u00E3o s\u00F3 a p\u00E1gina vis\u00EDvel.
+window.exportDemandasExcel = ()=>{
+  const dateStart   = document.getElementById('filterDateStart')?.value||'';
+  const dateEnd     = document.getElementById('filterDateEnd')?.value||'';
+  const collabFilter= document.getElementById('filterCollabD')?.value||'';
+  const projFilter  = document.getElementById('filterProjD')?.value||'';
+  const searchFilter= (document.getElementById('filterSearchD')?.value||'').toLowerCase().trim();
+
+  let data=getEntriesArray().map(([k,e])=>({...e,_key:k}));
+  if(dateStart || dateEnd){
+    // Se s\u00F3 um campo (de/at\u00E9) for preenchido, filtra apenas aquele dia.
+    const _from = dateStart || dateEnd, _to = dateEnd || dateStart;
+    const startTs = new Date(_from+'T00:00:00').getTime();
+    const endTs   = new Date(_to  +'T23:59:59').getTime();
+    // Inclui a demanda se o início OU qualquer período (reinício em outro dia) cair no intervalo.
+    data=data.filter(e=>{
+      if(e.startTime>=startTs && e.startTime<=endTs) return true;
+      if(Array.isArray(e.periods) && e.periods.some(p=>p.startTime>=startTs && p.startTime<=endTs)) return true;
+      return false;
+    });
+  }
+  if(collabFilter) data=data.filter(e=>e.collab===collabFilter);
+  if(projFilter)   data=data.filter(e=>e.project===projFilter);
+  if(searchFilter){
+    data=data.filter(e=>{
+      const task=(e.task||'').toLowerCase();
+      const collab=(state.COLLABS[e.collab]?.label||e.collab||'').toLowerCase();
+      const proj=(state.PROJECTS[e.project]?.label||e.project||'').toLowerCase();
+      const obs=(e.obs||'').toLowerCase();
+      return task.includes(searchFilter)||collab.includes(searchFilter)||proj.includes(searchFilter)||obs.includes(searchFilter);
+    });
+  }
+  data.sort((a,b)=>b.startTime-a.startTime);
+
+  if(!data.length){ showToast('Nada para exportar','Nenhuma demanda encontrada com os filtros atuais.'); return; }
+
+  const header=['Data','Colaborador','Tarefa','Projeto','In\u00EDcio','Fim','Dura\u00E7\u00E3o','% Amount','Tags','Observa\u00E7\u00E3o'];
+  const rows=data.map(e=>{
+    const col =state.COLLABS[e.collab] ||{label:e.collab};
+    const proj=state.PROJECTS[e.project]||{label:e.project};
+    const amt =parseFloat(calcAmount(e.project,e.duration,e.peso).toFixed(2));
+    return [
+      new Date(e.startTime).toLocaleDateString('pt-BR'),
+      col.label||e.collab||'',
+      e.task||'',
+      proj.label||e.project||'',
+      fmtTime(e.startTime),
+      fmtTime(e.endTime),
+      fmtDur(e.duration),
+      isFinite(amt)?amt:0,
+      (e.tags||[]).join('; '),
+      e.obs||''
+    ];
+  });
+
+  downloadXlsx(`demandas_kronos_${new Date().toISOString().slice(0,10)}.xlsx`, 'Demandas', [header,...rows]);
+  showToast('Excel gerado', `${data.length} demanda${data.length!==1?'s':''} exportada${data.length!==1?'s':''}.`);
+};
 
 // \u2550\u2550 ADMIN: COORDENA\u00C7\u00D5ES & EQUIPES \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // Permite criar coordena\u00E7\u00F5es (departamentos), equipes dentro delas e coordenadores
