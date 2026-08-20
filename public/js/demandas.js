@@ -235,9 +235,11 @@ export function renderDemandas(resetPage=false){
     const _from = dateStart || dateEnd, _to = dateEnd || dateStart;
     const startTs = new Date(_from+'T00:00:00').getTime();
     const endTs   = new Date(_to  +'T23:59:59').getTime();
+    // Inclui a demanda se o início OU qualquer período (reinício em outro dia) cair no intervalo.
     data=data.filter(e=>{
-      const ts = e.startTime;
-      return ts >= startTs && ts <= endTs;
+      if(e.startTime >= startTs && e.startTime <= endTs) return true;
+      if(Array.isArray(e.periods) && e.periods.some(p=>p.startTime>=startTs && p.startTime<=endTs)) return true;
+      return false;
     });
   }
   if(collabFilter)data=data.filter(e=>e.collab===collabFilter);
