@@ -1,31 +1,49 @@
-# Firebase cache
+# ── Dados pessoais e dumps — NUNCA versionar ─────────────────────────────────
+# A pasta backups/ é o padrão da casa (snapshot do RTDB antes de cada mudança),
+# mas o conteúdo é a base inteira: e-mail, nome, registro de ponto e avaliação
+# de colaborador identificado. Fica só na máquina. Ver backups/README.md.
+backups/
+Clockfy inserção/
+Clockfy insercao/
+*.csv
+
+# Backup do Firebase Auth: hash + salt de senha. Nem local, nem em nuvem
+# sincronizada — ver docs/security-audit (achado A2).
+auth-backup-*.json
+
+# Prints: podem conter a interface com nome real de colaborador
+Captura de tela*.png
+Screenshot*.png
+
+# ── Segredos ─────────────────────────────────────────────────────────────────
+.env
+.env.*
+serviceAccount.json
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+
+# ── Firebase ─────────────────────────────────────────────────────────────────
 .firebase/
 
-# Logs
+# ── Logs ─────────────────────────────────────────────────────────────────────
 *.log
 firebase-debug.log*
 firebase-debug.*.log*
+database-debug.log*
 
-# Node
+# ── Node ─────────────────────────────────────────────────────────────────────
 node_modules/
 .npm
 
-# Variáveis de ambiente
-.env
-
-# Temporários do Word/Office
+# ── Temporários do Office ────────────────────────────────────────────────────
 ~$*.docx
 ~$*.doc
 ~WRL*.tmp
 *.tmp
 
-# Sistema
+# ── Sistema ──────────────────────────────────────────────────────────────────
 Thumbs.db
 .DS_Store
 
-# Configs locais do Claude Code
+# ── Configs locais de ferramenta ─────────────────────────────────────────────
 .claude/
-
-# Backup do Auth (hashes de senha) e prints temporarios — nao versionar
-backups/auth-backup-*.json
-Captura de tela*.png

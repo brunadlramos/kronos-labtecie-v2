@@ -1,0 +1,6 @@
+serviceAccount.json
+v1-entries.json
+v2-usuarios.json
+v2-entries-import.json
+v2-entries-backup-*.json
+node_modules/
