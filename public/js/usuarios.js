@@ -44,11 +44,15 @@ export async function renderUsuarios(){
   const grid = document.getElementById('usuariosGrid');
   if(!grid) return;
 
-  // C3: configuração de jornada da equipe — visível p/ admin, gestora E coordenador/auditor
+  // Admin: visão consolidada de TODAS as equipes (com edição)
+  if(state.userPapel === 'admin'){
+    await _renderUsuariosAdmin(grid, true);
+    return;
+  }
+
+  // C3: configuração de jornada da equipe — visível p/ gestora E coordenador/auditor
   // (o coordenador analisa; a gravação segue restrita a gestora/admin pelas regras).
   // RH é SOMENTE LEITURA: pula a config editável e mostra só a visão consolidada abaixo.
-  // Vem ANTES do desvio do admin: o return dele pulava este bloco e o admin nunca via o botão.
-  // Para o admin vale a equipe ativa no seletor (a troca de equipe limpa dataset.loaded).
   if((state.isManager || state.isAuditor) && !state.isRH){
     const cfgBtn = document.getElementById('btnToggleCfgAvancada');
     if(cfgBtn) cfgBtn.style.display = 'inline-flex';
@@ -57,12 +61,6 @@ export async function renderUsuarios(){
       cfgArea.dataset.loaded = '1';
       await renderCfgColaboradores(cfgArea);   // renderiza escondido; o botão revela
     }
-  }
-
-  // Admin: visão consolidada de TODAS as equipes (com edição)
-  if(state.userPapel === 'admin'){
-    await _renderUsuariosAdmin(grid, true);
-    return;
   }
 
   // Coordenação (coordenador/auditor/rh): vê TODOS os colaboradores de TODAS as equipes,
@@ -549,15 +547,6 @@ window.saveEditColab = async function(uid){
     await update(ref(db,`usuarios/${uid}`),{equipeId:eqIdNova,papel});
   } else {
     await update(ref(db,`equipes/${eqIdOrig}/config/usuarios/${uid}`),{nome,papel,cor,curadora,estiloTrabalho});
-    // As regras leem o papel do nó GLOBAL /usuarios. Sem sincronizar, quem é promovido
-    // aqui vira gestor só na UI e recebe PERMISSION_DENIED ao gravar (ex.: piso de 100%).
-    // As regras só deixam o admin reescrever um /usuarios existente: para os demais, avisa
-    // em vez de falhar calado e deixar os dois nós divergentes.
-    try { await update(ref(db,`usuarios/${uid}`),{papel}); }
-    catch(e){
-      console.warn('[saveEditColab] papel global não sincronizado:', e?.code||e);
-      showToast('Cargo salvo só na equipe','O cargo não foi aplicado às permissões. Peça ao admin para salvar esta edição.');
-    }
   }
 
   const readEqId = eqIdNova === 'all' ? equipeDefault : eqIdNova;

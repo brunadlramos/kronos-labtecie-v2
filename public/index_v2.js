@@ -767,7 +767,7 @@ window.toggleCapDiaAll = async () => {
   const dk = dKey(state.dashDay);
   // mesma regra do renderDashCards: ativos e não-gestores
   const keys = Object.keys(state.COLLABS).filter(k =>
-    isActive(k) &&
+    (state.usersConfig[k]?.active !== false) &&
     !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||'')
   );
   if(!keys.length) return;
@@ -1693,7 +1693,7 @@ function _initArquivoFilters(){
   }
   const cs = document.getElementById('arquivoCollabFilter');
   if(cs && Object.keys(state.COLLABS).length && cs.options.length <= 1){
-    Object.entries(state.COLLABS).filter(([k])=>isActive(k)).forEach(([k,c])=>{ const o=document.createElement('option'); o.value=k; o.textContent=c.label; cs.appendChild(o); });
+    Object.entries(state.COLLABS).forEach(([k,c])=>{ const o=document.createElement('option'); o.value=k; o.textContent=c.label; cs.appendChild(o); });
   }
 }
 
@@ -1851,8 +1851,7 @@ window.exportWeekExcel = ()=>{
   const hcell = v   =>`<Cell ss:StyleID="hdr"><Data ss:Type="String">${_x(v)}</Data></Cell>`;
   const headers=['Colaborador','Data','% Tempo','% Amount','% Total','Horas'];
   const dataRows=[];
-  // Mesmo recorte da tabela semanal na tela: só ativos
-  Object.keys(state.COLLABS).filter(k=>isActive(k)).forEach(k=>{days.forEach(d=>{
+  Object.keys(state.COLLABS).forEach(k=>{days.forEach(d=>{
     const r=calcDay(k,dKey(d));
     const h=Math.floor(r.totalMs/3600000),m=Math.floor((r.totalMs%3600000)/60000);
     dataRows.push('<Row>'+
