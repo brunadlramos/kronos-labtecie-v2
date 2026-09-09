@@ -112,7 +112,7 @@ const ref = (uid, p) => db(uid).ref(p);
 
 before(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'kronos-rules-test',
+    projectId: 'demo-kronos',
     database: {
       host: HOST, port: PORT,
       rules: readFileSync(new URL('../database.rules.json', import.meta.url), 'utf8'),
@@ -206,8 +206,11 @@ describe('C4 · sobrescrita de registro de ponto alheio', () => {
     await assertSucceeds(ref(ANA, `equipes/${EQ}/entries/e_ana`).update({ task: 'Editado' }));
   });
 
+  // Apaga 'e_ana', que vem semeado. Antes apontava para 'e_ana_novo', criado por
+  // OUTRO teste -- com o re-seed por teste (beforeEach) ele nao existe mais, e
+  // apagar no vazio e negado porque data.child('collab') vira null.
   it('NAO-REGRESSAO: Ana apaga o próprio registro', async () => {
-    await assertSucceeds(ref(ANA, `equipes/${EQ}/entries/e_ana_novo`).remove());
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/entries/e_ana`).remove());
   });
 
   it('NAO-REGRESSAO: gestora corrige o registro de um colaborador', async () => {
