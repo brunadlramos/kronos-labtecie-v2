@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync } from 'node:fs';
-import { after, before, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import {
   assertFails, assertSucceeds, initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
@@ -118,6 +118,12 @@ before(async () => {
       rules: readFileSync(new URL('../database.rules.json', import.meta.url), 'utf8'),
     },
   });
+});
+
+// Cada teste comeca do mesmo estado. Sem isto a suite fica dependente de ordem:
+// o teste de clearMural, por exemplo, apaga posts que outro teste espera achar.
+beforeEach(async () => {
+  await env.clearDatabase();
   await env.withSecurityRulesDisabled(async (ctx) => {
     await ctx.database().ref().set(seed());
   });
