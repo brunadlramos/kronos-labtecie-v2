@@ -167,7 +167,7 @@ Cada fase entrega estado utilizável: parar em qualquer ponto não deixa nada pe
 - [ ] **0.1** Instalar JDK (necessário para o emulador do RTDB). Não há nenhum na
       máquina; `JAVA_HOME` está vazio. **Ação do dono** (precisa de admin):
       `winget install Microsoft.OpenJDK.21`
-- [ ] **0.2** `npx firebase-tools --version` responde (npm alcança o registry: PONG 308ms)
+- [x] **0.2** Dependências instaladas em `tests/` (484 pacotes; firebase-tools 15.29.0) — 08/09
 - [ ] **0.3** `npx firebase-tools login` — autenticação do dono
 - [ ] **0.4** Snapshot fresco de produção:
       `npx firebase-tools database:get / --project kronoslabtecie > backups/rtdb-backup-<AAAA-MM-DD>-pre-onda1.json`
@@ -328,4 +328,7 @@ Da ordem P2/P3 do relatório, sem re-litígio agora:
 
 | Data | Fase | O que foi feito | Resultado |
 |---|---|---|---|
-| 08/09/2026 | — | Plano criado; revisão adversarial pré-código; decisões D1–D9 registradas | Aguardando Fase 0 |
+| 08/09/2026 | — | Plano criado; revisão adversarial pré-código; decisões D1–D9 registradas | OK |
+| 08/09/2026 | 1 | Portão de testes escrito: 21 ataques + 20 não-regressão, isolados por teste | Escrito, não rodado |
+| 08/09/2026 | 0.2 | `tests/` instalado (corrigido peer conflict: rules-unit-testing 5 + firebase 12) | OK |
+| — | 0.1 | **Bloqueado: JDK não instalado — ação do dono** | Pendente |
