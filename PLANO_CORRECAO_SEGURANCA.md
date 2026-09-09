@@ -164,9 +164,8 @@ Cada fase entrega estado utilizável: parar em qualquer ponto não deixa nada pe
 
 ### Fase 0 — Rede de proteção · *nada toca produção*
 
-- [ ] **0.1** Instalar JDK (necessário para o emulador do RTDB). Não há nenhum na
-      máquina; `JAVA_HOME` está vazio. **Ação do dono** (precisa de admin):
-      `winget install Microsoft.OpenJDK.21`
+- [x] **0.1** JDK instalado — OpenJDK 21.0.12.1 em
+      `C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot` — 08/09
 - [x] **0.2** Dependências instaladas em `tests/` (484 pacotes; firebase-tools 15.29.0) — 08/09
 - [ ] **0.3** `npx firebase-tools login` — autenticação do dono
 - [ ] **0.4** Snapshot fresco de produção:
@@ -209,7 +208,10 @@ o emulador roda.
   - gestora avalia, limpa a lixeira, desarquiva e limpa o mural
   - gestora cria `colaborador` na própria equipe
   - colaborador cria, edita e apaga o **próprio** registro de ponto
-- [ ] **1.4** Suíte roda verde nos testes de não-regressão e **vermelha** nos 11 de ataque
+- [x] **1.4** Baseline medido no emulador — **47 testes: 28 passam, 19 falham**.
+      Todas as 19 falhas são de ATAQUE (vulnerabilidade confirmada); **zero**
+      falha de não-regressão. Saída em
+      `docs/security-audit/suite-baseline-antes-onda1.txt` — 08/09
 
 **Pronto quando:** a suíte prova, sozinha, que os 4 críticos existem — e que os fluxos
 legítimos funcionam. Esta é a **invariante central da onda**: *nenhuma conta de
@@ -331,4 +333,6 @@ Da ordem P2/P3 do relatório, sem re-litígio agora:
 | 08/09/2026 | — | Plano criado; revisão adversarial pré-código; decisões D1–D9 registradas | OK |
 | 08/09/2026 | 1 | Portão de testes escrito: 21 ataques + 20 não-regressão, isolados por teste | Escrito, não rodado |
 | 08/09/2026 | 0.2 | `tests/` instalado (corrigido peer conflict: rules-unit-testing 5 + firebase 12) | OK |
-| — | 0.1 | **Bloqueado: JDK não instalado — ação do dono** | Pendente |
+| 08/09/2026 | 0.1 | JDK 21.0.12.1 instalado pelo dono | OK |
+| 08/09/2026 | 1.4 | **Baseline no emulador: 28 passam, 19 ataques falham, 0 regressão.** Dois ataques já eram bloqueados (autopromoção; apagar ponto alheio) | OK — Fase 1 concluída |
+| — | 0.3–0.7 | Backup de produção e cópia — dependem de `firebase login` do dono | Pendente |

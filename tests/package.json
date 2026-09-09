@@ -4,9 +4,9 @@
   "type": "module",
   "description": "Portao de testes das Security Rules do Realtime Database (onda 1).",
   "scripts": {
-    "emu": "firebase emulators:start --only database --project kronos-rules-test",
+    "emu": "firebase emulators:start --only database --project demo-kronos --config ../firebase.json",
     "test": "node --test rules.test.js",
-    "test:ci": "firebase emulators:exec --only database --project kronos-rules-test \"node --test rules.test.js\""
+    "test:ci": "firebase emulators:exec --only database --project demo-kronos --config ../firebase.json \"node --test rules.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

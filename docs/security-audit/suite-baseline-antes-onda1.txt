@@ -1,0 +1,589 @@
+i  emulators: Starting emulators: database
+i  emulators: Detected demo project ID "demo-kronos", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  database: Database Emulator logging to database-debug.log
+i  Running script: node --test --test-reporter=tap rules.test.js
+TAP version 13
+# Subtest: B1 · criação de usuário com papel arbitrário
+    # Subtest: ATAQUE: gestora NÃO pode criar usuário com papel admin
+    not ok 1 - ATAQUE: gestora NÃO pode criar usuário com papel admin
+      ---
+      duration_ms: 329.714
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:138:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:139:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1771:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+      ...
+    # Subtest: ATAQUE: coordenador NÃO pode criar usuário com papel admin
+    not ok 2 - ATAQUE: coordenador NÃO pode criar usuário com papel admin
+      ---
+      duration_ms: 126.4909
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:144:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:145:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: gestora NÃO pode criar usuário com papel rh
+    not ok 3 - ATAQUE: gestora NÃO pode criar usuário com papel rh
+      ---
+      duration_ms: 137.9525
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:150:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:151:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: papel fora da lista de permissão é recusado até para admin
+    not ok 4 - ATAQUE: papel fora da lista de permissão é recusado até para admin
+      ---
+      duration_ms: 122.9516
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:156:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:157:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: NAO-REGRESSAO: gestora cria colaborador na própria equipe
+    ok 5 - NAO-REGRESSAO: gestora cria colaborador na própria equipe
+      ---
+      duration_ms: 107.3142
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: colaborador edita o próprio nome sem mexer em papel/equipe
+    ok 6 - NAO-REGRESSAO: colaborador edita o próprio nome sem mexer em papel/equipe
+      ---
+      duration_ms: 114.2871
+      type: 'test'
+      ...
+# [2026-09-09T02:42:51.871Z]  @firebase/database: FIREBASE WARNING: set at /usuarios/uid_ana/papel failed: permission_denied 
+    # Subtest: ATAQUE: colaborador NÃO promove a si mesmo (confirmado em emulador antes)
+    ok 7 - ATAQUE: colaborador NÃO promove a si mesmo (confirmado em emulador antes)
+      ---
+      duration_ms: 132.4971
+      type: 'test'
+      ...
+    1..7
+not ok 1 - B1 · criação de usuário com papel arbitrário
+  ---
+  duration_ms: 1108.4494
+  type: 'suite'
+  location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:137:1'
+  failureType: 'subtestsFailed'
+  error: '4 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: C4 · sobrescrita de registro de ponto alheio
+    # Subtest: ATAQUE: Ana NÃO pode gravar por cima do registro da Bia pondo a própria collab
+    not ok 1 - ATAQUE: Ana NÃO pode gravar por cima do registro da Bia pondo a própria collab
+      ---
+      duration_ms: 125.1824
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:181:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:182:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1771:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: Ana NÃO pode trocar só o campo collab de um registro alheio
+    not ok 2 - ATAQUE: Ana NÃO pode trocar só o campo collab de um registro alheio
+      ---
+      duration_ms: 139.0359
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:189:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:190:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+# [2026-09-09T02:42:52.277Z]  @firebase/database: FIREBASE WARNING: set at /equipes/diagramacao/entries/e_bia failed: permission_denied 
+    # Subtest: ATAQUE: Ana NÃO pode apagar o registro da Bia
+    ok 3 - ATAQUE: Ana NÃO pode apagar o registro da Bia
+      ---
+      duration_ms: 140.8649
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: Ana cria o próprio registro
+    ok 4 - NAO-REGRESSAO: Ana cria o próprio registro
+      ---
+      duration_ms: 120.5648
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: Ana edita o próprio registro
+    ok 5 - NAO-REGRESSAO: Ana edita o próprio registro
+      ---
+      duration_ms: 108.4516
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: Ana apaga o próprio registro
+    ok 6 - NAO-REGRESSAO: Ana apaga o próprio registro
+      ---
+      duration_ms: 123.6287
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: gestora corrige o registro de um colaborador
+    ok 7 - NAO-REGRESSAO: gestora corrige o registro de um colaborador
+      ---
+      duration_ms: 139.0821
+      type: 'test'
+      ...
+    1..7
+not ok 2 - C4 · sobrescrita de registro de ponto alheio
+  ---
+  duration_ms: 897.2125
+  type: 'suite'
+  location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:180:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: C1 · kanban: nó coletivo e campos de avaliação
+    # Subtest: ATAQUE: colaborador NÃO pode apagar o quadro inteiro
+    not ok 1 - ATAQUE: colaborador NÃO pode apagar o quadro inteiro
+      ---
+      duration_ms: 140.1138
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:225:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:226:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1771:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: colaborador NÃO pode gravar a própria avaliação
+    not ok 2 - ATAQUE: colaborador NÃO pode gravar a própria avaliação
+      ---
+      duration_ms: 138.1326
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:229:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:230:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: colaborador NÃO pode alterar avaliação existente
+    not ok 3 - ATAQUE: colaborador NÃO pode alterar avaliação existente
+      ---
+      duration_ms: 139.0015
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:235:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:236:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: colaborador NÃO pode APAGAR avaliação existente
+    not ok 4 - ATAQUE: colaborador NÃO pode APAGAR avaliação existente
+      ---
+      duration_ms: 139.413
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:241:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:242:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: colaborador NÃO pode criar card já com avaliação (D7)
+    not ok 5 - ATAQUE: colaborador NÃO pode criar card já com avaliação (D7)
+      ---
+      duration_ms: 137.9571
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:247:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:248:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: NAO-REGRESSAO: colaborador cria card sem avaliação
+    ok 6 - NAO-REGRESSAO: colaborador cria card sem avaliação
+      ---
+      duration_ms: 138.945
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: colaborador move card SEM avaliação (grava o card inteiro)
+    ok 7 - NAO-REGRESSAO: colaborador move card SEM avaliação (grava o card inteiro)
+      ---
+      duration_ms: 123.2828
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO (D6): colaborador move card JÁ AVALIADO preservando a nota
+    ok 8 - NAO-REGRESSAO (D6): colaborador move card JÁ AVALIADO preservando a nota
+      ---
+      duration_ms: 122.9797
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: colaborador lança horas em workers com a própria chave
+    ok 9 - NAO-REGRESSAO: colaborador lança horas em workers com a própria chave
+      ---
+      duration_ms: 139.5734
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: gestora avalia um card
+    ok 10 - NAO-REGRESSAO: gestora avalia um card
+      ---
+      duration_ms: 108.2681
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: gestora apaga uma avaliação
+    ok 11 - NAO-REGRESSAO: gestora apaga uma avaliação
+      ---
+      duration_ms: 123.5949
+      type: 'test'
+      ...
+    1..11
+not ok 3 - C1 · kanban: nó coletivo e campos de avaliação
+  ---
+  duration_ms: 1451.6891
+  type: 'suite'
+  location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:224:1'
+  failureType: 'subtestsFailed'
+  error: '5 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: C1 · mural: posse do post
+    # Subtest: ATAQUE: colaborador NÃO pode apagar o mural inteiro
+    not ok 1 - ATAQUE: colaborador NÃO pode apagar o mural inteiro
+      ---
+      duration_ms: 123.345
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:302:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:303:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1771:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: Ana NÃO pode apagar o post da Bia
+    not ok 2 - ATAQUE: Ana NÃO pode apagar o post da Bia
+      ---
+      duration_ms: 100.1117
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:306:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:307:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: Ana NÃO pode publicar post assinado como a Bia
+    not ok 3 - ATAQUE: Ana NÃO pode publicar post assinado como a Bia
+      ---
+      duration_ms: 131.7082
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:310:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:311:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: NAO-REGRESSAO: Ana publica o próprio post
+    ok 4 - NAO-REGRESSAO: Ana publica o próprio post
+      ---
+      duration_ms: 139.0688
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: Ana apaga o próprio post
+    ok 5 - NAO-REGRESSAO: Ana apaga o próprio post
+      ---
+      duration_ms: 139.6694
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: gestora limpa o mural inteiro (clearMural)
+    ok 6 - NAO-REGRESSAO: gestora limpa o mural inteiro (clearMural)
+      ---
+      duration_ms: 138.5775
+      type: 'test'
+      ...
+    1..6
+not ok 4 - C1 · mural: posse do post
+  ---
+  duration_ms: 772.7078
+  type: 'suite'
+  location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:301:1'
+  failureType: 'subtestsFailed'
+  error: '3 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: C1 · arquivo: nó coletivo e avaliação
+    # Subtest: ATAQUE: colaborador NÃO pode apagar o arquivo inteiro
+    not ok 1 - ATAQUE: colaborador NÃO pode apagar o arquivo inteiro
+      ---
+      duration_ms: 108.591
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:332:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:333:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1771:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: colaborador NÃO pode alterar avaliação de card arquivado
+    not ok 2 - ATAQUE: colaborador NÃO pode alterar avaliação de card arquivado
+      ---
+      duration_ms: 138.772
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:336:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:337:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: NAO-REGRESSAO (D7): colaborador arquiva card que já tem nota
+    ok 3 - NAO-REGRESSAO (D7): colaborador arquiva card que já tem nota
+      ---
+      duration_ms: 139.3664
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: gestora desarquiva (apaga do arquivo)
+    ok 4 - NAO-REGRESSAO: gestora desarquiva (apaga do arquivo)
+      ---
+      duration_ms: 125.3615
+      type: 'test'
+      ...
+    1..4
+not ok 5 - C1 · arquivo: nó coletivo e avaliação
+  ---
+  duration_ms: 512.2674
+  type: 'suite'
+  location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:331:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: E7 · forma dos campos que alimentam o render do Kanban
+    # Subtest: ATAQUE: assignee com HTML é recusado
+    not ok 1 - ATAQUE: assignee com HTML é recusado
+      ---
+      duration_ms: 138.8338
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:359:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:360:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1771:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: history[].by com HTML é recusado
+    not ok 2 - ATAQUE: history[].by com HTML é recusado
+      ---
+      duration_ms: 123.6314
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:364:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:365:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: ATAQUE: chave de workers com HTML é recusada
+    not ok 3 - ATAQUE: chave de workers com HTML é recusada
+      ---
+      duration_ms: 137.9002
+      type: 'test'
+      location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:369:3'
+      failureType: 'testCodeFailure'
+      error: 'Expected request to fail, but it succeeded.'
+      code: 'ERR_TEST_FAILURE'
+      stack: |-
+        file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/node_modules/@firebase/rules-unit-testing/dist/esm/index.esm.js:572:31
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async TestContext.<anonymous> (file:///C:/Users/allan/Desktop/Kronos/kronos-labtecie-v2/tests/rules.test.js:370:5)
+        async Test.run (node:internal/test_runner/test:1313:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:897:7)
+      ...
+    # Subtest: NAO-REGRESSAO: assignee com chave válida é aceito
+    ok 4 - NAO-REGRESSAO: assignee com chave válida é aceito
+      ---
+      duration_ms: 123.3886
+      type: 'test'
+      ...
+    # Subtest: NAO-REGRESSAO: assignee vazio (card sem responsável) é aceito
+    ok 5 - NAO-REGRESSAO: assignee vazio (card sem responsável) é aceito
+      ---
+      duration_ms: 108.6369
+      type: 'test'
+      ...
+    1..5
+not ok 6 - E7 · forma dos campos que alimentam o render do Kanban
+  ---
+  duration_ms: 632.6101
+  type: 'suite'
+  location: 'C:\\Users\\allan\\Desktop\\Kronos\\kronos-labtecie-v2\\tests\\rules.test.js:358:1'
+  failureType: 'subtestsFailed'
+  error: '3 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: Invariantes já corretas (não podem regredir)
+    # Subtest: isolamento entre equipes: colaborador não lê outra equipe
+    ok 1 - isolamento entre equipes: colaborador não lê outra equipe
+      ---
+      duration_ms: 138.8387
+      type: 'test'
+      ...
+    # Subtest: acesso não autenticado é negado
+    ok 2 - acesso não autenticado é negado
+      ---
+      duration_ms: 139.4256
+      type: 'test'
+      ...
+# [2026-09-09T02:42:56.541Z]  @firebase/database: FIREBASE WARNING: set at /equipes/diagramacao/foobar failed: permission_denied 
+# [2026-09-09T02:42:56.572Z]  @firebase/database: FIREBASE WARNING: set at /equipes/equipe_nova failed: permission_denied 
+    # Subtest: nó não previsto não aceita escrita (default fechado)
+    ok 3 - nó não previsto não aceita escrita (default fechado)
+      ---
+      duration_ms: 155.3606
+      type: 'test'
+      ...
+# [2026-09-09T02:42:56.696Z]  @firebase/database: FIREBASE WARNING: set at /equipes/diagramacao/entries/e_ana/task failed: permission_denied 
+    # Subtest: limite de tamanho resiste a escrita de campo isolado
+    ok 4 - limite de tamanho resiste a escrita de campo isolado
+      ---
+      duration_ms: 124.4943
+      type: 'test'
+      ...
+# [2026-09-09T02:42:56.836Z]  @firebase/database: FIREBASE WARNING: set at /equipes/diagramacao/activeTimers/bia failed: permission_denied 
+# [2026-09-09T02:42:56.883Z]  @firebase/database: FIREBASE WARNING: update at /equipes/diagramacao/avatars/bia failed: permission_denied 
+    # Subtest: activeTimers e avatars amarram a chave ao próprio usuário
+    ok 5 - activeTimers e avatars amarram a chave ao próprio usuário
+      ---
+      duration_ms: 232.7255
+      type: 'test'
+      ...
+# [2026-09-09T02:42:57.099Z]  @firebase/database: FIREBASE WARNING: update at /equipes/diagramacao/logs/l1 failed: permission_denied 
+# [2026-09-09T02:42:57.146Z]  @firebase/database: FIREBASE WARNING: set at /equipes/diagramacao/logs/l1 failed: permission_denied 
+    # Subtest: log é append-only para colaborador
+    ok 6 - log é append-only para colaborador
+      ---
+      duration_ms: 216.345
+      type: 'test'
+      ...
+# [2026-09-09T02:42:57.331Z]  @firebase/database: FIREBASE WARNING: set at /pwdReset/uid_bia failed: permission_denied 
+    # Subtest: pwdReset amarrado ao próprio UID
+    ok 7 - pwdReset amarrado ao próprio UID
+      ---
+      duration_ms: 185.7245
+      type: 'test'
+      ...
+    1..7
+ok 7 - Invariantes já corretas (não podem regredir)
+  ---
+  duration_ms: 1193.2261
+  type: 'suite'
+  ...
+1..7
+# tests 47
+# suites 7
+# pass 28
+# fail 19
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6784.759
+!  Script exited unsuccessfully (code 1)
+i  emulators: Shutting down emulators.
+i  database: Stopping Database Emulator
+!  Database Emulator has exited upon receiving signal: SIGINT
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
+
+Error: Script "node --test --test-reporter=tap rules.test.js" exited with code 1
