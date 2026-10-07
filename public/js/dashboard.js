@@ -22,8 +22,12 @@ function _dkToISO(dk) {
 }
 
 // ── isActive ───────────────────────────────────────────────────────────────────
+// Fonte da verdade é config/usuarios/<uid>.ativo (o que a tela de Usuários grava),
+// espelhado em state.COLLABS[k].active no boot. O nó legado users/<key>.active nunca é
+// atualizado ao desativar — ler só ele deixava todo inativo passar como ativo.
 export function isActive(collabKey) {
-  return state.usersConfig[collabKey]?.active !== false;
+  return state.COLLABS[collabKey]?.active !== false
+      && state.usersConfig[collabKey]?.active !== false;
 }
 
 // ── isRankable ───────────────────────────────────────────────────────────────
@@ -917,6 +921,7 @@ export function renderDemandasSemana(tbodyId, days, collabFilter='', searchFilte
   const endTs = new Date(days[days.length-1].getFullYear(), days[days.length-1].getMonth(), days[days.length-1].getDate(), 23,59,59).getTime();
 
   let data = getEntriesArray().map(([k,e])=>({...e,_key:k})).filter(e=>{
+    if(!isActive(e.collab)) return false;   // inativo sai das tabelas do dashboard
     if(collabFilter && e.collab !== collabFilter) return false;
     if(e.startTime >= startTs && e.startTime <= endTs) return true;
     if(e.periods && e.periods.some(p=>p.startTime>=startTs && p.startTime<=endTs)) return true;

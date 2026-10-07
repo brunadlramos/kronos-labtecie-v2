@@ -1547,6 +1547,8 @@ window.renderIndicadores = ()=>{
     });
   }
   if(colabF) cards = cards.filter(c=>kIsAssignee(c,colabF));
+  // Inativo sai dos Indicadores (totais, tabela e pendentes). Card sem responsável fica.
+  cards = cards.filter(c=>!c.assignee || isActive(c.assignee));
 
   // Avaliados vs pendentes
   const avaliados = cards.filter(c=>c[field]);

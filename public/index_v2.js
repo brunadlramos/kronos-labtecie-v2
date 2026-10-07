@@ -767,7 +767,7 @@ window.toggleCapDiaAll = async () => {
   const dk = dKey(state.dashDay);
   // mesma regra do renderDashCards: ativos e não-gestores
   const keys = Object.keys(state.COLLABS).filter(k =>
-    (state.usersConfig[k]?.active !== false) &&
+    isActive(k) &&
     !state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||'')
   );
   if(!keys.length) return;
@@ -1693,7 +1693,7 @@ function _initArquivoFilters(){
   }
   const cs = document.getElementById('arquivoCollabFilter');
   if(cs && Object.keys(state.COLLABS).length && cs.options.length <= 1){
-    Object.entries(state.COLLABS).forEach(([k,c])=>{ const o=document.createElement('option'); o.value=k; o.textContent=c.label; cs.appendChild(o); });
+    Object.entries(state.COLLABS).filter(([k])=>isActive(k)).forEach(([k,c])=>{ const o=document.createElement('option'); o.value=k; o.textContent=c.label; cs.appendChild(o); });
   }
 }
 

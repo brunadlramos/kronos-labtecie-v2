@@ -229,7 +229,8 @@ export function renderDemandas(resetPage=false){
   const collabFilter=document.getElementById('filterCollabD')?.value||'';
   const projFilter=document.getElementById('filterProjD')?.value||'';
   const searchFilter=(document.getElementById('filterSearchD')?.value||'').toLowerCase().trim();
-  let data=getEntriesArray().map(([k,e])=>({...e,_key:k}));
+  // Inativo sai da listagem; os registros seguem no banco e nas exportações CSV
+  let data=getEntriesArray().map(([k,e])=>({...e,_key:k})).filter(e=>isActive(e.collab));
   if(dateStart || dateEnd){
     // Se só um campo (de/até) for preenchido, filtra apenas aquele dia.
     const _from = dateStart || dateEnd, _to = dateEnd || dateStart;
@@ -753,7 +754,7 @@ export function renderRelatorio(){
     .map(([k,e])=>({...e,_key:k}))
     .filter(e=>{
       const t = e.startTime;
-      return t>=startTs && t<=endTs;
+      return t>=startTs && t<=endTs && isActive(e.collab);
     });
 
   // ── TABELA PRODUÇÃO ──────────────────────────────────────────────────────
