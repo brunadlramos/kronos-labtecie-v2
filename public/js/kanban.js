@@ -1583,7 +1583,9 @@ window.renderIndicadores = ()=>{
 
   const grid = document.getElementById('indResumoGrid');
   if(grid){
-    grid.innerHTML = Object.entries(resumo).map(([k,r])=>{
+    // Resumo por pessoa é análise: inativo sai. 'desconhecido' e chaves sem cadastro ficam
+    // (não há como dizer que são inativos). Os cards avaliados seguem na tabela detalhada.
+    grid.innerHTML = Object.entries(resumo).filter(([k])=>!state.COLLABS[k] || isActive(k)).map(([k,r])=>{
       const col = state.COLLABS[k]||{label:k,initials:'?',color:'#94A3B8'};
       const barras = AJUSTE_LEVELS.map(lv=>{
         const cnt = r.niveis[lv.id]||0;

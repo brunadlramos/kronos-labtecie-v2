@@ -1851,7 +1851,8 @@ window.exportWeekExcel = ()=>{
   const hcell = v   =>`<Cell ss:StyleID="hdr"><Data ss:Type="String">${_x(v)}</Data></Cell>`;
   const headers=['Colaborador','Data','% Tempo','% Amount','% Total','Horas'];
   const dataRows=[];
-  Object.keys(state.COLLABS).forEach(k=>{days.forEach(d=>{
+  // Mesmo recorte da tabela semanal na tela: só ativos
+  Object.keys(state.COLLABS).filter(k=>isActive(k)).forEach(k=>{days.forEach(d=>{
     const r=calcDay(k,dKey(d));
     const h=Math.floor(r.totalMs/3600000),m=Math.floor((r.totalMs%3600000)/60000);
     dataRows.push('<Row>'+

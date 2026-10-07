@@ -416,7 +416,8 @@ export function renderCharts(){
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},color:cp.legend}}}}
     });
   }
-  const collabRank=Object.keys(state.COLLABS).filter(k=>!state.MANAGER_EMAILS.includes(Object.keys(state.COLLAB_EMAILS).find(e=>state.COLLAB_EMAILS[e]===k)||'')).map(k=>({...state.COLLABS[k],...calcDay(k,chartsDk)})).sort((a,b)=>b.percTotal-a.percTotal);
+  // isRankable = ativo E não-gestor: inativo sai das análises (o histórico de registros continua)
+  const collabRank=Object.keys(state.COLLABS).filter(k=>isRankable(k)).map(k=>({...state.COLLABS[k],...calcDay(k,chartsDk)})).sort((a,b)=>b.percTotal-a.percTotal);
   if(document.getElementById('chartRanking')){
     state.charts.ranking=new Chart(document.getElementById('chartRanking'),{
       type:'bar',
@@ -429,7 +430,7 @@ export function renderCharts(){
       type:'line',
       data:{
         labels:days.map(d=>fmtShortDate(d)),
-        datasets:Object.keys(state.COLLABS).map((k)=>({
+        datasets:Object.keys(state.COLLABS).filter(k=>isActive(k)).map((k)=>({
           label:state.COLLABS[k].label,
           data:days.map(d=>calcDay(k,dKey(d)).percTotal.toFixed(1)),
           borderColor:state.COLLABS[k].color,backgroundColor:state.COLLABS[k].color+'22',
@@ -569,7 +570,8 @@ export function renderInconsistencias(){
     const d=new Date(today);d.setDate(today.getDate()-i);
     const dk=dKey(d);const dayStr=d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
     if(d.getDay()===0)continue;
-    Object.keys(state.COLLABS).forEach(k=>{
+    // Inativo não registra mais: sem o filtro, viraria um "sem registros" diário eterno
+    Object.keys(state.COLLABS).filter(k=>isActive(k)).forEach(k=>{
       const data=calcDay(k,dk);
       if(data.count===0&&i<5){alerts.push({type:'warn',icon:'👻',text:`${state.COLLABS[k].label} sem registros`,sub:`${dayStr} — nenhum registro encontrado`});}
       else if(data.totalMs>10*3600000){alerts.push({type:'warn',icon:'⏰',text:`${state.COLLABS[k].label} com mais de 10h registradas`,sub:`${dayStr} — ${(data.totalMs/3600000).toFixed(1)}h registradas`});}
