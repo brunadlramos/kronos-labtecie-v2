@@ -549,6 +549,15 @@ window.saveEditColab = async function(uid){
     await update(ref(db,`usuarios/${uid}`),{equipeId:eqIdNova,papel});
   } else {
     await update(ref(db,`equipes/${eqIdOrig}/config/usuarios/${uid}`),{nome,papel,cor,curadora,estiloTrabalho});
+    // As regras leem o papel do nó GLOBAL /usuarios. Sem sincronizar, quem é promovido
+    // aqui vira gestor só na UI e recebe PERMISSION_DENIED ao gravar (ex.: piso de 100%).
+    // As regras só deixam o admin reescrever um /usuarios existente: para os demais, avisa
+    // em vez de falhar calado e deixar os dois nós divergentes.
+    try { await update(ref(db,`usuarios/${uid}`),{papel}); }
+    catch(e){
+      console.warn('[saveEditColab] papel global não sincronizado:', e?.code||e);
+      showToast('Cargo salvo só na equipe','O cargo não foi aplicado às permissões. Peça ao admin para salvar esta edição.');
+    }
   }
 
   const readEqId = eqIdNova === 'all' ? equipeDefault : eqIdNova;
