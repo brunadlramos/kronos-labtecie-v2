@@ -1126,6 +1126,12 @@ window.openKanbanDetail=(key)=>{
   document.getElementById('kdColumn').textContent = isArchived ? `📦 ${modLabel}` : modLabel;
   document.getElementById('kdHours').textContent=card.hours?kFmtHours(card.hours):'Nenhuma hora ainda';
   document.getElementById('kdCreated').textContent=card.createdAt?kFmtDate(card.createdAt):'—';
+  // Data de conclusão (editável pela gestora — útil p/ corrigir cards importados do Trello)
+  const _concTs = card.concludedAt || (isArchived ? card.archivedAt : null);
+  const _kdConc = document.getElementById('kdConcluded');
+  if(_kdConc) _kdConc.textContent = _concTs ? kFmtDate(_concTs) : '—';
+  const _kdConcBtn = document.getElementById('kdEditConcludedBtn');
+  if(_kdConcBtn) _kdConcBtn.style.display = (state.isManager && (isArchived || card.column==='concluido')) ? '' : 'none';
   // ✅ FIX: links sempre visíveis e editáveis inline por qualquer colaborador
   kdRenderLinks(card.links||[]);
   if(card.obs){ document.getElementById('kdObsSection').style.display='block'; document.getElementById('kdObs').textContent=card.obs; }
@@ -1785,6 +1791,48 @@ window.exportIndicadoresCSV = ()=>{
 
 window.closeKanbanDetail=()=>{ releaseFocus(); document.getElementById('kanbanDetailModal').classList.remove('open'); state.currentKanbanDetailId=null; };
 
+// ── Editar a DATA DE CONCLUSÃO de um card (gestora) ──────────────────────────
+// Grava no nó correto (arquivo p/ arquivados, kanban p/ ativos). Para arquivados,
+// também ajusta "Arquivado em" e o ano do arquivo, refletindo a data verídica.
+window.kdEditConcluded = ()=>{
+  const key = window._detailCardKey || state.currentKanbanDetailId;
+  if(!key || !state.isManager) return;
+  const { card } = _cardAndRef(key);
+  if(!card) return;
+  const cur = card.concludedAt || card.archivedAt || card.updatedAt || Date.now();
+  const d = new Date(cur);
+  const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const wrap = document.getElementById('kdConcludedWrap');
+  if(!wrap) return;
+  wrap.innerHTML = `<input type="date" id="kdConcludedInput" value="${val}" max="2999-12-31" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-family:var(--mono);font-size:0.72rem;outline:none;">
+    <button onclick="kdSaveConcluded()" class="btn-sm success" style="padding:3px 9px;font-size:0.7rem;">Salvar</button>
+    <button onclick="openKanbanDetail(window._detailCardKey)" class="btn-sm" style="padding:3px 9px;font-size:0.7rem;">Cancelar</button>`;
+  document.getElementById('kdConcludedInput')?.focus();
+};
+window.kdSaveConcluded = async ()=>{
+  const key = window._detailCardKey || state.currentKanbanDetailId;
+  if(!key) return;
+  if(!state.isManager){ showToast('Sem permissão','Apenas a gestora pode editar a data.'); return; }
+  const val = document.getElementById('kdConcludedInput')?.value;
+  const ts = val ? new Date(val+'T12:00:00').getTime() : NaN;  // meio-dia local evita erro de fuso
+  if(!isFinite(ts)){ showToast('Data inválida','Escolha uma data válida.'); return; }
+  const { card, ref: cardRef, arq } = _cardAndRef(key);
+  if(!card){ showToast('Erro','Card não encontrado. Feche e abra novamente.'); return; }
+  const patch = { concludedAt: ts };
+  if(arq){ patch.archivedAt = ts; patch.archiveYear = new Date(ts).getFullYear(); }  // reflete no Arquivo Morto
+  setSyncStatus('loading','Salvando...');
+  try{
+    await update(child(cardRef, key), patch);
+    Object.assign(card, patch);
+    if(arq){ if(state.arquivoCards) state.arquivoCards[key]=card; if(window._arquivoCards) window._arquivoCards[key]=card; }
+    setSyncStatus('ok','Sincronizado ✓');
+    showToast('Data atualizada', `Concluído em ${kFmtDate(ts)}.`);
+    try{ registrarLog('editar','Editou data de conclusão', `${(card.name||'').slice(0,40)} → ${kFmtDate(ts)}`); }catch(e){}
+    openKanbanDetail(key);
+    window.renderArquivo?.();
+  }catch(e){ setSyncStatus('ok','Sincronizado ✓'); showToast('Erro','Falha ao salvar a data. Tente novamente.'); console.error('[kdSaveConcluded]',e); }
+};
+
 // ── LINKS INLINE NO DETALHE DO CARD ──────────────────────────────────────────
 // Renderiza lista de links com campos editáveis + botão remover
 function kdRenderLinks(links){
@@ -2375,6 +2423,149 @@ function getArchivedCards(){
   return Object.entries(state.arquivoCards).map(([k,c])=>({...c,_key:k}));
 }
 
+// ── ARQUIVO MORTO: reorganizar (arrastar entre colunas) + colunas retráteis ───
+state.aColState = state.aColState || {};
+state.aSelected = state.aSelected || new Set();  // seleção múltipla no Arquivo Morto
+function _initAColState(ids){
+  ids.forEach(id=>{ if(!state.aColState[id]) state.aColState[id]={collapsed:false,pinned:false}; });
+  try{
+    const saved=JSON.parse(localStorage.getItem('kronos_acol_state')||'{}');
+    Object.entries(saved).forEach(([id,s])=>{ state.aColState[id]={...(state.aColState[id]||{collapsed:false,pinned:false}),...s}; });
+  }catch(e){}
+}
+function _aSaveColState(){ try{ localStorage.setItem('kronos_acol_state', JSON.stringify(state.aColState)); }catch(e){} }
+window.aToggleCollapse=(colId)=>{
+  const st=state.aColState[colId]=state.aColState[colId]||{collapsed:false,pinned:false};
+  if(st.pinned) return;
+  st.collapsed=!st.collapsed; _aSaveColState(); window.renderArquivo();
+};
+window.aTogglePin=(colId,e)=>{
+  e.stopPropagation();
+  const st=state.aColState[colId]=state.aColState[colId]||{collapsed:false,pinned:false};
+  st.pinned=!st.pinned; if(st.pinned) st.collapsed=false; _aSaveColState(); window.renderArquivo();
+};
+// Monta uma coluna do Arquivo Morto (com colapso/pin e, opcionalmente, alvo de drop)
+function _arqColHtml({id,color,title,count,bodyHtml,droppable}){
+  const st=state.aColState[id]||{};
+  const isCollapsed=st.collapsed && !st.pinned;
+  const isPinned=st.pinned;
+  if(isCollapsed){
+    return `<div class="k-col k-col-collapsed" style="width:44px;min-width:44px;flex-shrink:0;">
+      <div class="k-col-header" style="border-bottom:3px solid ${color};cursor:pointer;user-select:none;"
+        role="button" tabindex="0" aria-expanded="false" aria-label="${escH(title)} — expandir coluna"
+        onclick="aToggleCollapse('${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();aToggleCollapse('${id}')}">
+        <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.68rem;font-weight:700;color:var(--text);padding:8px 2px;white-space:nowrap;">${title} <span style="color:${color}">(${count})</span></div>
+      </div>
+    </div>`;
+  }
+  const dropAttrs = (droppable && state.isManager)
+    ? `ondragover="arqDragOver(event,'${id}')" ondragleave="arqDragLeave(event)" ondrop="arqDrop(event,'${id}')"` : '';
+  return `<div class="k-col" style="width:260px;">
+    <div class="k-col-header" style="border-bottom:3px solid ${color};cursor:pointer;user-select:none;"
+      role="button" tabindex="0" aria-expanded="true" aria-label="${escH(title)} — recolher coluna"
+      onclick="aToggleCollapse('${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();aToggleCollapse('${id}')}">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:4px;">
+        <div style="display:flex;align-items:center;gap:6px;"><div class="k-col-title">${title}</div><div class="k-col-count">${count}</div></div>
+        <div style="display:flex;align-items:center;gap:2px;" onclick="event.stopPropagation()">
+          <button onclick="aTogglePin('${id}',event)" title="${isPinned?'Desafixar':'Fixar coluna expandida'}" aria-label="${isPinned?'Desafixar coluna':'Fixar coluna expandida'}" aria-pressed="${isPinned}"
+            style="background:none;border:none;cursor:pointer;font-size:0.72rem;padding:2px 4px;opacity:${isPinned?1:0.3};color:${isPinned?'var(--orange)':'var(--muted)'};transition:opacity .15s;"><span aria-hidden="true">📌</span></button>
+          <span aria-hidden="true" style="font-size:0.6rem;color:var(--muted);pointer-events:none;">▴</span>
+        </div>
+      </div>
+    </div>
+    <div class="k-col-body" id="arqcol-${id}" ${dropAttrs}>
+      ${bodyHtml}
+    </div>
+  </div>`;
+}
+
+// Arrastar cards entre colunas (módulos) para reorganizar o Arquivo Morto — só gestora.
+let _arqDragKey=null;
+window.arqDragStart=(e,key)=>{ _arqDragKey=key; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',key); document.getElementById('arqcard-'+key)?.classList.add('dragging'); };
+window.arqDragEnd=()=>{ document.querySelectorAll('.k-card.dragging').forEach(c=>c.classList.remove('dragging')); document.querySelectorAll('.k-col-body.drag-over').forEach(c=>c.classList.remove('drag-over')); _arqDragKey=null; };
+window.arqDragOver=(e,modId)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; document.getElementById('arqcol-'+modId)?.classList.add('drag-over'); };
+window.arqDragLeave=(e)=>{ e.currentTarget.classList.remove('drag-over'); };
+window.arqDrop=async(e,modId)=>{
+  e.preventDefault();
+  const key=e.dataTransfer.getData('text/plain')||_arqDragKey;
+  document.getElementById('arqcol-'+modId)?.classList.remove('drag-over');
+  if(!key) return;
+  // Se o card arrastado faz parte de uma seleção múltipla, move todos juntos.
+  if(state.aSelected?.has(key) && state.aSelected.size>1){ await aMoveKeysToModule([...state.aSelected], modId); }
+  else { await window.moveArquivoCardToModule(key,modId); }
+};
+window.moveArquivoCardToModule=async(key,modId)=>{
+  if(!state.isManager){ showToast('Sem permissão','Apenas a gestora pode reorganizar o Arquivo Morto.'); return; }
+  const card = state.arquivoCards?.[key] || window._arquivoCards?.[key];
+  if(!card || card.module===modId) return;
+  try{
+    await update(child(arquivoRef,key), { module:modId, reorganizadoEm:Date.now() });
+    card.module = modId;
+    if(state.arquivoCards) state.arquivoCards[key]=card;
+    if(window._arquivoCards) window._arquivoCards[key]=card;
+    window.renderArquivo?.();
+    showToast('Movido', `Card movido para ${state.MODS.find(m=>m.id===modId)?.label || (modId==='TRELLO'?'Importados do Trello':modId)}.`);
+  }catch(e){ showToast('Erro','Falha ao mover o card. Tente novamente.'); console.error('[moveArquivoCardToModule]',e); }
+};
+
+// ── Seleção múltipla + mover em lote no Arquivo Morto (só gestora) ────────────
+function _refreshABulkModSelect(){
+  const sel=document.getElementById('aBulkModSelect');
+  if(!sel) return;
+  const cur=sel.value;
+  const mods=(state.MODS||[]).filter(m=>m.id!=='TRELLO');
+  sel.innerHTML=mods.map(m=>`<option value="${escH(m.id)}">${escH(m.label)}</option>`).join('');
+  if(cur && sel.querySelector(`option[value="${cur}"]`)) sel.value=cur;
+}
+function _updateABulkBar(){
+  const bar=document.getElementById('arquivoBulkBar');
+  if(!bar) return;
+  bar.style.display = state.isManager ? 'flex' : 'none';
+  const n=state.aSelected?.size||0;
+  const countEl=document.getElementById('aBulkCount');
+  if(countEl) countEl.textContent = n ? `${n} selecionado${n>1?'s':''}` : 'Nenhum selecionado';
+  const btn=document.getElementById('aBulkMoveBtn');
+  if(btn) btn.disabled = n===0;
+  _refreshABulkModSelect();
+}
+window.aToggleSelect=(key,checked)=>{
+  state.aSelected=state.aSelected||new Set();
+  if(checked) state.aSelected.add(key); else state.aSelected.delete(key);
+  document.getElementById('arqcard-'+key)?.classList.toggle('k-card-selected', checked);
+  _updateABulkBar();
+};
+window.aClearSelection=()=>{
+  state.aSelected=new Set();
+  window.renderArquivo?.();
+};
+async function aMoveKeysToModule(keys, modId){
+  if(!state.isManager){ showToast('Sem permissão','Apenas a gestora pode reorganizar o Arquivo Morto.'); return; }
+  const cache = state.arquivoCards || window._arquivoCards || {};
+  const valid = keys.filter(k=>{ const c=cache[k]; return c && c.module!==modId; });
+  if(!valid.length){ showToast('Nada a mover','Os cards selecionados já estão nessa coluna.'); return; }
+  const modLabel = state.MODS.find(m=>m.id===modId)?.label || (modId==='TRELLO'?'Importados do Trello':modId);
+  setSyncStatus('loading','Movendo...');
+  const now=Date.now();
+  const updates={};
+  valid.forEach(k=>{ updates[`${k}/module`]=modId; updates[`${k}/reorganizadoEm`]=now; });
+  try{
+    await update(arquivoRef, updates);   // 1 escrita atômica p/ todos
+    valid.forEach(k=>{ const c=cache[k]; if(c){ c.module=modId; if(state.arquivoCards) state.arquivoCards[k]=c; if(window._arquivoCards) window._arquivoCards[k]=c; } });
+    state.aSelected=new Set();
+    setSyncStatus('ok','Sincronizado ✓');
+    showToast('Movidos', `${valid.length} card(s) movido(s) para ${modLabel}.`);
+    try{ registrarLog('kanban','Reorganizou arquivo (lote)', `${valid.length} card(s) → ${modLabel}`); }catch(e){}
+  }catch(e){ setSyncStatus('ok','Sincronizado ✓'); showToast('Erro','Falha ao mover. Tente novamente.'); console.error('[aMoveKeysToModule]',e); }
+  window.renderArquivo?.();
+}
+window.aMoveSelected=async()=>{
+  const modId=document.getElementById('aBulkModSelect')?.value;
+  if(!modId){ showToast('Escolha a coluna','Selecione a coluna de destino.'); return; }
+  const keys=[...(state.aSelected||[])];
+  if(!keys.length){ showToast('Nada selecionado','Selecione ao menos um card.'); return; }
+  await aMoveKeysToModule(keys, modId);
+};
+
 window.renderArquivo = ()=>{
   const board = document.getElementById('arquivoBoard'); if(!board) return;
   // Escalabilidade #2: garante o arquivo carregado sob demanda (lazy) antes de renderizar
@@ -2401,9 +2592,12 @@ window.renderArquivo = ()=>{
     else if(years.length) yearSel.value = String(years[0]);
   }
   const selYear = yearSel && yearSel.value ? +yearSel.value : (years[0]||null);
-  const all = allRaw.filter(c=>_yearOf(c)===selYear);
-  // Coluna TRELLO virtual quando houver cards importados do Trello (config da equipe pode não ter TRELLO)
-  const hasTrello = all.some(c=>c.importedFrom==='trello');
+  // Busca cross-ano: com termo de busca, procura em TODO o arquivo (todos os anos),
+  // como no Fluxo de Demandas; sem busca, mantém o escopo do ano selecionado.
+  const all = search ? allRaw : allRaw.filter(c=>_yearOf(c)===selYear);
+  // Coluna TRELLO virtual quando houver cards NO MÓDULO 'TRELLO' (exibição unificada por
+  // módulo: some sozinha quando a gestora move todos os cards do Trello para outras colunas).
+  const hasTrello = all.some(c=>c.module==='TRELLO');
   const baseMods = modFilter ? state.MODS.filter(m=>m.id===modFilter) : state.MODS;
   const mods = (hasTrello && !state.MODS.some(m=>m.id==='TRELLO') && !modFilter)
     ? [{id:'TRELLO',label:'Importados do Trello',color:'#0052CC'}, ...baseMods]
@@ -2423,53 +2617,45 @@ window.renderArquivo = ()=>{
     btnAT.style.display = hasTrelloConcluidos ? '' : 'none';
   }
 
-  board.innerHTML = mods.map(mod=>{
-    let cards;
-    if(mod.id==='TRELLO'){
-      // Coluna especial: todos os cards arquivados com origem Trello
-      cards = all.filter(c=>c.importedFrom==='trello');
-    } else {
-      cards = all.filter(c=>c.module===mod.id && c.importedFrom!=='trello');
-    }
+  _initAColState([...mods.map(m=>m.id), 'lixeira']);
+
+  const modsHtml = mods.map(mod=>{
+    // Exibição unificada por MÓDULO (sem travar os cards do Trello numa coluna à parte):
+    // cada card aparece na coluna do seu `module`, então dá para reorganizar arrastando.
+    let cards = all.filter(c=>c.module===mod.id);
     if(collabFilter) cards = cards.filter(c=>kIsAssignee(c,collabFilter));
     if(typeFilter) cards = cards.filter(c=>(c.tags||[]).some(t=>t.includes(typeFilter)));
     if(search) cards = cards.filter(c=>(c.name||'').toLowerCase().includes(search));
     cards.sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
-    return `<div class="k-col" style="width:260px;">
-      <div class="k-col-header" style="border-bottom:3px solid ${mod.color}">
-        <div class="k-col-title">${mod.label}</div>
-        <div class="k-col-count">${cards.length}</div>
-      </div>
-      <div class="k-col-body">
-        ${cards.length?cards.map(card=>{
-          const col=state.COLLABS[card.assignee]||{label:card.assignee||'?',initials:'?',color:'#94A3B8'};
-          const labelsHtml=(card.tags||[]).slice(0,2).map(t=>{const lc=kLabelColor(t);return`<span class="k-card-label" style="background:${lc.bg};border:1px solid ${lc.border};color:${lc.color}">${escH(t)}</span>`;}).join('');
-          // ✅ NOVO: links clicáveis no arquivo morto
-          const linksHtml=(card.links||[]).filter(Boolean).map(l=>`<a class="k-card-link" href="${escH(sanitizeUrl(l))}" target="_blank" rel="noopener noreferrer">${ICONS.link} ${escH(l.replace(/https?:\/\/(www\.)?/,'').slice(0,30))}</a>`).join('');
-          return`<div class="k-card" style="opacity:0.85;cursor:pointer;" onclick="openKanbanDetail('${card._key}')">
-            <div class="k-card-name">${escH(card.name||'Sem título')}</div>
-            ${labelsHtml?`<div class="k-card-labels">${labelsHtml}</div>`:''}
-            ${linksHtml?`<div class="k-card-links">${linksHtml}</div>`:''}
-            <div class="k-card-meta">
-              <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
-              ${card.hours?`<span class="k-card-hours">${ICONS.clock} ${kFmtHours(card.hours)}</span>`:''}
-            </div>
-            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--muted);margin-top:5px;">Arquivado em ${card.archivedAt?new Date(card.archivedAt).toLocaleDateString('pt-BR'):'-'}</div>
-          </div>`;
-        }).join(''):`<div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:20px;">Nenhuma disciplina neste módulo</div>`}
-      </div>
-    </div>`;
-  }).join('') +
-  // ✅ NOVO: Lixeira com botão desarquivar por card e botão limpar lixeira
-  `<div class="k-col" style="width:260px;">
-    <div class="k-col-header" style="border-bottom:3px solid #EF4444">
-      <div class="k-col-title">🗑 Lixeira</div>
-      <div class="k-col-count">${lixeiraCards.length}</div>
-    </div>
-    <div class="k-col-body">
-      <div style="font-size:0.62rem;color:var(--muted);text-align:center;margin-bottom:6px;">Cards removidos automaticamente após 30 dias</div>
-      ${state.isManager&&lixeiraCards.length?`<button onclick="clearLixeira()" style="width:100%;margin-bottom:8px;padding:5px 0;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">${ICONS.trash} Limpar lixeira (${lixeiraCards.length})</button>`:''}
-      ${lixeiraCards.length?lixeiraCards.map(card=>{
+    const body = cards.length ? cards.map(card=>{
+      const col=state.COLLABS[card.assignee]||{label:card.assignee||'?',initials:'?',color:'#94A3B8'};
+      const labelsHtml=(card.tags||[]).slice(0,2).map(t=>{const lc=kLabelColor(t);return`<span class="k-card-label" style="background:${lc.bg};border:1px solid ${lc.border};color:${lc.color}">${escH(t)}</span>`;}).join('');
+      const linksHtml=(card.links||[]).filter(Boolean).map(l=>`<a class="k-card-link" href="${escH(sanitizeUrl(l))}" target="_blank" rel="noopener noreferrer">${ICONS.link} ${escH(l.replace(/https?:\/\/(www\.)?/,'').slice(0,30))}</a>`).join('');
+      const isSel = state.isManager && state.aSelected?.has(card._key);
+      const selChk = state.isManager
+        ? `<input type="checkbox" class="k-card-chk" draggable="false" ${isSel?'checked':''} onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onchange="aToggleSelect('${card._key}',this.checked)" title="Selecionar para mover em lote" aria-label="Selecionar card" style="position:absolute;top:8px;right:8px;width:15px;height:15px;accent-color:var(--orange);cursor:pointer;z-index:2;">`
+        : '';
+      return`<div class="k-card${isSel?' k-card-selected':''}" id="arqcard-${card._key}" style="opacity:0.85;cursor:${state.isManager?'grab':'pointer'};"
+        ${state.isManager?`draggable="true" ondragstart="arqDragStart(event,'${card._key}')" ondragend="arqDragEnd(event)"`:''}
+        onclick="openKanbanDetail('${card._key}')">
+        ${selChk}
+        <div class="k-card-name" style="${state.isManager?'padding-right:20px;':''}">${escH(card.name||'Sem título')}</div>
+        ${labelsHtml?`<div class="k-card-labels">${labelsHtml}</div>`:''}
+        ${linksHtml?`<div class="k-card-links">${linksHtml}</div>`:''}
+        <div class="k-card-meta">
+          <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
+          ${card.hours?`<span class="k-card-hours">${ICONS.clock} ${kFmtHours(card.hours)}</span>`:''}
+        </div>
+        <div style="font-family:var(--mono);font-size:0.58rem;color:var(--muted);margin-top:5px;">Arquivado em ${card.archivedAt?new Date(card.archivedAt).toLocaleDateString('pt-BR'):'-'}</div>
+      </div>`;
+    }).join('') : `<div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:20px;">Nenhuma disciplina neste módulo</div>`;
+    return _arqColHtml({id:mod.id, color:mod.color, title:mod.label, count:cards.length, bodyHtml:body, droppable:true});
+  }).join('');
+
+  // Lixeira (não é alvo de drop) — botão desarquivar por card + limpar lixeira
+  const lixBody = `<div style="font-size:0.62rem;color:var(--muted);text-align:center;margin-bottom:6px;">Cards removidos automaticamente após 30 dias</div>`
+    + (state.isManager&&lixeiraCards.length?`<button onclick="clearLixeira()" style="width:100%;margin-bottom:8px;padding:5px 0;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;">${ICONS.trash} Limpar lixeira (${lixeiraCards.length})</button>`:'')
+    + (lixeiraCards.length?lixeiraCards.map(card=>{
         const col=state.COLLABS[card.assignee]||{label:card.assignee||'?',initials:'?',color:'#94A3B8'};
         return`<div class="k-card" style="opacity:0.75;">
           <div class="k-card-name" style="cursor:default;">${escH(card.name||'')}</div>
@@ -2479,10 +2665,11 @@ window.renderArquivo = ()=>{
           </div>
           ${state.isManager?`<button onclick="unarchiveKanbanCard('${card._key}')" style="width:100%;margin-top:6px;padding:4px 0;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;font-size:0.7rem;font-weight:700;cursor:pointer;">${ICONS.archive} Desarquivar</button>`:''}
         </div>`;
-      }).join(''):`<div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:20px;">Lixeira vazia</div>`}
-    </div>
-  </div>`;
+      }).join(''):`<div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:20px;">Lixeira vazia</div>`);
+
+  board.innerHTML = modsHtml + _arqColHtml({id:'lixeira', color:'#EF4444', title:'🗑 Lixeira', count:lixeiraCards.length, bodyHtml:lixBody, droppable:false});
   _setupArquivoPan();
+  _updateABulkBar();
 };
 
 // ── Modal de escolha de arquivamento (Arquivo Morto vs Lixeira) ──────────────

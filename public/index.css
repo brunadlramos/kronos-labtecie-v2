@@ -1018,6 +1018,7 @@ table.week-table tr:hover td{background:var(--orange-light);}
 .k-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:grab;transition:all 0.18s;animation:kCardIn 0.2s ease;position:relative;}
 .k-card:hover{border-color:var(--orange-border);box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .k-card.dragging{opacity:0.45;cursor:grabbing;}
+.k-card.k-card-selected{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange);}
 /* Card urgente: borda vermelha com destaque espesso à esquerda.
    (Antes usava ::before + inset, que desalinhavam nos cantos arredondados
    e deixavam acabamento torto na lateral esquerda.) */

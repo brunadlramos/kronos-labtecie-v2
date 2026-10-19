@@ -9,6 +9,7 @@ import {
   fmtDur, fmtTime, fmtDate, fmtShortDate, escH, countUp
 } from './utils.js';
 import { db } from './firebase-refs.js';
+import { downloadXlsx } from './xlsx-lite.js';
 import { ref, get, query, orderByChild, startAt, endAt }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
@@ -912,6 +913,62 @@ export function renderDashDemandasWeek() {
   renderDemandasSemana('dashDemandasBody', days, collabFilter, searchFilter);
 }
 window.renderDashDemandasWeek = renderDashDemandasWeek;
+
+// Exporta a tabela "Demandas da Semana" para Excel (.xlsx). Usa exatamente os
+// mesmos filtros da tela (intervalo de datas ou semana atual, colaborador e busca)
+// e inclui todas as linhas correspondentes.
+window.exportDashDemandasExcel = ()=>{
+  const _s = document.getElementById('dashDemandasStart')?.value;
+  const _e = document.getElementById('dashDemandasEnd')?.value;
+  const days = (_s && _e) ? _dateRangeDays(_s, _e) : getWeekDays(state.weekOffset);
+  const collabFilter = document.getElementById('dashDemandasCollab')?.value || '';
+  const searchFilter = (document.getElementById('dashDemandasSearch')?.value||'').toLowerCase().trim();
+
+  const startTs = days[0].getTime();
+  const _last = days[days.length-1];
+  const endTs = new Date(_last.getFullYear(), _last.getMonth(), _last.getDate(), 23,59,59).getTime();
+
+  let data = getEntriesArray().map(([k,e])=>({...e,_key:k})).filter(e=>{
+    if(!isActive(e.collab)) return false;   // mesmo recorte da tabela na tela
+    if(collabFilter && e.collab !== collabFilter) return false;
+    if(e.startTime >= startTs && e.startTime <= endTs) return true;
+    if(e.periods && e.periods.some(p=>p.startTime>=startTs && p.startTime<=endTs)) return true;
+    return false;
+  }).sort((a,b)=>b.startTime-a.startTime);
+
+  if(searchFilter){
+    data = data.filter(e=>{
+      const task=(e.task||'').toLowerCase();
+      const collab=(state.COLLABS[e.collab]?.label||e.collab||'').toLowerCase();
+      const proj=(state.PROJECTS[e.project]?.label||e.project||'').toLowerCase();
+      return task.includes(searchFilter)||collab.includes(searchFilter)||proj.includes(searchFilter);
+    });
+  }
+
+  if(!data.length){ window.showToast?.('Nada para exportar','Nenhuma demanda encontrada no período/filtros atuais.'); return; }
+
+  const header=['Data','Colaborador','Tarefa','Projeto','Início','Fim','Duração','% Amount','Tags','Observação'];
+  const rows=data.map(e=>{
+    const col =state.COLLABS[e.collab] ||{label:e.collab};
+    const proj=state.PROJECTS[e.project]||{label:e.project};
+    const amt =parseFloat(calcAmount(e.project,e.duration,e.peso).toFixed(2));
+    return [
+      new Date(e.startTime).toLocaleDateString('pt-BR'),
+      col.label||e.collab||'',
+      e.task||'',
+      proj.label||e.project||'',
+      fmtTime(e.startTime),
+      fmtTime(e.endTime),
+      fmtDur(e.duration),
+      isFinite(amt)?amt:0,
+      (e.tags||[]).join('; '),
+      e.obs||''
+    ];
+  });
+
+  downloadXlsx(`demandas_semana_kronos_${new Date().toISOString().slice(0,10)}.xlsx`, 'Demandas da Semana', [header,...rows]);
+  window.showToast?.('Excel gerado', `${data.length} demanda${data.length!==1?'s':''} exportada${data.length!==1?'s':''}.`);
+};
 
 // ── renderDemandasSemana (reutilizável para gestora e RH) ─────────────────────
 export function renderDemandasSemana(tbodyId, days, collabFilter='', searchFilter='') {
