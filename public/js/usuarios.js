@@ -44,15 +44,11 @@ export async function renderUsuarios(){
   const grid = document.getElementById('usuariosGrid');
   if(!grid) return;
 
-  // Admin: visão consolidada de TODAS as equipes (com edição)
-  if(state.userPapel === 'admin'){
-    await _renderUsuariosAdmin(grid, true);
-    return;
-  }
-
-  // C3: configuração de jornada da equipe — visível p/ gestora E coordenador/auditor
+  // C3: configuração de jornada da equipe — visível p/ admin, gestora E coordenador/auditor
   // (o coordenador analisa; a gravação segue restrita a gestora/admin pelas regras).
   // RH é SOMENTE LEITURA: pula a config editável e mostra só a visão consolidada abaixo.
+  // Vem ANTES do desvio do admin: o return dele pulava este bloco e o admin nunca via o botão.
+  // Para o admin vale a equipe ativa no seletor (a troca de equipe limpa dataset.loaded).
   if((state.isManager || state.isAuditor) && !state.isRH){
     const cfgBtn = document.getElementById('btnToggleCfgAvancada');
     if(cfgBtn) cfgBtn.style.display = 'inline-flex';
@@ -61,6 +57,12 @@ export async function renderUsuarios(){
       cfgArea.dataset.loaded = '1';
       await renderCfgColaboradores(cfgArea);   // renderiza escondido; o botão revela
     }
+  }
+
+  // Admin: visão consolidada de TODAS as equipes (com edição)
+  if(state.userPapel === 'admin'){
+    await _renderUsuariosAdmin(grid, true);
+    return;
   }
 
   // Coordenação (coordenador/auditor/rh): vê TODOS os colaboradores de TODAS as equipes,
