@@ -110,7 +110,7 @@ Vale a pré-condição (a) da seção 3.
 **O comando de hash por arquivo ainda não está definido** (seção 7). Definir e registrar: `________`
 
 - [ ] Calcular o hash (ex.: SHA-256) de cada arquivo de `public/` na branch **e** de cada arquivo servido por `kronoslabtecie.web.app`; listar diferenças. Executar em Docker/máquina dedicada, não no PC com carteiras.
-- [ ] Toda diferença é **esperada** (E7 (`kanban.js`, `importadores.js`) e UI do B1 (`usuarios.js`)) — nada "só em produção" sendo sobrescrito. Se houver: **parar** e trazer para a branch antes (como no restore `c6e1890`).
+- [ ] Toda diferença é **esperada** (arquivos alterados em relação a `origin/main`: `index_v2.js`, `login_v2.js`, `js/auth.js`, `config.js`, `dashboard.js`, `demandas.js`, `importadores.js`, `kanban.js`, `timer.js`, `usuarios.js` e `firebase.json` (HSTS)) — nada "só em produção" sendo sobrescrito. Se houver: **parar** e trazer para a branch antes (como no restore `c6e1890`).
 - [ ] Lista de arquivos diferentes anexada ao Registro.
 
 ### 5.2 Deploy
@@ -149,3 +149,16 @@ Vale a pré-condição (a) da seção 3.
 - **firebase-tools no container:** presença na imagem/versão e persistência do login não verificadas.
 - **`database.rules.ANTES.json`:** só no PC do Allan; não versionado.
 - **Pasta do repo sincronizada na nuvem?** Não verificado (seção 2).
+
+## 8. Escopo da Onda 1+2+3 e o que muda para os usuários (ler antes de decidir)
+
+- **Suíte:** 193 testes, 0 falhas. Ensaio com o snapshot real de 26/11 (28 colaboradores, 9 gestoras, 1 admin): 0 regressões, nas regras e nas operações do front.
+- **Mudanças intencionais de comportamento:**
+  - o log de auditoria (`equipes/*/logs`) passa a ser lido **só pelo admin**;
+  - colaborador deixa de ler `/coordenacoes`; sem ela, 2 usuários veriam o id da equipe no lugar do nome (reverter = uma linha no `.read` de `coordenacoes`);
+  - `peso` das horas só muda pela gestão; `from` de notificação e `requestedBy` de pedido são amarrados ao autor (a gestão fica livre);
+  - colaborador com a tela aberta há muito tempo e nota de avaliação desatualizada no cache leva erro ao arquivar um card até recarregar a página.
+- **Deploy conjunto:** regras e hosting dependem um do outro (o front usa `update` parcial e o importador de avaliações grava em outro caminho). Publicar as regras e, em seguida, o hosting, na mesma janela. Em caso de falha, reverter os dois.
+- **HSTS** (`includeSubDomains`, 1 ano) entra junto com o hosting; é difícil de reverter, e o risco só pesa se o app for servido na raiz de um domínio institucional.
+- **Não corrigido (aceito/backlog):** A4 (atestado e `config/usuarios` legíveis por toda a equipe: exige mudar modelo e front), B5 (marcador de troca de senha gravável pelo usuário: exige Cloud Function), arquivo morto ainda alterável por membro em alguns casos, card criado sem `name` passa a ser recusado (conferir o importador do Trello), `saveKanbanCard` zera horas/workers/comentários ao editar (já era assim em produção).
+- **Não testado:** navegador real, Auth e Hosting. Fazer o smoke test das seções 4 e 5 com conta de teste.
