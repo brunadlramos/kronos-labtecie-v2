@@ -2379,7 +2379,7 @@ window._updateArquivoDropdown = (query)=>{
   drop.innerHTML = matches.map(card=>{
     const mod = state.MODS.find(m=>m.id===card.module)||{};
     const col = state.COLLABS[card.assignee]||{};
-    return `<div class="k-search-drop-item" onmousedown="event.preventDefault()" onclick="window._goToArquivoCard('${escH(card._key)}','${escH((card.name||'').replace(/'/g,"\\'"))}')">
+    return `<div class="k-search-drop-item" onmousedown="event.preventDefault()" onclick="window._goToArquivoCard(this.dataset.k,this.dataset.n)" data-k="${escH(card._key)}" data-n="${escH(card.name||'')}">
       <div class="k-search-drop-name">${escH(card.name||'Sem título')}</div>
       <div class="k-search-drop-meta">
         <span style="color:${mod.color||'#94A3B8'}">${escH(mod.label||'Arquivo Morto')}</span>

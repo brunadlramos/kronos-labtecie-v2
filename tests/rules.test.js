@@ -830,6 +830,19 @@ describe('C6 · notifs.from amarrado ao autor', () => {
   });
 });
 
+describe('Revisao Onda 3 · config/usuarios/<uid>/key so com caracteres seguros (vai cru em onclick)', () => {
+  const k = (u, v) => ref(u, `equipes/${EQ}/config/usuarios/ana/key`).set(v);
+  it("ATAQUE: gestora/gestorTemp NAO gravam key com JS", async () => {
+    await assertFails(k(GEST, "x');alert(1)//"));
+    await assertFails(k(TMP, "x');alert(1)//"));
+    await assertFails(k(GEST, 'a'.repeat(61)));
+  });
+  it('NAO-REGRESSAO: key legitima continua gravavel', async () => {
+    await assertSucceeds(k(GEST, 'ana'));
+    await assertSucceeds(k(GEST, 'ana_2-b'));
+  });
+});
+
 describe('C5b · peso so muda pela gestao (revisao Opus)', () => {
   const e = (u, id) => ref(u, `equipes/${EQ}/entries/${id}`);
   it('ATAQUE: Ana NAO grava peso no proprio registro (update e set)', async () => {
