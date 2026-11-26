@@ -1026,21 +1026,21 @@ window.saveKanbanCard = async () => {
   const fromEntryKey = (!state.editingKanbanId && window._pendingFromEntryKey) ? window._pendingFromEntryKey : (state.kanbanCards[state.editingKanbanId]?.fromEntryKey||null);
   window._pendingFromEntryKey = null;
 
+  const editing = !!(state.editingKanbanId && state.kanbanCards[state.editingKanbanId]);
   const cardData = {
     name,
     assignee,
-    assignees,
+    // null explícito apaga o campo opcional no update (array vazio dependia do SDK)
+    assignees: assignees.length ? assignees : null,
     // Curador (só Revisão): salva o escolhido ou null para limpar; outras equipes não tocam.
     ...(EQUIPE_ID === 'revisao' ? { curador: (document.getElementById('kcCurador')?.value || null) } : {}),
     column,
     module,
     obs: obs || '',
-    tags,
-    links: validLinks,
-    hours: 0,
-    workers: {},
-    comments: {},
-    adjustCycles: 0,
+    tags: tags?.length ? tags : null,
+    links: validLinks.length ? validLinks : null,
+    // horas/workers/comentários só nascem na criação; editar NUNCA os toca
+    ...(editing ? {} : { hours: 0, workers: {}, comments: {}, adjustCycles: 0 }),
     ...(fromEntryKey ? {fromEntryKey} : {}),
     history: state.editingKanbanId
       ? [...(state.kanbanCards[state.editingKanbanId]?.history || [])]
@@ -2286,7 +2286,22 @@ function _baseModule(card){
 // move um card ATIVO (kanban) → nó arquivo (arquiva de verdade)
 async function moveCardToArquivo(key, cardData){
   const data = {...cardData, archived:true, archiveYear:_archiveYearOf(cardData), module:_baseModule(cardData)};
-  await set(child(arquivoRef, key), data);
+  try { await set(child(arquivoRef, key), data); }
+  catch(e){
+    if(e?.code !== 'PERMISSION_DENIED') throw e;
+    // cache velho (nota/responsável mudou no servidor): relê o card do banco e tenta UMA vez
+    const snap = await get(child(kanbanRef, key));
+    if(!snap.exists()) throw e;
+    const f = snap.val();
+    for(const k of ['name','assignee','ajuste_diagramacao','ajuste_diagramacao_obs','ajuste_curadoria','ajuste_curadoria_obs','ajuste_avaliado_em']){
+      if(f[k] === undefined) delete data[k]; else data[k] = f[k];
+    }
+    try { await set(child(arquivoRef, key), data); }
+    catch(e2){
+      if(e2?.code === 'PERMISSION_DENIED') showToast('Dados desatualizados','Este card mudou no servidor. Recarregue a página (F5) e tente de novo.');
+      throw e2;
+    }
+  }
   await remove(child(kanbanRef, key));
   state.arquivoCards[key] = data;
   delete state.kanbanCards[key];
