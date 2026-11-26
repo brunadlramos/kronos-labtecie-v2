@@ -70,8 +70,8 @@ export async function renderCfgColaboradores(targetEl){
           </select></td>
           <td style="vertical-align:middle;">
             <div style="display:inline-flex;align-items:center;gap:6px;">
-              <span id="udot_${uid}" style="width:16px;height:16px;border-radius:50%;background:${u.cor||'#94A3B8'};border:1px solid var(--border);flex-shrink:0;display:inline-block;"></span>
-              <input type="color" value="${u.cor||'#94A3B8'}" id="ucl_${uid}" oninput="document.getElementById('udot_${uid}').style.background=this.value" style="width:36px;height:26px;padding:2px;border-radius:6px;cursor:pointer;vertical-align:middle;">
+              <span id="udot_${uid}" style="width:16px;height:16px;border-radius:50%;background:${escH(u.cor||'#94A3B8')};border:1px solid var(--border);flex-shrink:0;display:inline-block;"></span>
+              <input type="color" value="${escH(u.cor||'#94A3B8')}" id="ucl_${uid}" oninput="document.getElementById('udot_${uid}').style.background=this.value" style="width:36px;height:26px;padding:2px;border-radius:6px;cursor:pointer;vertical-align:middle;">
             </div>
           </td>
           <td>
