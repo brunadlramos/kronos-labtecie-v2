@@ -1051,6 +1051,14 @@ window.saveKanbanCard = async () => {
     updatedAt: now
   };
 
+  // Editar sem mexer no responsável não regrava assignee/assignees: a regra trava a troca em card avaliado
+  // e cards antigos (sem assignees, ou assignee != assignees[0]) seriam recusados.
+  if (editing) {
+    const old = state.kanbanCards[state.editingKanbanId];
+    const oldList = Array.isArray(old.assignees) ? old.assignees : (old.assignee ? [old.assignee] : []);
+    if (JSON.stringify(oldList) === JSON.stringify(assignees)) { delete cardData.assignee; delete cardData.assignees; }
+  }
+
   try {
     setSyncStatus('loading', state.editingKanbanId ? 'Atualizando...' : 'Criando...');
 
