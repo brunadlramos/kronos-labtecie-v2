@@ -131,11 +131,11 @@ Vale a pré-condição (a) da seção 3.
 - [ ] Novo backup (`...-pos-<motivo>.json`) e contagem de nós **comparada** com a da seção 2 (plano 4.3). Diferenças só explicáveis por uso normal entre os dois momentos; qualquer queda inexplicada → rollback + investigar.
 - [ ] Registrar em `PLANO_CORRECAO_SEGURANCA.md`, seção 7: data, o que foi publicado, commit, contagens, resultado do smoke test.
 - [ ] Red team contra a cópia (plano 4.2) e atualização do relatório (4.4–4.5), se ainda pendentes.
+- [ ] **Encerrar a sessão [DONO]:** `docker compose -f docker-compose.testes.yml exec dev npx --no firebase logout` e depois `docker compose -f docker-compose.testes.yml down` (o container guarda o login de produção e enxerga `backups/`; não deixar de pé).
 
 | Data | Deploy | Commit | Contagem antes | Contagem depois | Smoke | Quem |
 |---|---|---|---|---|---|---|
 | | | | | | | |
-- [ ] **Encerrar a sessão [DONO]:** `docker compose -f docker-compose.testes.yml exec dev npx --no firebase logout` e depois `docker compose -f docker-compose.testes.yml down` (o container guarda o login de produção e enxerga `backups/`; não deixar de pé).
 
 ## 7. O que ainda NÃO foi verificado / não definido
 
