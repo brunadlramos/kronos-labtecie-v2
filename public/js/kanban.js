@@ -429,7 +429,7 @@ function renderKCard(card, botoesMemo){
     if(b.tipo==='timer'){
       if(timerAtivo) return `<button class="k-btn-timer" style="background:var(--orange);color:#fff;" disabled>🔴 Timer ativo</button>`;
       if(state.isRunning && !timerAtivo) return '';
-      return `<button class="k-btn-timer" onclick="startKanbanTimer('${card._key}')">${ICONS.play} ${timerLabel}</button>`;
+      return `<button class="k-btn-timer" onclick="startKanbanTimer('${card._key}')">${ICONS.play} ${escH(timerLabel)}</button>`;
     }
     if(b.tipo==='mover'&&b.destino){
       const destCol = state.K_COLS.find(c=>c.id===b.destino);
@@ -1678,7 +1678,7 @@ window.renderIndicadores = ()=>{
         onclick="openKanbanDetail('${c._key}');setTimeout(()=>showPage('kanban',null),0)">
         <div style="width:20px;height:20px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
         <div style="flex:1;font-size:0.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(c.name||'—')}</div>
-        <div style="font-size:0.65rem;font-family:var(--mono);color:var(--muted);">${kColLabel(c.column)||'Arquivo'}</div>
+        <div style="font-size:0.65rem;font-family:var(--mono);color:var(--muted);">${escH(kColLabel(c.column)||'Arquivo')}</div>
       </div>`;
     }).join('') || '<div style="font-size:0.78rem;color:var(--muted);">✅ Todos os cards avaliados!</div>';
   }
