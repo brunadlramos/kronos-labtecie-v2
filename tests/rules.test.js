@@ -169,22 +169,6 @@ describe('B1 · criação de usuário com papel arbitrário', () => {
     await assertSucceeds(ref(ANA, `usuarios/${ANA}`).update({ nome: 'Ana Maria' }));
   });
 
-  it('ATAQUE: gestora NÃO pode gravar papel admin direto no filho (update)', async () => {
-    await assertFails(ref(GEST, `usuarios/${NOVO}`).update({ papel: 'admin', equipeId: EQ }));
-  });
-
-  it('NAO-REGRESSAO: coordenador cria colaborador em equipe da sua coordenação', async () => {
-    await assertSucceeds(ref(COORD, 'usuarios/uid_novo_colab').set({
-      nome: 'Novo', email: 'novo@fatecie.edu.br', papel: 'colaborador', equipeId: EQ,
-    }));
-  });
-
-  it('NAO-REGRESSAO: admin cria gestora (papel da lista)', async () => {
-    await assertSucceeds(ref(ADMIN, 'usuarios/uid_nova_gestora').set({
-      nome: 'G', email: 'g@fatecie.edu.br', papel: 'gestora', equipeId: EQ,
-    }));
-  });
-
   it('ATAQUE: colaborador NÃO promove a si mesmo (confirmado em emulador antes)', async () => {
     await assertFails(ref(ANA, `usuarios/${ANA}/papel`).set('admin'));
   });

@@ -358,10 +358,10 @@ export function renderKanban(){
         onclick="kToggleCollapse('${col.id}')"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kToggleCollapse('${col.id}')}">
         ${isCollapsed
-          ? `<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.68rem;font-weight:700;color:var(--text);padding:8px 2px;white-space:nowrap;">${col.label} <span style="color:${col.color}">(${colCards.length})</span></div>`
+          ? `<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.68rem;font-weight:700;color:var(--text);padding:8px 2px;white-space:nowrap;">${escH(col.label)} <span style="color:${col.color}">(${colCards.length})</span></div>`
           : `<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:4px;">
                <div style="display:flex;align-items:center;gap:6px;">
-                 <div class="k-col-title">${col.label}</div>
+                 <div class="k-col-title">${escH(col.label)}</div>
                  <div class="k-col-count">${colCards.length}</div>
                </div>
                <div style="display:flex;align-items:center;gap:2px;" onclick="event.stopPropagation()">
@@ -407,8 +407,9 @@ function renderKCard(card, botoesMemo){
           <span style="color:#8b5cf6;">🔎 Curador:</span> ${escH(cu.label||card.curador)}</div>`; })()
     : '';
   const modColors = {MOD1:'#7C6AFF',MOD2:'#10B981',MOD3:'#F59E0B',MOD4:'#EF4444'};
+  const mc = Object.hasOwn(modColors, card.module) ? modColors[card.module] : '#94A3B8';  // hasOwn: module="constructor" não vira cor
   const modBadge = card.module&&card.module!=='none'
-    ?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:${modColors[card.module]||'#94A3B8'}22;border:1px solid ${modColors[card.module]||'#94A3B8'}55;color:${modColors[card.module]||'#94A3B8'}">${card.module}</span>`:'';
+    ?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:${mc}22;border:1px solid ${mc}55;color:${mc}">${escH(card.module)}</span>`:'';
   const labelsHtml = (card.tags||[]).map(t=>{
     const lc=kLabelColor(t);
     return `<span class="k-card-label" style="background:${lc.bg};border:1px solid ${lc.border};color:${lc.color}">${escH(t)}</span>`;
@@ -417,7 +418,7 @@ function renderKCard(card, botoesMemo){
   const workers = card.workers||{};
   const workersSummary = Object.entries(workers).map(([k,mins])=>{
     const wc=state.COLLABS[k]||{initials:'?',color:'#94A3B8'};
-    return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;"><span style="width:14px;height:14px;border-radius:50%;background:${wc.color};display:inline-flex;align-items:center;justify-content:center;font-size:0.4rem;font-weight:800;color:#fff">${wc.initials}</span><span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">${kFmtHours(mins)}</span></span>`;
+    return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;"><span style="width:14px;height:14px;border-radius:50%;background:${wc.color};display:inline-flex;align-items:center;justify-content:center;font-size:0.4rem;font-weight:800;color:#fff">${escH(wc.initials)}</span><span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">${kFmtHours(mins)}</span></span>`;
   }).join('');
   const commentCount = Object.keys(card.comments||{}).length;
 
@@ -437,7 +438,7 @@ function renderKCard(card, botoesMemo){
     }
     if(b.tipo==='concluir'){
       if(!state.isManager&&!kIsAssignee(card,state.currentCollabKey)) return '';
-      return `<button class="k-btn-move" style="border-color:rgba(34,197,94,0.4);color:var(--success);" onclick="concludeKanbanCard('${card._key}')">${ICONS.check} ${b.label||'Concluir'}</button>`;
+      return `<button class="k-btn-move" style="border-color:rgba(34,197,94,0.4);color:var(--success);" onclick="concludeKanbanCard('${card._key}')">${ICONS.check} ${escH(b.label||'Concluir')}</button>`;
     }
     return '';
   }).join('');
@@ -876,13 +877,13 @@ function renderKanbanComments(card){
   const comments=Object.entries(card.comments||{}).map(([k,v])=>({...v,_key:k})).sort((a,b)=>a.ts-b.ts);
   if(!comments.length){container.innerHTML='<div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:8px">Nenhum comentário ainda</div>';return;}
   container.innerHTML=comments.map(cm=>{
-    // ✅ SEC: label de fallback escapado
-    const col=state.COLLABS[cm.by]||{label:escH(cm.by||'?'),initials:'?',color:'#94A3B8'};
+    // ✅ SEC: label/initials escapados no consumo (escH no template), não no fallback
+    const col=state.COLLABS[cm.by]||{label:cm.by||'?',initials:'?',color:'#94A3B8'};
     const canDel=state.isManager||cm.by===state.currentCollabKey;
     return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-        <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.45rem;font-weight:800;color:#fff">${col.initials}</div>
-        <span style="font-size:0.72rem;font-weight:700">${col.label}</span>
+        <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.45rem;font-weight:800;color:#fff">${escH(col.initials)}</div>
+        <span style="font-size:0.72rem;font-weight:700">${escH(col.label)}</span>
         <span style="font-family:var(--mono);font-size:0.6rem;color:var(--muted);margin-left:auto">${fmtTime(cm.ts)}</span>
         ${canDel?`<button onclick="deleteKanbanComment('${cm._key}')" aria-label="Excluir comentário" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0 2px;display:flex;align-items:center;transition:color 0.2s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">${ICONS.x}</button>`:''}
       </div>
@@ -1138,15 +1139,15 @@ window.openKanbanDetail=(key)=>{
   else { document.getElementById('kdObsSection').style.display='none'; }
   document.getElementById('kdHistory').innerHTML=(card.history||[]).slice().reverse().map(h=>{
     const hc=state.COLLABS[h.by]||{label:h.by||'?',initials:'?',color:'#94A3B8'};
-    return`<div class="k-history-item"><div class="k-history-dot"></div><div style="flex:1"><span style="font-weight:700">${escH(h.action)}</span> <span style="font-size:0.65rem;color:var(--muted)">por ${hc.label}</span></div><div style="font-family:var(--mono);font-size:0.62rem;color:var(--muted);white-space:nowrap">${kFmtDate(h.ts)}</div></div>`;
+    return`<div class="k-history-item"><div class="k-history-dot"></div><div style="flex:1"><span style="font-weight:700">${escH(h.action)}</span> <span style="font-size:0.65rem;color:var(--muted)">por ${escH(hc.label)}</span></div><div style="font-family:var(--mono);font-size:0.62rem;color:var(--muted);white-space:nowrap">${kFmtDate(h.ts)}</div></div>`;
   }).join('');
   const workers=card.workers||{};
   document.getElementById('kdWorkers').innerHTML=Object.entries(workers).length
     ? Object.entries(workers).map(([k,mins])=>{
         const wc=state.COLLABS[k]||{label:k,initials:'?',color:'#94A3B8'};
         return`<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;">
-          <div style="width:20px;height:20px;border-radius:50%;background:${wc.color};display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff">${wc.initials}</div>
-          <span style="font-size:0.78rem;font-weight:700">${wc.label}</span>
+          <div style="width:20px;height:20px;border-radius:50%;background:${wc.color};display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff">${escH(wc.initials)}</div>
+          <span style="font-size:0.78rem;font-weight:700">${escH(wc.label)}</span>
           <span style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">${kFmtHours(mins)}</span>
         </div>`;
       }).join('')
@@ -1614,9 +1615,9 @@ window.renderIndicadores = ()=>{
       return `
         <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="width:28px;height:28px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:800;color:#fff;">${col.initials}</div>
+            <div style="width:28px;height:28px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
             <div style="flex:1">
-              <div style="font-size:0.82rem;font-weight:800;">${col.label}</div>
+              <div style="font-size:0.82rem;font-weight:800;">${escH(col.label)}</div>
               <div style="font-size:0.65rem;color:var(--muted);font-family:var(--mono);">${r.total} card${r.total!==1?'s':''} avaliados</div>
             </div>
             <div style="text-align:right;">
@@ -1646,8 +1647,8 @@ window.renderIndicadores = ()=>{
         <td style="padding:9px 14px;font-size:0.78rem;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${c.manual?'':'cursor:pointer;'}" ${c.manual?'':`onclick="openKanbanDetail('${c._key}')"`} title="${c.manual?escH('Adicionada manualmente'+(c.motivo?': '+c.motivo:'')):'Abrir card'}">${escH(c.name||c.title||'Sem nome')}${c.manual?' <span class="ind-manual-tag">manual</span>':''}</td>
         <td style="padding:9px 14px;">
           <div style="display:flex;align-items:center;gap:5px;">
-            <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${col.initials}</div>
-            <span style="font-size:0.75rem;font-weight:700;">${col.label}</span>
+            <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
+            <span style="font-size:0.75rem;font-weight:700;">${escH(col.label)}</span>
           </div>
         </td>
         <td style="padding:9px 14px;">
@@ -1675,7 +1676,7 @@ window.renderIndicadores = ()=>{
       const col = state.COLLABS[c.assignee]||{label:c.assignee||'?',initials:'?',color:'#94A3B8'};
       return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:9px;padding:9px 14px;cursor:pointer;"
         onclick="openKanbanDetail('${c._key}');setTimeout(()=>showPage('kanban',null),0)">
-        <div style="width:20px;height:20px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${col.initials}</div>
+        <div style="width:20px;height:20px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
         <div style="flex:1;font-size:0.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(c.name||'—')}</div>
         <div style="font-size:0.65rem;font-family:var(--mono);color:var(--muted);">${kColLabel(c.column)||'Arquivo'}</div>
       </div>`;
@@ -2643,7 +2644,7 @@ window.renderArquivo = ()=>{
         ${labelsHtml?`<div class="k-card-labels">${labelsHtml}</div>`:''}
         ${linksHtml?`<div class="k-card-links">${linksHtml}</div>`:''}
         <div class="k-card-meta">
-          <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
+          <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${escH(col.initials)}</div>${escH(col.label)}</div>
           ${card.hours?`<span class="k-card-hours">${ICONS.clock} ${kFmtHours(card.hours)}</span>`:''}
         </div>
         <div style="font-family:var(--mono);font-size:0.58rem;color:var(--muted);margin-top:5px;">Arquivado em ${card.archivedAt?new Date(card.archivedAt).toLocaleDateString('pt-BR'):'-'}</div>
@@ -2660,7 +2661,7 @@ window.renderArquivo = ()=>{
         return`<div class="k-card" style="opacity:0.75;">
           <div class="k-card-name" style="cursor:default;">${escH(card.name||'')}</div>
           <div class="k-card-meta">
-            <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
+            <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${escH(col.initials)}</div>${escH(col.label)}</div>
             <span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">${card.archivedAt?new Date(card.archivedAt).toLocaleDateString('pt-BR'):''}</span>
           </div>
           ${state.isManager?`<button onclick="unarchiveKanbanCard('${card._key}')" style="width:100%;margin-top:6px;padding:4px 0;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;font-size:0.7rem;font-weight:700;cursor:pointer;">${ICONS.archive} Desarquivar</button>`:''}
