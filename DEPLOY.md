@@ -27,7 +27,7 @@ Legenda: **[DONO]** = passo que exige `firebase login` ou decisão do Allan/Brun
 - [ ] Container de pé: `docker compose -f docker-compose.testes.yml up -d --build` e, na 1ª vez, `docker compose -f docker-compose.testes.yml exec -T dev npm ci`. Confirmar que `$FB --version` responde **dentro do container** (não verificado se a imagem `Dockerfile.testes` o permite).
 - [ ] **Login [DONO]:** feito **dentro do container**, em sessão interativa (`exec` **sem** `-T`): `docker compose -f docker-compose.testes.yml exec dev npx --no firebase login --no-localhost`. Nunca `firebase login` no host. Conferir a conta com acesso a `kronoslabtecie` e à cópia. A sessão pode se perder se o container for recriado (só `.cache` é volume nomeado): refazer o login quando acontecer.
 - [ ] Working tree limpo, na branch que será publicada; `git log -1` anotado: `________`
-- [ ] Suíte de regras verde (esperado após a Fase 2: 47/47; baseline antes da Fase 2: 28 passam, 19 ataques falham):
+- [ ] Suíte de regras verde (esperado: 0 falhas, total muda a cada onda; baseline antes da Fase 2: 28 passam, 19 ataques falham):
   ```bash
   docker compose -f docker-compose.testes.yml exec -T dev npm run test:ci
   ```
@@ -72,7 +72,7 @@ Legenda: **[DONO]** = passo que exige `firebase login` ou decisão do Allan/Brun
 
 ## 4. Deploy 1 — regras (`database.rules.json`)
 
-Pré: seção 2 feita hoje; seção 3 sem falha.
+Pré: seção 2 feita hoje; seção 3 **executada e sem falha** (sem ensaio na cópia não há deploy).
 
 - [ ] `git diff` das regras apresentado ao Allan → OK registrado (plano 2.6).
 - [ ] Bruna decidiu.
@@ -110,7 +110,7 @@ Vale a pré-condição (a) da seção 3.
 **O comando de hash por arquivo ainda não está definido** (seção 7). Definir e registrar: `________`
 
 - [ ] Calcular o hash (ex.: SHA-256) de cada arquivo de `public/` na branch **e** de cada arquivo servido por `kronoslabtecie.web.app`; listar diferenças. Executar em Docker/máquina dedicada, não no PC com carteiras.
-- [ ] Toda diferença é **esperada** (só E7: `escH` nos pontos do plano 3.1) — nada "só em produção" sendo sobrescrito. Se houver: **parar** e trazer para a branch antes (como no restore `c6e1890`).
+- [ ] Toda diferença é **esperada** (E7 (`kanban.js`, `importadores.js`) e UI do B1 (`usuarios.js`)) — nada "só em produção" sendo sobrescrito. Se houver: **parar** e trazer para a branch antes (como no restore `c6e1890`).
 - [ ] Lista de arquivos diferentes anexada ao Registro.
 
 ### 5.2 Deploy
@@ -135,6 +135,7 @@ Vale a pré-condição (a) da seção 3.
 | Data | Deploy | Commit | Contagem antes | Contagem depois | Smoke | Quem |
 |---|---|---|---|---|---|---|
 | | | | | | | |
+- [ ] **Encerrar a sessão [DONO]:** `docker compose -f docker-compose.testes.yml exec dev npx --no firebase logout` e depois `docker compose -f docker-compose.testes.yml down` (o container guarda o login de produção e enxerga `backups/`; não deixar de pé).
 
 ## 7. O que ainda NÃO foi verificado / não definido
 
