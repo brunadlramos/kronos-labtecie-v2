@@ -108,7 +108,10 @@ function seed() {
         },
         logs: { l1: { ts: 1750000000000, cat: 'criar', who: 'ana', action: 'Criou card' } },
         notifs: { n1: { to: 'ana', title: 'Oi', msg: 'tudo bem', from: 'gestora', ts: 1750000000000, read: false } },
-        approvalRequests: {},
+        approvalRequests: {
+          r_bia: { type: 'edit', entryKey: 'e_bia', payload: { collab: 'bia', task: 'x' }, requestedBy: 'bia',
+                   requestedByEmail: 'bia@fatecie.edu.br', requestedAt: 1750000000000, status: 'pending' },
+        },
         folgas: { '2026-09-01': { bia: { label: 'Atestado', type: 'atestado' } } },
       },
     },
@@ -736,5 +739,124 @@ describe('A6 · rh é somente leitura por regra (mesmo com equipe real)', () => 
 
   it('NAO-REGRESSAO: colaborador continua escrevendo kanban', async () => {
     await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_novo2`).set(card));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ONDA 2 · autoria e forma: C2 approvalRequests, C6 notifs, C5 entries
+// ═════════════════════════════════════════════════════════════════════════════
+describe('C2 · approvalRequests amarrado ao autor', () => {
+  const ar = (u, id, v) => ref(u, `equipes/${EQ}/approvalRequests/${id}`).set(v);
+  const base = { requestedByEmail: 'ana@fatecie.edu.br', requestedAt: 1750100000000, status: 'pending' };
+
+  it('ATAQUE: Ana NÃO cria pedido em nome da Bia', async () => {
+    await assertFails(ar(ANA, 'r1', { ...base, type: 'edit', entryKey: 'e_ana', payload: { collab: 'ana' }, requestedBy: 'bia' }));
+  });
+
+  it('ATAQUE: Ana NÃO pede exclusão do registro da Bia', async () => {
+    await assertFails(ar(ANA, 'r1', { ...base, type: 'delete', entryKey: 'e_bia', payload: { collab: 'bia' }, requestedBy: 'ana' }));
+  });
+
+  it('ATAQUE: Ana NÃO põe payload.collab de outra pessoa (ausência no nome da Bia)', async () => {
+    await assertFails(ar(ANA, 'r1', { ...base, type: 'folga', payload: { tipo: 'atestado', isos: ['2026-09-02'], collab: 'bia' }, requestedBy: 'ana' }));
+  });
+
+  it('ATAQUE: pedido sem requestedBy é recusado', async () => {
+    await assertFails(ar(ANA, 'r1', { ...base, type: 'new', entryKey: null, payload: { collab: 'ana' } }));
+  });
+
+  it('NAO-REGRESSAO: Ana pede edição do próprio registro', async () => {
+    await assertSucceeds(ar(ANA, 'r1', { ...base, type: 'edit', entryKey: 'e_ana', payload: { collab: 'ana', task: 'x' }, requestedBy: 'ana' }));
+  });
+
+  it('NAO-REGRESSAO: Ana pede novo registro (entryKey null) e exclusão do próprio', async () => {
+    await assertSucceeds(ar(ANA, 'r1', { ...base, type: 'new', entryKey: null, payload: { collab: 'ana', task: 'x' }, requestedBy: 'ana' }));
+    await assertSucceeds(ar(ANA, 'r2', { ...base, type: 'delete', entryKey: 'e_ana', payload: { collab: 'ana', task: 'x' }, requestedBy: 'ana' }));
+  });
+
+  it('NAO-REGRESSAO: Ana solicita ausência (folga) em nome próprio', async () => {
+    await assertSucceeds(ar(ANA, 'r1', { ...base, type: 'folga', payload: { tipo: 'atestado', label: 'x', isos: ['2026-09-02'], collab: 'ana' }, requestedBy: 'ana' }));
+  });
+
+  it('NAO-REGRESSAO: gestora recusa/aprova (remove o pedido) e admin cria', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/approvalRequests/r_bia`).remove());
+  });
+});
+
+describe('C6 · notifs.from amarrado ao autor', () => {
+  const nf = (u, id, v) => ref(u, `equipes/${EQ}/notifs/${id}`).set(v);
+  const n = { to: 'bia', title: 'Oi', msg: 'x', ts: 1750100000000, read: false };
+
+  it('ATAQUE: Ana NÃO assina notificação como a gestora', async () => {
+    await assertFails(nf(ANA, 'n2', { ...n, from: 'gestora' }));
+  });
+
+  it('ATAQUE: Ana NÃO reescreve from/to da notificação que recebeu', async () => {
+    const base = { to: 'ana', title: 'Oi', msg: 'tudo bem', ts: 1750000000000, read: true };
+    await assertFails(nf(ANA, 'n1', { ...base, from: 'admin' }));
+    await assertFails(nf(ANA, 'n1', { ...base, from: 'gestora', to: 'bia' }));
+  });
+
+  it('NAO-REGRESSAO: Ana notifica a Bia assinando como ela mesma (ou sem from)', async () => {
+    await assertSucceeds(nf(ANA, 'n2', { ...n, from: 'ana' }));
+    await assertSucceeds(nf(ANA, 'n3', n));
+  });
+
+  it('NAO-REGRESSAO: gestora notifica; admin (sem chave) notifica', async () => {
+    await assertSucceeds(nf(GEST, 'n2', { ...n, from: 'gestora' }));
+    await assertSucceeds(nf(ADMIN, 'n3', { ...n, from: 'sistema' }));
+  });
+
+  it('NAO-REGRESSAO: Ana marca como lida (regrava a notificação inteira, com _key)', async () => {
+    await assertSucceeds(nf(ANA, 'n1', { to: 'ana', title: 'Oi', msg: 'tudo bem', from: 'gestora', ts: 1750000000000, read: true, _key: 'n1' }));
+  });
+});
+
+describe('C5 · entries: tipos e faixas, sem allowlist de nomes', () => {
+  const e = { task: 'T', project: 'p1', collab: 'ana', obs: '', startTime: 1750007200000, endTime: 1750010800000,
+              duration: 3600000, createdAt: 1750007200000 };
+  const put = (v, id = 'e_novo') => ref(ANA, `equipes/${EQ}/entries/${id}`).set({ ...e, ...v });
+
+  for (const [nome, v] of [
+    ['duration string', { duration: '9999' }],
+    ['duration negativa', { duration: -1 }],
+    ['duration absurda', { duration: 1e12 }],
+    ['peso string', { peso: '5' }],
+    ['peso absurdo', { peso: 1000 }],
+    ['peso negativo', { peso: -2 }],
+    ['startTime string', { startTime: 'ontem' }],
+    ['endTime absurdo', { endTime: 9e15 }],
+    ['needsReview não-boolean', { needsReview: 'sim' }],
+    ['importedFrom não-string', { importedFrom: 123 }],
+    ['periods com duration absurda', { periods: [{ startTime: 1750007200000, endTime: 1750010800000, duration: 1e12 }] }],
+  ]) {
+    it(`ATAQUE: ${nome} é recusado`, async () => { await assertFails(put(v)); });
+  }
+
+  it('ATAQUE: Ana NÃO infla a duration do próprio registro existente', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/entries/e_ana`).update({ duration: 1e12 }));
+  });
+
+  it('NAO-REGRESSAO: registro completo com campos opcionais reais (peso, periods, tags, clockify)', async () => {
+    await assertSucceeds(put({ peso: 7.2, tags: ['a'], needsReview: true, importedFrom: 'clockify_csv',
+      createdBy: 'ana@fatecie.edu.br', kanbanCardKey: '-Nabc',
+      periods: [{ startTime: 1750007200000, endTime: 1750010800000, duration: 3600000 }] }));
+  });
+
+  it('NAO-REGRESSAO: campo novo desconhecido continua aceito (sem allowlist)', async () => {
+    await assertSucceeds(put({ campoNovoDoFuturo: 'x' }));
+  });
+
+  it('NAO-REGRESSAO: duration no maior valor real do snapshot (104220000) e peso 0', async () => {
+    await assertSucceeds(put({ duration: 104220000, peso: 0 }));
+  });
+
+  it('NAO-REGRESSAO: reinício de timer regrava o registro com periods e duration somada', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/entries/e_ana`).set({
+      ...e, createdAt: 1750000000000, periods: [
+        { startTime: 1750000000000, endTime: 1750003600000, duration: 3600000 },
+        { startTime: 1750007200000, endTime: 1750010800000, duration: 3600000 }],
+      duration: 7200000, endTime: 1750010800000, modifiedAt: 1750011000000, modifiedBy: 'ana@fatecie.edu.br',
+    }));
   });
 });
