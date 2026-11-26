@@ -71,18 +71,19 @@
           ".indexOn": ["updatedAt", "column", "assignee"],
           "$cardId": {
             ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)",
-            ".validate": "!newData.exists() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('ajuste_diagramacao').val() === data.child('ajuste_diagramacao').val() && newData.child('ajuste_diagramacao_obs').val() === data.child('ajuste_diagramacao_obs').val() && newData.child('ajuste_curadoria').val() === data.child('ajuste_curadoria').val() && newData.child('ajuste_curadoria_obs').val() === data.child('ajuste_curadoria_obs').val() && newData.child('ajuste_avaliado_em').val() === data.child('ajuste_avaliado_em').val())",
+            ".validate": "(data.exists() || ($cardId.matches(/^[-A-Za-z0-9_]+$/) && $cardId.length <= 64)) && (!newData.exists() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('ajuste_diagramacao').val() === data.child('ajuste_diagramacao').val() && newData.child('ajuste_diagramacao_obs').val() === data.child('ajuste_diagramacao_obs').val() && newData.child('ajuste_curadoria').val() === data.child('ajuste_curadoria').val() && newData.child('ajuste_curadoria_obs').val() === data.child('ajuste_curadoria_obs').val() && newData.child('ajuste_avaliado_em').val() === data.child('ajuste_avaliado_em').val()))",
             "assignee": { ".validate": "newData.isString() && newData.val().matches(/^[^<>\"'&`]{0,60}$/)" },
             "assignees": { "$i": { ".validate": "newData.isString() && newData.val().matches(/^[^<>\"'&`]{0,60}$/)" } },
             "history": { "$i": { "by": { ".validate": "newData.isString() && newData.val().matches(/^[^<>\"'&`]{0,60}$/)" } } },
-            "workers": { "$k": { ".validate": "$k.matches(/^[^<>\"'&`]{1,60}$/)" } }
+            "workers": { "$k": { ".validate": "$k.matches(/^[^<>\"'&`]{1,60}$/)" } },
+            "comments": { "$commentId": { ".validate": "data.exists() || ($commentId.matches(/^[-A-Za-z0-9_]+$/) && $commentId.length <= 64)" } }
           }
         },
 
         "arquivo": {
           "$cardId": {
             ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)",
-            ".validate": "!newData.exists() || !data.exists() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('ajuste_diagramacao').val() === data.child('ajuste_diagramacao').val() && newData.child('ajuste_diagramacao_obs').val() === data.child('ajuste_diagramacao_obs').val() && newData.child('ajuste_curadoria').val() === data.child('ajuste_curadoria').val() && newData.child('ajuste_curadoria_obs').val() === data.child('ajuste_curadoria_obs').val() && newData.child('ajuste_avaliado_em').val() === data.child('ajuste_avaliado_em').val())"
+            ".validate": "(data.exists() || ($cardId.matches(/^[-A-Za-z0-9_]+$/) && $cardId.length <= 64)) && (!newData.exists() || !data.exists() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('ajuste_diagramacao').val() === data.child('ajuste_diagramacao').val() && newData.child('ajuste_diagramacao_obs').val() === data.child('ajuste_diagramacao_obs').val() && newData.child('ajuste_curadoria').val() === data.child('ajuste_curadoria').val() && newData.child('ajuste_curadoria_obs').val() === data.child('ajuste_curadoria_obs').val() && newData.child('ajuste_avaliado_em').val() === data.child('ajuste_avaliado_em').val()))"
           }
         },
 
@@ -91,7 +92,7 @@
           ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
           "$postId": {
             ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && ((!data.exists() && newData.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val()) || (data.exists() && data.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val() && (!newData.exists() || newData.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val()))))",
-            ".validate": "!newData.exists() || (newData.child('text').isString() && newData.child('text').val().length <= 280)"
+            ".validate": "(data.exists() || ($postId.matches(/^[-A-Za-z0-9_]+$/) && $postId.length <= 64)) && (!newData.exists() || (newData.child('text').isString() && newData.child('text').val().length <= 280))"
           }
         },
 
