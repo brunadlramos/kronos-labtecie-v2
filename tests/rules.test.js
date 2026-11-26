@@ -652,3 +652,89 @@ describe('B6 · gestorTemp: boolean e só a gestão concede', () => {
     await assertSucceeds(ref(TMP, cu(TMP)).set(false));
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ONDA 2 · alcance de leitura/escrita: A3, A2, A6
+// ═════════════════════════════════════════════════════════════════════════════
+describe('A3 · sem fail-open com /coordenacoes vazio', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => { await ctx.database().ref('coordenacoes').remove(); });
+  });
+
+  it('ATAQUE: coordenador NÃO lê equipe alheia sem /coordenacoes', async () => {
+    await assertFails(ref(COORD, 'equipes/audiovisual/config').once('value'));
+  });
+
+  it('ATAQUE: coordenador NÃO escreve holidays/folgas/capDia/indicadores em equipe alheia', async () => {
+    await assertFails(ref(COORD, 'equipes/audiovisual/holidays/2026-01-01').set({ label: 'x' }));
+    await assertFails(ref(COORD, 'equipes/audiovisual/folgas/2026-01-01/x').set({ label: 'x' }));
+    await assertFails(ref(COORD, 'equipes/audiovisual/capDia/2026-01-01/x').set(true));
+    await assertFails(ref(COORD, 'equipes/audiovisual/indicadoresManuais/i1').set({ name: 'x' }));
+    await assertFails(ref(COORD, 'equipes/audiovisual/config/metas').set({ horasDia: 1 }));
+  });
+
+  it('NAO-REGRESSAO: coordenador continua lendo a própria equipe (equipeId)', async () => {
+    await assertSucceeds(ref(COORD, `equipes/${EQ}/config`).once('value'));
+  });
+});
+
+describe('A3 · com /coordenacoes, coordenador alcança só a sua coordenação', () => {
+  it('NAO-REGRESSAO: coordenador lê/escreve equipe da sua coordenação', async () => {
+    await assertSucceeds(ref(COORD, 'equipes/revisao/config').once('value'));
+    await assertSucceeds(ref(COORD, 'equipes/revisao/holidays/2026-01-01').set({ label: 'x' }));
+  });
+
+  it('ATAQUE: coordenador NÃO lê equipe de outra coordenação', async () => {
+    await assertFails(ref(COORD, 'equipes/audiovisual/config').once('value'));
+  });
+});
+
+describe('A2 · log de auditoria fora da cascata de leitura', () => {
+  it('ATAQUE: colaborador, gestora e coordenador NÃO leem o log', async () => {
+    for (const u of [ANA, GEST, COORD, RH]) await assertFails(ref(u, `equipes/${EQ}/logs`).once('value'));
+  });
+
+  it('ATAQUE: colaborador NÃO lê a equipe inteira (cascata do pai)', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}`).once('value'));
+  });
+
+  it('NAO-REGRESSAO: admin lê o log', async () => {
+    await assertSucceeds(ref(ADMIN, `equipes/${EQ}/logs`).once('value'));
+  });
+
+  for (const nó of ['config', 'entries', 'approvalRequests', 'kanban', 'arquivo', 'mural', 'notifs', 'activeTimers',
+    'avatars', 'desafio', 'holidays', 'folgas', 'customTags', 'removedDefaultTags', 'customProjects', 'users',
+    'indicadoresManuais', 'capDia']) {
+    it(`NAO-REGRESSAO: membro, coordenador e rh leem ${nó}`, async () => {
+      for (const u of [ANA, GEST, COORD, RH]) await assertSucceeds(ref(u, `equipes/${EQ}/${nó}`).once('value'));
+    });
+  }
+
+  it('NAO-REGRESSAO: consultas do app (notifs por to, entries por collab, approvals por requestedBy)', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/notifs`).orderByChild('to').equalTo('ana').limitToLast(50).once('value'));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/entries`).orderByChild('collab').equalTo('ana').once('value'));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/approvalRequests`).orderByChild('requestedBy').equalTo('ana').once('value'));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/mural`).orderByChild('ts').limitToLast(20).once('value'));
+  });
+});
+
+describe('A6 · rh é somente leitura por regra (mesmo com equipe real)', () => {
+  const card = { name: 'C', column: 'fazer', assignee: 'ana', updatedAt: 1750100000000 };
+
+  it('ATAQUE: rh com equipe real NÃO escreve kanban/arquivo/notifs/approvalRequests', async () => {
+    await assertFails(ref(RHEQ, `equipes/${EQ}/kanban/k_rh`).set(card));
+    await assertFails(ref(RHEQ, `equipes/${EQ}/kanban/k_livre`).update({ column: 'revisao' }));
+    await assertFails(ref(RHEQ, `equipes/${EQ}/arquivo/a_rh`).set(card));
+    await assertFails(ref(RHEQ, `equipes/${EQ}/notifs/n_rh`).set({ to: 'ana', title: 'x', msg: 'y' }));
+    await assertFails(ref(RHEQ, `equipes/${EQ}/approvalRequests/r_rh`).set({ type: 'edit', status: 'pending' }));
+  });
+
+  it('NAO-REGRESSAO: rh com equipe real lê e registra login no log', async () => {
+    await assertSucceeds(ref(RHEQ, `equipes/${EQ}/kanban`).once('value'));
+    await assertSucceeds(ref(RHEQ, `equipes/${EQ}/logs/l_rh`).set({ ts: 1750100000000, cat: 'login', action: 'Entrou no sistema' }));
+  });
+
+  it('NAO-REGRESSAO: colaborador continua escrevendo kanban', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_novo2`).set(card));
+  });
+});
