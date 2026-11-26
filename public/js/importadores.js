@@ -674,7 +674,7 @@ function _avRenderValidacao(){
     const nivelDiagLabel = m.reg.nivelDiag || '(sem avaliação)';
     const nivelCurLabel  = m.reg.nivelCur  || '(sem avaliação)';
     const cardInfo = c
-      ? `<span style="font-weight:700;">"${escH((c.name||'').slice(0,50))}"</span> — ${escH(cardColabLabel)} — <span style="font-size:0.65rem;color:var(--muted);">${c._fonte==='arquivo'?'📦 Arquivo':'📋 Kanban'}</span>`
+      ? `<span style="font-weight:700;">"${escH((c.name||'').slice(0,50))}"</span> — ${cardColabLabel} — <span style="font-size:0.65rem;color:var(--muted);">${c._fonte==='arquivo'?'📦 Arquivo':'📋 Kanban'}</span>`
       : '<span style="color:var(--muted);font-style:italic;">Nenhum card encontrado</span>';
 
     const canSelect = m.tipo !== 'nenhum';
