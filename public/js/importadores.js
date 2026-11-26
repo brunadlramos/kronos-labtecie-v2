@@ -7,7 +7,7 @@ import {
   escH, fmtDur, fmtTime, fmtDate, dKey, dateKey, todayKey
 } from './utils.js';
 import {
-  db, kanbanRef, entriesRef, notifsRef, EQUIPE_ID
+  db, kanbanRef, arquivoRef, entriesRef, notifsRef, EQUIPE_ID
 } from './firebase-refs.js';
 import {
   ref, push, set, update, get, remove, child, onValue
@@ -761,8 +761,7 @@ window.avImportar = async()=>{
       fields.updatedAt          = now;
 
       // Determina se é kanban ou arquivo morto
-      const dbPath = card._fonte==='arquivo' ? `arquivo/${card._key}` : `kanban/${card._key}`;
-      await update(ref(db, dbPath), fields);
+      await update(child(card._fonte==='arquivo' ? arquivoRef : kanbanRef, card._key), fields);   // item 11: caminho da equipe, nao a raiz
 
       // Atualiza cache local
       if(card._fonte==='arquivo' && window._arquivoCards?.[card._key]){
