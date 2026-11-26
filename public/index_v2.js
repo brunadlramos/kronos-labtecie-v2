@@ -499,6 +499,7 @@ state.viewDate.setHours(0,0,0,0); state.projDate.setHours(0,0,0,0);
 // todo usuário (exceto admin) precisa criar uma senha pessoal no primeiro acesso.
 // Marcamos quem já trocou em /pwdReset/<uid>. Para DESATIVAR no futuro: FORCE_PWD_RESET_SINCE = 0.
 const FORCE_PWD_RESET_SINCE = new Date(2026, 6, 11, 0, 0, 0).getTime(); // 11/07/2026 00:00 (mês 6 = julho)
+// D1: constante usada SO pelo portao de troca de senha (index_v2.js:538, recusa reuso). Nao pre-preenche mais nenhum prompt; o portao em si e a regra B5 ficam inalterados.
 const PWD_PADRAO = '0123456';
 
 async function _enforcePasswordReset(user){
