@@ -406,6 +406,57 @@ describe('E7 · forma dos campos que alimentam o render do Kanban', () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// E7 · formato da CHAVE (vetor onclick="...('${key}')" no render)
+// ═════════════════════════════════════════════════════════════════════════════
+describe('E7 · formato das chaves de card, comentário e post', () => {
+  const MAL = "x');alert(1);"; // sem '/', que o RTDB usa como separador de caminho
+  const PUSH = '-NaBc123_x';
+  const card = { name: 'C', column: 'fazer', assignee: 'ana', updatedAt: 1750100000000 };
+
+  it('ATAQUE: chave de card com JS é recusada em kanban', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/${MAL}`).set(card));
+  });
+
+  it('ATAQUE: chave de card com JS é recusada em arquivo', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/${MAL}`).set(card));
+  });
+
+  it('ATAQUE: chave de comentário com JS é recusada', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_livre/comments`).update({
+      [MAL]: { text: 'x', by: 'ana', ts: 1750100000000 },
+    }));
+  });
+
+  it('ATAQUE: chave de post do mural com JS é recusada', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/mural/${MAL}`).set({
+      text: 'x', collab: 'ana', ts: 1750100000000,
+    }));
+  });
+
+  it('ATAQUE: chave de card com mais de 64 caracteres é recusada', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/${'a'.repeat(65)}`).set(card));
+  });
+
+  it('NAO-REGRESSAO: chave estilo push() é aceita em kanban, arquivo e mural', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/${PUSH}`).set(card));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/${PUSH}`).set(card));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/mural/${PUSH}`).set({ text: 'x', collab: 'ana', ts: 1750100000000 }));
+  });
+
+  it('NAO-REGRESSAO: comentário com chave c<Date.now()> é aceito', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_livre/comments/c1750100000000`).set({
+      text: 'ok', by: 'ana', ts: 1750100000000,
+    }));
+  });
+
+  it('NAO-REGRESSAO: gestora reorganiza arquivo por update multi-path (`${k}/module`)', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo`).update({
+      'a_nota/module': 'MOD2', 'a_nota/reorganizadoEm': 1750100000000,
+    }));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Invariantes que JÁ funcionam — guarda contra regressão da onda
 // ═════════════════════════════════════════════════════════════════════════════
 describe('Invariantes já corretas (não podem regredir)', () => {
