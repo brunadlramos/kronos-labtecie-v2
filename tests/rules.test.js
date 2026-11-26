@@ -1065,3 +1065,35 @@ describe('Onda 3 · config/usuarios (itens 8 e 9)', () => {
     await assertSucceeds(ref(GEST, `equipes/${EQ}/config/usuarios/${GEST}`).update({ nome: 'Gestora 2', papel: 'gestora' }));
   });
 });
+
+describe('Onda 4 · item 1 · arquivo só nasce de card que existe no kanban', () => {
+  it('ATAQUE: membro NÃO cria item de arquivo para chave sem card no kanban (horas inventadas)', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/inventado`).set({ hours: 999, workers: { ana: 999 }, archived: true }));
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/inventado2`).set({ name: 'X', assignee: 'ana', hours: 999, archived: true }));
+  });
+  it('ATAQUE: membro NÃO altera horas de item que já está no arquivo', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/a_nota`).set({ name: 'Arquivado avaliado', module: 'MOD1', assignee: 'bia', ajuste_diagramacao: 'bom', archivedAt: 1750000000000, hours: 999 }));
+  });
+  it('NAO-REGRESSAO: membro arquiva card real (copia do kanban + remove) e a gestão desarquiva', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/k_livre`).set({ name: 'Card sem nota', assignee: 'ana', hours: 3, workers: { ana: 60 }, archived: true }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_livre`).remove());
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo/k_livre`).remove());
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo/a_gest`).set({ name: 'G', assignee: 'ana', hours: 5 }));
+  });
+});
+
+describe('Onda 4 · item 2 · membro não troca responsável de card avaliado', () => {
+  it('ATAQUE: membro NÃO troca assignee/assignees de card com ajuste_*', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_nota`).update({ assignee: 'bia' }));
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_nota`).update({ assignees: ['bia'] }));
+    await env.withSecurityRulesDisabled(async (ctx) => { await ctx.database().ref(`equipes/${EQ}/kanban/k_nota/assignees`).set(['ana', 'bia']); });
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_nota`).update({ assignees: ['bia'] }));
+  });
+  it('NAO-REGRESSAO: gestão troca; membro move coluna/comenta/edita card avaliado mantendo responsável; troca em card sem nota', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/kanban/k_nota`).update({ assignee: 'bia' }));
+    await assertSucceeds(ref(TMP, `equipes/${EQ}/kanban/k_nota`).update({ assignees: ['bia'] }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_nota`).update({ column: 'fazendo', assignee: 'bia', assignees: ['bia'], updatedAt: 5 }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_nota/comments/c1750100000000`).set({ text: 'ok', by: 'ana', ts: 1750100000000 }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_livre`).update({ assignee: 'bia', assignees: ['bia'] }));
+  });
+});
