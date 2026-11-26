@@ -1,0 +1,15 @@
+# Uso: docker compose -f docker-compose.testes.yml up -d --build
+#      docker compose -f docker-compose.testes.yml exec -T dev npm ci   (1a vez)
+#      docker compose -f docker-compose.testes.yml exec -T dev npm run test:ci
+# So o repo e montado; node_modules e cache do emulador ficam em volumes nomeados (fora do host).
+services:
+  dev:
+    build: { context: ., dockerfile: Dockerfile.testes }
+    command: sleep infinity
+    volumes:
+      - .:/work
+      - kronos_node_modules:/work/tests/node_modules
+      - kronos_fb_cache:/home/node/.cache
+volumes:
+  kronos_node_modules:
+  kronos_fb_cache:
