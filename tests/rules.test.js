@@ -39,6 +39,8 @@ const ADMIN = 'uid_admin';    // admin global
 const CFG   = 'uid_cfg';       // colaborador no global, gestora SO em config/usuarios (promovida pelo coordenador)
 const TMP   = 'uid_tmp';       // colaborador com gestorTemp === true em config/usuarios
 const NOVO  = 'uid_novo';     // conta que ainda não tem perfil em /usuarios
+const RH    = 'uid_rh';       // RH global (equipeId '-'): somente leitura
+const RHEQ  = 'uid_rh_eq';    // RH com equipe REAL atribuída (A6: continua somente leitura)
 
 const EQ = 'diagramacao';
 
@@ -60,8 +62,11 @@ function seed() {
       [CFG]:   { nome: 'Cfg',      email: 'cfg@fatecie.edu.br',      papel: 'colaborador', equipeId: EQ },
       [TMP]:   { nome: 'Tmp',      email: 'tmp@fatecie.edu.br',      papel: 'colaborador', equipeId: EQ },
       [ADMIN]: { nome: 'Admin',    email: 'admin@fatecie.edu.br',    papel: 'admin',       equipeId: EQ },
+      [RH]:    { nome: 'Rh',       email: 'rh@fatecie.edu.br',       papel: 'rh',          equipeId: '-' },
+      [RHEQ]:  { nome: 'RhEq',     email: 'rheq@fatecie.edu.br',     papel: 'rh',          equipeId: EQ },
     },
     equipes: {
+      audiovisual: { config: { metas: { horasDia: 8 } } },   // equipe de OUTRA coordenação
       [EQ]: {
         config: {
           usuarios: {
@@ -549,5 +554,101 @@ describe('Invariantes já corretas (não podem regredir)', () => {
   it('pwdReset amarrado ao próprio UID', async () => {
     await assertSucceeds(ref(ANA, `pwdReset/${ANA}`).set(1750100000000));
     await assertFails(ref(ANA, `pwdReset/${BIA}`).set(1750100000000));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ONDA 2 · perfil, coordenações, pwdReset, gestorTemp
+// ═════════════════════════════════════════════════════════════════════════════
+describe('A1 · coordenacaoId congelado fora do admin', () => {
+  it('ATAQUE: coordenador NÃO troca a própria coordenacaoId', async () => {
+    await assertFails(ref(COORD, `usuarios/${COORD}`).update({ coordenacaoId: 'outra' }));
+  });
+
+  it('ATAQUE: colaborador NÃO se atribui coordenacaoId', async () => {
+    await assertFails(ref(ANA, `usuarios/${ANA}`).update({ coordenacaoId: 'ensino' }));
+  });
+
+  it('ATAQUE: gestora NÃO cria colaborador já com coordenacaoId', async () => {
+    await assertFails(ref(GEST, 'usuarios/uid_novo_colab').set({
+      nome: 'N', email: 'n@fatecie.edu.br', papel: 'colaborador', equipeId: EQ, coordenacaoId: 'outra',
+    }));
+  });
+
+  it('NAO-REGRESSAO: coordenador regrava o próprio perfil inalterado e muda o nome', async () => {
+    await assertSucceeds(ref(COORD, `usuarios/${COORD}`).set({
+      nome: 'Coord Novo', email: 'coord@fatecie.edu.br', papel: 'coordenador', equipeId: EQ, coordenacaoId: 'ensino',
+    }));
+  });
+
+  it('NAO-REGRESSAO: admin muda a coordenacaoId do coordenador', async () => {
+    await assertSucceeds(ref(ADMIN, `usuarios/${COORD}`).update({ coordenacaoId: 'outra' }));
+  });
+
+  it('NAO-REGRESSAO: admin cria coordenador com coordenacaoId (cfgCriarCoordenador)', async () => {
+    await assertSucceeds(ref(ADMIN, 'usuarios/uid_novo_coord').set({
+      nome: 'C', email: 'c@fatecie.edu.br', papel: 'coordenador', equipeId: EQ, coordenacaoId: 'ensino', equipes: [EQ, 'revisao'],
+    }));
+  });
+});
+
+describe('A5 · leitura de /coordenacoes só para quem precisa', () => {
+  it('ATAQUE: colaborador NÃO lê /coordenacoes', async () => {
+    await assertFails(ref(ANA, 'coordenacoes').once('value'));
+  });
+
+  for (const [nome, uid] of [['gestora', GEST], ['coordenador', COORD], ['admin', ADMIN], ['rh', RH]]) {
+    it(`NAO-REGRESSAO: ${nome} lê /coordenacoes (loadCoordenacoes)`, async () => {
+      await assertSucceeds(ref(uid, 'coordenacoes').once('value'));
+    });
+  }
+});
+
+describe('B5 · pwdReset: só valor plausível', () => {
+  it('ATAQUE: valor absurdo (futuro distante) é recusado', async () => {
+    await assertFails(ref(ANA, `pwdReset/${ANA}`).set(99999999999999));
+  });
+
+  it('ATAQUE: valor ínfimo é recusado', async () => {
+    await assertFails(ref(ANA, `pwdReset/${ANA}`).set(1));
+  });
+
+  it('NAO-REGRESSAO: Date.now() do cliente é aceito', async () => {
+    await assertSucceeds(ref(ANA, `pwdReset/${ANA}`).set(Date.now()));
+  });
+  // Limite aceito: o próprio usuário ainda grava o marcador (a correção real = Cloud Function).
+});
+
+describe('B6 · gestorTemp: boolean e só a gestão concede', () => {
+  const cu = (u) => `equipes/${EQ}/config/usuarios/${u}/gestorTemp`;
+
+  it('ATAQUE: quem tem gestorTemp NÃO concede a outro', async () => {
+    await assertFails(ref(TMP, cu(ANA)).set(true));
+  });
+
+  it('ATAQUE: quem tem gestorTemp NÃO concede em set do nó inteiro', async () => {
+    await assertFails(ref(TMP, `equipes/${EQ}/config/usuarios/${BIA}`).update({ gestorTemp: true }));
+  });
+
+  it('ATAQUE: gestorTemp não-boolean é recusado até para a gestora', async () => {
+    await assertFails(ref(GEST, cu(ANA)).set('sim'));
+    await assertFails(ref(GEST, cu(ANA)).set(1));
+  });
+
+  for (const [nome, uid] of [['gestora', GEST], ['coordenador', COORD], ['admin', ADMIN]]) {
+    it(`NAO-REGRESSAO: ${nome} concede gestorTemp`, async () => {
+      await assertSucceeds(ref(uid, cu(ANA)).set(true));
+    });
+  }
+
+  it('NAO-REGRESSAO: gestora salva a linha (saveColab grava gestorTemp:false)', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/config/usuarios/${ANA}`).update({
+      nome: 'Ana', papel: 'colaborador', cor: '#94A3B8', ativo: true, gestorTemp: false,
+    }));
+  });
+
+  it('NAO-REGRESSAO: quem tem gestorTemp salva linha sem mudar o gestorTemp, e revoga', async () => {
+    await assertSucceeds(ref(TMP, `equipes/${EQ}/config/usuarios/${TMP}`).update({ gestorTemp: true, cor: '#111111' }));
+    await assertSucceeds(ref(TMP, cu(TMP)).set(false));
   });
 });

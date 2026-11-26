@@ -104,12 +104,12 @@ function _entryItemHTML(e){
   // ✅ FIX BUG 6: verificação segura com fallback para objeto vazio
   const isInKanban = Object.values(state.kanbanCards||{}).some(c => c.fromEntryKey === e._key);
   return`<div class="entry-item">
-      <div class="entry-dot" style="background:${escH(proj.color)}"></div>
+      <div class="entry-dot" style="background:${proj.color}"></div>
       <div class="entry-main">
         <div class="entry-task" onclick="openEntryDetail('${e._key}')" style="cursor:pointer" title="Ver detalhes do registro">${escH(e.task)}</div>
         <div class="entry-meta">
           <span class="badge collab-badge"><span class="mini-av" style="background:${col.color}">${col.initials}</span>${col.label}</span>
-          <span class="badge">${escH(proj.label)}</span>
+          <span class="badge">${proj.label}</span>
           <span class="badge" style="color:var(--success);border-color:rgba(34,197,94,0.3)">+${amt.toFixed(2)}% amt</span>
           ${modBadge}
         </div>
@@ -303,7 +303,7 @@ export function renderDemandas(resetPage=false){
         <strong style="color:var(--text)">${escH(e.task)}${periodsBadge}</strong>
         <div style="font-size:0.7rem;color:var(--muted)">${new Date(e.startTime).toLocaleDateString('pt-BR')}</div>
       </td>
-      <td><span style="color:${escH(proj.color)};font-weight:700;font-size:0.78rem">${escH(proj.label)}</span></td>
+      <td><span style="color:${proj.color};font-weight:700;font-size:0.78rem">${proj.label}</span></td>
       <td style="font-family:var(--mono);font-size:0.75rem">${fmtTime(e.startTime)}</td>
       <td style="font-family:var(--mono);font-size:0.75rem">${fmtTime(e.endTime)}</td>
       <td style="font-family:var(--mono);font-size:0.75rem">${fmtDur(e.duration)}</td>
@@ -378,7 +378,7 @@ export function renderProjCards(){
   container.innerHTML=projData.map(p=>{
     const h=Math.floor(p.totalMs/3600000),m=Math.floor((p.totalMs%3600000)/60000);
     return`<div class="proj-card">
-      <div class="proj-card-header"><div class="proj-dot" style="background:${escH(p.color)}"></div><div class="proj-name">${escH(p.label)}</div></div>
+      <div class="proj-card-header"><div class="proj-dot" style="background:${p.color}"></div><div class="proj-name">${p.label}</div></div>
       <div class="proj-count">${p.count}</div>
       <div class="proj-hours" style="color:var(--muted)">${h}h ${String(m).padStart(2,'0')}m total</div>
       <div class="proj-hours">+${(p.count>0?calcAmount(p.key,p.totalMs):0).toFixed(1)}% amount</div>

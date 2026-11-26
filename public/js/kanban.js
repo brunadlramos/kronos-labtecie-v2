@@ -267,7 +267,7 @@ window.kMoveToCol = async(key, destColId)=>{
   const now = Date.now();
   const hist = [...(card.history||[]),{action:`Movido para ${kColLabel(destColId)}`,by:state.currentCollabKey,byEmail:state.currentUser?.email||'',ts:now}];
   try{
-    await update(child(kanbanRef,key),{column:destColId,history:hist,updatedAt:now,modifiedBy:state.currentUser?.email||'desconhecido'});   // R2: update parcial, nao regrava ajuste_* do cache velho
+    await set(child(kanbanRef,key),{...card,column:destColId,history:hist,updatedAt:now,modifiedBy:state.currentUser?.email||'desconhecido'});
     showToast('Card movido',`→ ${kColLabel(destColId)}`);
     registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(destColId)}`);
   }catch(err){
@@ -530,7 +530,7 @@ window.kDrop = async (e, colId) => {
 
   try {
     // ✅ AUDIT: updatedAt e modifiedBy registrados em toda movimentação
-    await update(child(kanbanRef, droppedKey), { column: colId, history: hist, updatedAt: now_drop, modifiedBy: state.currentUser?.email||'desconhecido' });
+    await set(child(kanbanRef, droppedKey), { ...card, column: colId, history: hist, updatedAt: now_drop, modifiedBy: state.currentUser?.email||'desconhecido' });
     showToast('Card movido', `→ ${kColLabel(colId)}`);
     if(colId==='concluido') celebrate(e.clientX, e.clientY);   // Craft: celebra ao arrastar p/ Concluído
     registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(colId)}`);

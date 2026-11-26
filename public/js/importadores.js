@@ -305,7 +305,7 @@ window.handleTrelloFile = (event)=>{
       _trelloBuildMap();
       _trelloGoPanel(2);
     } catch(err){
-      console.error('[importJSON]',err); showToast('❌ Erro ao ler JSON', 'Arquivo inválido ou ilegível.');
+      showToast('❌ Erro ao ler JSON', err.message);
     }
   };
   reader.readAsText(file, 'utf-8');
@@ -490,9 +490,9 @@ window.startTrelloImport = async()=>{
       _trelloLog('ok', `✓ [${assignee||'—'}] ${card.name.slice(0,45)}`);
 
     } catch(e){
-      console.error('[trello]',e); err++;
+      err++;
       document.getElementById('trelloCntErr').textContent = err;
-      _trelloLog('err', `✗ ${card.name.slice(0,40)} — falha ao importar`);
+      _trelloLog('err', `✗ ${card.name.slice(0,40)} — ${e.message}`);
     }
 
     if((i+1)%10===0) await new Promise(r=>setTimeout(r,300));
@@ -775,9 +775,9 @@ window.avImportar = async()=>{
       document.getElementById('avCntOk').textContent = ok;
       _avLog('ok', `✓ ${reg.disciplina.slice(0,45)}`);
     } catch(e){
-      console.error('[avaliacoes]',e); err++;
+      err++;
       document.getElementById('avCntErr').textContent = err;
-      _avLog('err', `✗ ${reg.disciplina.slice(0,40)} — falha ao importar`);
+      _avLog('err', `✗ ${reg.disciplina.slice(0,40)} — ${e.message}`);
     }
   }
 
