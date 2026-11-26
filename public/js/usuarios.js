@@ -93,7 +93,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID, avatarsMap = nu
   const _card = ([uid,u])=>{
     const key      = u.key || uid;
     const initials = u.iniciais || (u.nome||key).slice(0,2).toUpperCase();
-    const color    = u.cor || '#94A3B8';
+    const color    = escH(u.cor || '#94A3B8');
     const active   = u.ativo !== false;
     const roleLabel = u.papel === 'gestora' ? 'Gestão' : u.papel === 'admin' ? 'Administração' : '';
     // Foto: na visão multi-equipe usa o avatarsMap da equipe certa; senão, o avatar da equipe ativa.
@@ -338,7 +338,7 @@ window.openEditColabModal = async function(key, equipeId = EQUIPE_ID){
       <label class="modal-label">Equipe
         <select class="filter-select" id="editColabNovaEquipe" style="width:100%;margin-top:4px;">
           <option value="all"${equipeId==='all'?' selected':''}>Todas as equipes (acesso global)</option>
-          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===equipeId?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
+          ${(state.userEquipes||[]).map(eq=>`<option value="${escH(eq)}"${eq===equipeId?' selected':''}>${escH(state.EQUIPE_LABELS[eq]||eq)}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabNovaEquipe" value="${equipeId}">`}
       <label class="modal-label">Papel
@@ -348,7 +348,7 @@ window.openEditColabModal = async function(key, equipeId = EQUIPE_ID){
         </select>
       </label>
       <label class="modal-label">Cor
-        <input type="color" id="editColabCor" value="${u.cor||'#94A3B8'}" style="width:60px;height:32px;margin-left:10px;border-radius:6px;padding:2px;">
+        <input type="color" id="editColabCor" value="${escH(u.cor||'#94A3B8')}" style="width:60px;height:32px;margin-left:10px;border-radius:6px;padding:2px;">
       </label>
       <label class="modal-label" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="editColabCuradora" ${u.curadora?'checked':''}>
@@ -403,7 +403,7 @@ window.openNovoColabModal = function(){
       <label class="modal-label">Equipe
         <select class="modal-input" id="editColabEquipe" style="width:100%;margin-top:4px;">
           ${state.userPapel === 'admin' ? '<option value="all">Todas as equipes (acesso global)</option>' : ''}
-          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===EQUIPE_ID?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
+          ${(state.userEquipes||[]).map(eq=>`<option value="${escH(eq)}"${eq===EQUIPE_ID?' selected':''}>${escH(state.EQUIPE_LABELS[eq]||eq)}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabEquipe" value="${EQUIPE_ID}">`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
