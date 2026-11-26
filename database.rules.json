@@ -7,13 +7,13 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh')",
         ".write": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (!data.exists() && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' && newData.child('equipeId').val() === root.child('usuarios').child(auth.uid).child('equipeId').val()) || (!data.exists() && root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' && root.child('coordenacoes').child(root.child('usuarios').child(auth.uid).child('coordenacaoId').val()).child('equipes').child(newData.child('equipeId').val()).exists()))",
-        ".validate": "root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (auth.uid !== $uid && (root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador') && newData.child('papel').val() === 'colaborador') || (newData.child('papel').val() === data.child('papel').val() && newData.child('equipeId').val() === data.child('equipeId').val())",
+        ".validate": "root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || (auth.uid !== $uid && (root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador') && newData.child('papel').val() === 'colaborador' && !newData.child('coordenacaoId').exists()) || (newData.child('papel').val() === data.child('papel').val() && newData.child('equipeId').val() === data.child('equipeId').val() && newData.child('coordenacaoId').val() === data.child('coordenacaoId').val())",
         "papel": { ".validate": "newData.val() === data.val() || newData.val() === 'colaborador' || newData.val() === 'gestora' || newData.val() === 'coordenador' || newData.val() === 'auditor' || newData.val() === 'rh' || newData.val() === 'admin'" }
       }
     },
 
     "coordenacoes": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || root.child('usuarios').child(auth.uid).child('papel').val() === 'auditor' || root.child('usuarios').child(auth.uid).child('papel').val() === 'rh' || root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora')",
       ".write": "auth != null && root.child('usuarios').child(auth.uid).child('papel').val() === 'admin'"
     },
 
@@ -22,7 +22,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin')",
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.isNumber()"
+        ".validate": "newData.isNumber() && newData.val() > 1700000000000 && newData.val() <= now + 86400000"
       }
     },
 
@@ -47,6 +47,9 @@
             "$cu": {
               "papel": {
                 ".validate": "root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || !data.exists() || newData.val() === data.val()"
+              },
+              "gestorTemp": {
+                ".validate": "newData.isBoolean() && (newData.val() === false || newData.val() === data.val() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || (root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora' && root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId))"
               }
             }
           }
