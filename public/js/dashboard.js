@@ -1011,7 +1011,7 @@ export function renderDemandasSemana(tbodyId, days, collabFilter='', searchFilte
         <strong>${escH(e.task)}${periodsBadge}</strong>
         <div style="font-size:0.7rem;color:var(--muted)">${new Date(e.startTime).toLocaleDateString('pt-BR')}</div>
       </td>
-      <td><span style="color:${proj.color};font-weight:700;font-size:0.78rem">${proj.label}</span></td>
+      <td><span style="color:${escH(proj.color)};font-weight:700;font-size:0.78rem">${escH(proj.label)}</span></td>
       <td style="font-family:var(--mono);font-size:0.75rem">${fmtTime(e.startTime)}</td>
       <td style="font-family:var(--mono);font-size:0.75rem">${fmtTime(e.endTime)}</td>
       <td style="font-family:var(--mono);font-size:0.75rem">${fmtDur(e.duration)}</td>
