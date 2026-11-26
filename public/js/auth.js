@@ -154,10 +154,10 @@ function _renderEquipePills(equipes, equipeAtiva){
     if(!bar) return;
     bar.classList.add('visible');
     bar.innerHTML = equipes.map(eq => {
-      const label = state.EQUIPE_LABELS[eq] || EQUIPE_LABELS[eq] || eq.charAt(0).toUpperCase()+eq.slice(1);
+      const label = escH(state.EQUIPE_LABELS[eq] || EQUIPE_LABELS[eq] || eq.charAt(0).toUpperCase()+eq.slice(1));
       const active = eq === equipeAtiva;
       return `<button class="equipe-pill${active?' active':''}"
-        onclick="window._doEquipeSwitch('${eq}')"
+        onclick="window._doEquipeSwitch('${escH(eq)}')"
         aria-pressed="${active}"
         aria-label="Ver equipe ${label}">${label}</button>`;
     }).join('');
