@@ -69,17 +69,28 @@
 
         "kanban": {
           ".indexOn": ["updatedAt", "column", "assignee"],
-          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)"
+          "$cardId": {
+            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)",
+            ".validate": "!newData.exists() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('ajuste_diagramacao').val() === data.child('ajuste_diagramacao').val() && newData.child('ajuste_diagramacao_obs').val() === data.child('ajuste_diagramacao_obs').val() && newData.child('ajuste_curadoria').val() === data.child('ajuste_curadoria').val() && newData.child('ajuste_curadoria_obs').val() === data.child('ajuste_curadoria_obs').val() && newData.child('ajuste_avaliado_em').val() === data.child('ajuste_avaliado_em').val())",
+            "assignee": { ".validate": "newData.isString() && newData.val().matches(/^[^<>\"'&`]{0,60}$/)" },
+            "assignees": { "$i": { ".validate": "newData.isString() && newData.val().matches(/^[^<>\"'&`]{0,60}$/)" } },
+            "history": { "$i": { "by": { ".validate": "newData.isString() && newData.val().matches(/^[^<>\"'&`]{0,60}$/)" } } },
+            "workers": { "$k": { ".validate": "$k.matches(/^[^<>\"'&`]{1,60}$/)" } }
+          }
         },
 
         "arquivo": {
-          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)"
+          "$cardId": {
+            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)",
+            ".validate": "!newData.exists() || !data.exists() || root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora') || (newData.child('ajuste_diagramacao').val() === data.child('ajuste_diagramacao').val() && newData.child('ajuste_diagramacao_obs').val() === data.child('ajuste_diagramacao_obs').val() && newData.child('ajuste_curadoria').val() === data.child('ajuste_curadoria').val() && newData.child('ajuste_curadoria_obs').val() === data.child('ajuste_curadoria_obs').val() && newData.child('ajuste_avaliado_em').val() === data.child('ajuste_avaliado_em').val())"
+          }
         },
 
         "mural": {
           ".indexOn": ["ts"],
-          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId)",
+          ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('gestorTemp').val() === true || (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && root.child('usuarios').child(auth.uid).child('papel').val() === 'gestora'))",
           "$postId": {
+            ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('equipeId').val() === $equipeId && ((!data.exists() && newData.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val()) || (data.exists() && data.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val() && (!newData.exists() || newData.child('collab').val() === root.child('equipes').child($equipeId).child('config/usuarios').child(auth.uid).child('key').val()))))",
             ".validate": "!newData.exists() || (newData.child('text').isString() && newData.child('text').val().length <= 280)"
           }
         },
