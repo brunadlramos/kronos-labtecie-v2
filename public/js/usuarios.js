@@ -794,7 +794,7 @@ async function _setCoordenadorProfile(uid, dados, coordId){
 window.cfgCriarCoordenador = async(coordId)=>{
   const nome=prompt('Nome do coordenador:'); if(!nome||!nome.trim()) return;
   const email=(prompt('E-mail do coordenador:')||'').trim().toLowerCase(); if(!email.includes('@')){ showToast('Erro','E-mail inv\u00E1lido.'); return; }
-  const senha=prompt('Senha inicial (m\u00EDn. 6 caracteres):','0123456'); if(!senha||senha.length<6){ showToast('Erro','Senha muito curta.'); return; }
+  const senha=prompt('Senha inicial (m\u00EDn. 6 caracteres):'); if(!senha||senha.length<6||senha==='0123456'){ showToast('Erro','Senha inv\u00E1lida: m\u00EDnimo 6 caracteres e diferente da padr\u00E3o.'); return; }
   try{
     const secAuth=_getSecondaryAuth();
     const cred=await createUserWithEmailAndPassword(secAuth,email,senha);

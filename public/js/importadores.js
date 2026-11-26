@@ -490,7 +490,7 @@ window.startTrelloImport = async()=>{
       _trelloLog('ok', `✓ [${assignee||'—'}] ${card.name.slice(0,45)}`);
 
     } catch(e){
-      err++;
+      console.error('[trello]',e); err++;
       document.getElementById('trelloCntErr').textContent = err;
       _trelloLog('err', `✗ ${card.name.slice(0,40)} — falha ao importar`);
     }
@@ -775,7 +775,7 @@ window.avImportar = async()=>{
       document.getElementById('avCntOk').textContent = ok;
       _avLog('ok', `✓ ${reg.disciplina.slice(0,45)}`);
     } catch(e){
-      err++;
+      console.error('[avaliacoes]',e); err++;
       document.getElementById('avCntErr').textContent = err;
       _avLog('err', `✗ ${reg.disciplina.slice(0,40)} — falha ao importar`);
     }
