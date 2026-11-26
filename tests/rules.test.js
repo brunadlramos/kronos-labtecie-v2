@@ -323,7 +323,12 @@ describe('C1 · kanban: nó coletivo e campos de avaliação', () => {
     }));
   });
 
-  it('NAO-REGRESSAO: colaborador remove card avaliado do kanban (arquivar na lixeira)', async () => {
+  // R3: a nota só sai do kanban junto com o card se ele JÁ está no arquivo (o app grava arquivo e depois remove)
+  it('NAO-REGRESSAO: colaborador arquiva card avaliado (grava arquivo e remove do kanban)', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/k_nota`).set({
+      name: 'Card avaliado', module: 'MOD1', assignee: 'ana', archived: true,
+      ajuste_diagramacao: 'excelente', ajuste_diagramacao_obs: 'ótimo', ajuste_avaliado_em: 1750000000000,
+    }));
     await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_nota`).remove());
   });
 
@@ -391,15 +396,16 @@ describe('C1 · arquivo: nó coletivo e avaliação', () => {
   });
 
   // Decisão D7: em arquivo o card NASCE por movimento, trazendo a nota consigo.
-  it('NAO-REGRESSAO (D7): colaborador arquiva card que já tem nota', async () => {
-    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/a_movido`).set({
+  it('NAO-REGRESSAO (D7): colaborador arquiva card que já tem nota (a mesma do kanban)', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/k_nota`).set({
       name: 'Card avaliado', module: 'MOD1', assignee: 'ana',
-      ajuste_diagramacao: 'excelente', archivedAt: 1750100000000,
+      ajuste_diagramacao: 'excelente', ajuste_diagramacao_obs: 'ótimo', ajuste_avaliado_em: 1750000000000,
+      archivedAt: 1750100000000,
     }));
   });
 
   it('NAO-REGRESSAO: gestora desarquiva (apaga do arquivo)', async () => {
-    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo/a_movido`).remove());
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo/a_nota`).remove());
   });
 });
 
@@ -858,5 +864,107 @@ describe('C5 · entries: tipos e faixas, sem allowlist de nomes', () => {
         { startTime: 1750007200000, endTime: 1750010800000, duration: 3600000 }],
       duration: 7200000, endTime: 1750010800000, modifiedAt: 1750011000000, modifiedBy: 'ana@fatecie.edu.br',
     }));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ONDA 2 · B3 mural, B4/F2 arquivo, R3 card, B2 avaliação
+// ═════════════════════════════════════════════════════════════════════════════
+describe('B3 · mural: collab do post é imutável', () => {
+  it('ATAQUE: nem a gestora reatribui o collab de um post existente', async () => {
+    await assertFails(ref(GEST, `equipes/${EQ}/mural/m_bia/collab`).set('ana'));
+    await assertFails(ref(GEST, `equipes/${EQ}/mural/m_bia`).set({ text: 'post da Bia', collab: 'ana', ts: 1750000000000 }));
+  });
+
+  it('ATAQUE: rh com equipe real NÃO apaga no mural', async () => {
+    await assertFails(ref(RHEQ, `equipes/${EQ}/mural/m_bia`).remove());
+    await assertFails(ref(RHEQ, `equipes/${EQ}/mural`).set(null));
+  });
+
+  it('NAO-REGRESSAO: Ana edita o texto do próprio post mantendo o collab; gestora modera texto alheio', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/mural/m_ana`).set({ text: 'editado', collab: 'ana', ts: 1750000000000 }));
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/mural/m_bia/text`).set('moderado'));
+  });
+});
+
+describe('B4/F2 · arquivo: só gestão apaga; nota de item novo vem do kanban', () => {
+  it('ATAQUE: colaborador NÃO apaga item arquivado (desarquivar/limpar é da gestão)', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/a_nota`).remove());
+    await assertFails(ref(BIA, `equipes/${EQ}/arquivo/a_nota`).remove());
+  });
+
+  it('ATAQUE: colaborador NÃO cria item no arquivo com ajuste_* inventado', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/a_forjado`).set({ name: 'F', module: 'MOD1', assignee: 'ana', ajuste_diagramacao: 'excelente' }));
+  });
+
+  it('ATAQUE: ajuste_* diferente do card de origem no kanban é recusado', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/k_livre`).set({ name: 'x', module: 'MOD1', assignee: 'ana', ajuste_curadoria: 'bom' }));
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/k_nota`).set({ name: 'x', module: 'MOD1', assignee: 'ana', ajuste_diagramacao: 'ruim' }));
+  });
+
+  it('ATAQUE: rh com equipe real NÃO apaga item do arquivo', async () => {
+    await assertFails(ref(RHEQ, `equipes/${EQ}/arquivo/a_nota`).remove());
+  });
+
+  for (const [nome, uid] of [['gestora', GEST], ['gestora só de config', CFG], ['gestorTemp', TMP], ['admin', ADMIN]]) {
+    it(`NAO-REGRESSAO: ${nome} desarquiva (apaga item) e limpa o arquivo`, async () => {
+      await assertSucceeds(ref(uid, `equipes/${EQ}/arquivo/a_nota`).remove());
+      await assertSucceeds(ref(uid, `equipes/${EQ}/arquivo`).update({ a_nota: null, a_outro: null }));
+    });
+  }
+
+  it('NAO-REGRESSAO: gestora arquiva em lote (cria itens, um com nota própria)', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo`).update({
+      'a_lote1': { name: 'L1', module: 'TRELLO', assignee: 'ana', ajuste_diagramacao: 'bom' },
+      'a_lote2': { name: 'L2', module: 'TRELLO', assignee: 'ana' },
+    }));
+  });
+
+  it('NAO-REGRESSAO: colaborador arquiva card sem nota e comenta/regrava item existente igual', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/k_livre`).set({ name: 'Card sem nota', module: 'MOD1', assignee: 'ana', archived: true }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/a_nota/comments/c1750100000000`).set({ text: 'ok', by: 'ana', ts: 1750100000000 }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/a_nota`).set({ name: 'Arquivado avaliado', module: 'MOD1', assignee: 'bia', ajuste_diagramacao: 'bom', archivedAt: 1750000000000 }));
+  });
+});
+
+describe('R3 · card com nota não some do kanban sem passar pelo arquivo', () => {
+  it('ATAQUE: colaborador NÃO apaga card avaliado (apagar e recriar sem a nota)', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_nota`).remove());
+  });
+
+  it('ATAQUE: card avaliado continua lá, então recriar sem nota (set) também falha', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_nota`).set({ name: 'Card avaliado', column: 'concluido', assignee: 'ana', updatedAt: 1750100000000 }));
+  });
+
+  it('NAO-REGRESSAO: colaborador apaga card SEM nota', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_livre`).remove());
+  });
+
+  for (const [nome, uid] of [['gestora', GEST], ['gestora só de config', CFG], ['gestorTemp', TMP], ['admin', ADMIN]]) {
+    it(`NAO-REGRESSAO: ${nome} apaga card avaliado (limpar lixeira)`, async () => {
+      await assertSucceeds(ref(uid, `equipes/${EQ}/kanban/k_nota`).remove());
+    });
+  }
+
+  it('NAO-REGRESSAO: card avaliado vai para a lixeira por set (coluna), sem apagar', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_nota`).set({
+      name: 'Card avaliado', column: 'lixeira', archived: true, assignee: 'ana',
+      ajuste_diagramacao: 'excelente', ajuste_diagramacao_obs: 'ótimo', ajuste_avaliado_em: 1750000000000, updatedAt: 1750100000000,
+    }));
+  });
+});
+
+describe('B2 · ajuste_* só da gestão (conferência)', () => {
+  it('ATAQUE: coordenador, rh e colaborador NÃO avaliam card', async () => {
+    for (const u of [COORD, RHEQ, ANA, BIA]) {
+      await assertFails(ref(u, `equipes/${EQ}/kanban/k_livre`).update({ ajuste_diagramacao: 'excelente' }));
+    }
+  });
+
+  it('NAO-REGRESSAO: gestora e admin avaliam card e item do arquivo', async () => {
+    for (const u of [GEST, ADMIN]) {
+      await assertSucceeds(ref(u, `equipes/${EQ}/kanban/k_livre`).update({ ajuste_diagramacao: 'bom', ajuste_avaliado_em: 1750100000000 }));
+      await assertSucceeds(ref(u, `equipes/${EQ}/arquivo/a_nota`).update({ ajuste_curadoria: 'bom' }));
+    }
   });
 });
