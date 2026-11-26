@@ -169,6 +169,22 @@ describe('B1 · criação de usuário com papel arbitrário', () => {
     await assertSucceeds(ref(ANA, `usuarios/${ANA}`).update({ nome: 'Ana Maria' }));
   });
 
+  it('ATAQUE: gestora NÃO pode gravar papel admin direto no filho (update)', async () => {
+    await assertFails(ref(GEST, `usuarios/${NOVO}`).update({ papel: 'admin', equipeId: EQ }));
+  });
+
+  it('NAO-REGRESSAO: coordenador cria colaborador em equipe da sua coordenação', async () => {
+    await assertSucceeds(ref(COORD, 'usuarios/uid_novo_colab').set({
+      nome: 'Novo', email: 'novo@fatecie.edu.br', papel: 'colaborador', equipeId: EQ,
+    }));
+  });
+
+  it('NAO-REGRESSAO: admin cria gestora (papel da lista)', async () => {
+    await assertSucceeds(ref(ADMIN, 'usuarios/uid_nova_gestora').set({
+      nome: 'G', email: 'g@fatecie.edu.br', papel: 'gestora', equipeId: EQ,
+    }));
+  });
+
   it('ATAQUE: colaborador NÃO promove a si mesmo (confirmado em emulador antes)', async () => {
     await assertFails(ref(ANA, `usuarios/${ANA}/papel`).set('admin'));
   });
@@ -234,7 +250,7 @@ describe('C1 · kanban: nó coletivo e campos de avaliação', () => {
 
   it('ATAQUE: colaborador NÃO pode alterar avaliação existente', async () => {
     await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_nota`).update({
-      ajuste_diagramacao: 'excelente',
+      ajuste_diagramacao: 'ruim'  /* valor DIFERENTE do semeado: igual seria o caso D6 (inalterado) */,
     }));
   });
 
@@ -281,6 +297,10 @@ describe('C1 · kanban: nó coletivo e campos de avaliação', () => {
     }));
   });
 
+  it('NAO-REGRESSAO: colaborador remove card avaliado do kanban (arquivar na lixeira)', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_nota`).remove());
+  });
+
   it('NAO-REGRESSAO: colaborador lança horas em workers com a própria chave', async () => {
     await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_livre/workers/ana`).set(120));
   });
@@ -319,8 +339,13 @@ describe('C1 · mural: posse do post', () => {
     }));
   });
 
+  // Apaga 'm_ana' (semeado): m_ana2 so existe dentro de outro teste, e o beforeEach re-semeia.
   it('NAO-REGRESSAO: Ana apaga o próprio post', async () => {
-    await assertSucceeds(ref(ANA, `equipes/${EQ}/mural/m_ana2`).remove());
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/mural/m_ana`).remove());
+  });
+
+  it('NAO-REGRESSAO: gestora apaga post de colaborador', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/mural/m_bia`).remove());
   });
 
   it('NAO-REGRESSAO: gestora limpa o mural inteiro (clearMural)', async () => {
