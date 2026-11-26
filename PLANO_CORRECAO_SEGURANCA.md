@@ -336,3 +336,4 @@ Da ordem P2/P3 do relatório, sem re-litígio agora:
 | 08/09/2026 | 0.1 | JDK 21.0.12.1 instalado pelo dono | OK |
 | 08/09/2026 | 1.4 | **Baseline no emulador: 28 passam, 19 ataques falham, 0 regressão.** Dois ataques já eram bloqueados (autopromoção; apagar ponto alheio) | OK — Fase 1 concluída |
 | — | 0.3–0.7 | Backup de produção e cópia — dependem de `firebase login` do dono | Pendente |
+| 26/11/2026 | 4.6 | `DEPLOY.md` (runbook do zero) escrito; **nenhum comando executado**, restauração na cópia e `kronos-fdb75` ainda não verificados | Escrito, não exercitado |
