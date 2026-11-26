@@ -267,7 +267,7 @@ window.kMoveToCol = async(key, destColId)=>{
   const now = Date.now();
   const hist = [...(card.history||[]),{action:`Movido para ${kColLabel(destColId)}`,by:state.currentCollabKey,byEmail:state.currentUser?.email||'',ts:now}];
   try{
-    await set(child(kanbanRef,key),{...card,column:destColId,history:hist,updatedAt:now,modifiedBy:state.currentUser?.email||'desconhecido'});
+    await update(child(kanbanRef,key),{column:destColId,history:hist,updatedAt:now,modifiedBy:state.currentUser?.email||'desconhecido'});   // R2: update parcial, nao regrava ajuste_* do cache velho
     showToast('Card movido',`→ ${kColLabel(destColId)}`);
     registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(destColId)}`);
   }catch(err){
@@ -358,10 +358,10 @@ export function renderKanban(){
         onclick="kToggleCollapse('${col.id}')"
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kToggleCollapse('${col.id}')}">
         ${isCollapsed
-          ? `<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.68rem;font-weight:700;color:var(--text);padding:8px 2px;white-space:nowrap;">${col.label} <span style="color:${col.color}">(${colCards.length})</span></div>`
+          ? `<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.68rem;font-weight:700;color:var(--text);padding:8px 2px;white-space:nowrap;">${escH(col.label)} <span style="color:${col.color}">(${colCards.length})</span></div>`
           : `<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:4px;">
                <div style="display:flex;align-items:center;gap:6px;">
-                 <div class="k-col-title">${col.label}</div>
+                 <div class="k-col-title">${escH(col.label)}</div>
                  <div class="k-col-count">${colCards.length}</div>
                </div>
                <div style="display:flex;align-items:center;gap:2px;" onclick="event.stopPropagation()">
@@ -407,8 +407,9 @@ function renderKCard(card, botoesMemo){
           <span style="color:#8b5cf6;">🔎 Curador:</span> ${escH(cu.label||card.curador)}</div>`; })()
     : '';
   const modColors = {MOD1:'#7C6AFF',MOD2:'#10B981',MOD3:'#F59E0B',MOD4:'#EF4444'};
+  const mc = Object.hasOwn(modColors, card.module) ? modColors[card.module] : '#94A3B8';  // hasOwn: module="constructor" não vira cor
   const modBadge = card.module&&card.module!=='none'
-    ?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:${modColors[card.module]||'#94A3B8'}22;border:1px solid ${modColors[card.module]||'#94A3B8'}55;color:${modColors[card.module]||'#94A3B8'}">${card.module}</span>`:'';
+    ?`<span style="font-family:var(--mono);font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:4px;background:${mc}22;border:1px solid ${mc}55;color:${mc}">${escH(card.module)}</span>`:'';
   const labelsHtml = (card.tags||[]).map(t=>{
     const lc=kLabelColor(t);
     return `<span class="k-card-label" style="background:${lc.bg};border:1px solid ${lc.border};color:${lc.color}">${escH(t)}</span>`;
@@ -417,7 +418,7 @@ function renderKCard(card, botoesMemo){
   const workers = card.workers||{};
   const workersSummary = Object.entries(workers).map(([k,mins])=>{
     const wc=state.COLLABS[k]||{initials:'?',color:'#94A3B8'};
-    return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;"><span style="width:14px;height:14px;border-radius:50%;background:${wc.color};display:inline-flex;align-items:center;justify-content:center;font-size:0.4rem;font-weight:800;color:#fff">${wc.initials}</span><span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">${kFmtHours(mins)}</span></span>`;
+    return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;"><span style="width:14px;height:14px;border-radius:50%;background:${wc.color};display:inline-flex;align-items:center;justify-content:center;font-size:0.4rem;font-weight:800;color:#fff">${escH(wc.initials)}</span><span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">${kFmtHours(mins)}</span></span>`;
   }).join('');
   const commentCount = Object.keys(card.comments||{}).length;
 
@@ -428,7 +429,7 @@ function renderKCard(card, botoesMemo){
     if(b.tipo==='timer'){
       if(timerAtivo) return `<button class="k-btn-timer" style="background:var(--orange);color:#fff;" disabled>🔴 Timer ativo</button>`;
       if(state.isRunning && !timerAtivo) return '';
-      return `<button class="k-btn-timer" onclick="startKanbanTimer('${card._key}')">${ICONS.play} ${timerLabel}</button>`;
+      return `<button class="k-btn-timer" onclick="startKanbanTimer('${card._key}')">${ICONS.play} ${escH(timerLabel)}</button>`;
     }
     if(b.tipo==='mover'&&b.destino){
       const destCol = state.K_COLS.find(c=>c.id===b.destino);
@@ -437,7 +438,7 @@ function renderKCard(card, botoesMemo){
     }
     if(b.tipo==='concluir'){
       if(!state.isManager&&!kIsAssignee(card,state.currentCollabKey)) return '';
-      return `<button class="k-btn-move" style="border-color:rgba(34,197,94,0.4);color:var(--success);" onclick="concludeKanbanCard('${card._key}')">${ICONS.check} ${b.label||'Concluir'}</button>`;
+      return `<button class="k-btn-move" style="border-color:rgba(34,197,94,0.4);color:var(--success);" onclick="concludeKanbanCard('${card._key}')">${ICONS.check} ${escH(b.label||'Concluir')}</button>`;
     }
     return '';
   }).join('');
@@ -529,7 +530,7 @@ window.kDrop = async (e, colId) => {
 
   try {
     // ✅ AUDIT: updatedAt e modifiedBy registrados em toda movimentação
-    await set(child(kanbanRef, droppedKey), { ...card, column: colId, history: hist, updatedAt: now_drop, modifiedBy: state.currentUser?.email||'desconhecido' });
+    await update(child(kanbanRef, droppedKey), { column: colId, history: hist, updatedAt: now_drop, modifiedBy: state.currentUser?.email||'desconhecido' });
     showToast('Card movido', `→ ${kColLabel(colId)}`);
     if(colId==='concluido') celebrate(e.clientX, e.clientY);   // Craft: celebra ao arrastar p/ Concluído
     registrarLog('mover', `Moveu "${(card.name||'').slice(0,40)}"`, `→ ${kColLabel(colId)}`);
@@ -697,7 +698,7 @@ window.stopKanbanTimer = async()=>{
     if(card){
       const workers = {...(card.workers||{})};
       workers[collab] = (workers[collab]||0) + mins;
-      await set(child(kanbanRef, cardKey),{...card, hours:(card.hours||0)+mins, workers});
+      await update(child(kanbanRef, cardKey),{hours:(card.hours||0)+mins, workers});   // item 7: parcial, nao regrava ajuste_* do cache
     }
 
     showToast('Timer finalizado',`${kFmtHours(mins)} registrados${card?' no card e':''} no timer!`);
@@ -731,13 +732,13 @@ window.concludeKanbanCard = async(key)=>{
   // ✅ FIX BUG 3: state.currentCollabKey em vez de state.currentUser
   const hist=[...(card.history||[]),{action:'Concluído',by:state.currentCollabKey,ts:now}];
   // ✅ AUDIT: modifiedBy registrado ao concluir
-  await set(child(kanbanRef, key),{...card,column:'concluido',concludedAt:now,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+  await update(child(kanbanRef, key),{column:'concluido',concludedAt:now,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
   showToast('Disciplina concluída!','Card movido para Concluído.');
   registrarLog('concluir', `Concluiu "${(card.name||'').slice(0,40)}"`);
   // Notifica todos os responsáveis (exceto quem concluiu)
   kCardAssignees(card)
     .filter(a=>a && a!==state.currentCollabKey)
-    .forEach(a=>push(notifsRef,{to:a,title:'Disciplina concluída',msg:'"'+(card.name||'').slice(0,30)+'" foi liberada!',from:state.currentCollabKey,ts:now,read:false}));
+    .forEach(a=>push(notifsRef,{to:a,title:'Disciplina concluída',msg:'"'+(card.name||'').slice(0,30)+'" foi liberada!',from:state.currentCollabKey,ts:now,read:false}).catch(e=>console.error('[concluir notif]',e)));
 };
 
 // Marca/desmarca um card como URGENTE (gestora ou responsável). Disponível para toda equipe.
@@ -876,13 +877,13 @@ function renderKanbanComments(card){
   const comments=Object.entries(card.comments||{}).map(([k,v])=>({...v,_key:k})).sort((a,b)=>a.ts-b.ts);
   if(!comments.length){container.innerHTML='<div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:8px">Nenhum comentário ainda</div>';return;}
   container.innerHTML=comments.map(cm=>{
-    // ✅ SEC: label de fallback escapado
-    const col=state.COLLABS[cm.by]||{label:escH(cm.by||'?'),initials:'?',color:'#94A3B8'};
+    // ✅ SEC: label/initials escapados no consumo (escH no template), não no fallback
+    const col=state.COLLABS[cm.by]||{label:cm.by||'?',initials:'?',color:'#94A3B8'};
     const canDel=state.isManager||cm.by===state.currentCollabKey;
     return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-        <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.45rem;font-weight:800;color:#fff">${col.initials}</div>
-        <span style="font-size:0.72rem;font-weight:700">${col.label}</span>
+        <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.45rem;font-weight:800;color:#fff">${escH(col.initials)}</div>
+        <span style="font-size:0.72rem;font-weight:700">${escH(col.label)}</span>
         <span style="font-family:var(--mono);font-size:0.6rem;color:var(--muted);margin-left:auto">${fmtTime(cm.ts)}</span>
         ${canDel?`<button onclick="deleteKanbanComment('${cm._key}')" aria-label="Excluir comentário" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0 2px;display:flex;align-items:center;transition:color 0.2s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">${ICONS.x}</button>`:''}
       </div>
@@ -899,7 +900,7 @@ window.addKanbanComment = async()=>{
   const comments={...(card.comments||{})};
   const newKey='c'+Date.now();
   comments[newKey]={text,by:state.currentCollabKey,ts:Date.now()};
-  await set(child(tRef, key),{...card,comments});
+  await update(child(tRef, key),{['comments/'+newKey]:comments[newKey]});
   if(arq) state.arquivoCards[key]={...card,comments};   // sem listener no arquivo: atualiza cache
   input.value='';
   renderKanbanComments({...card,comments});
@@ -910,7 +911,7 @@ window.deleteKanbanComment = async(commentKey)=>{
   const {card, ref:tRef, arq}=_cardAndRef(key); if(!card) return;
   const comments={...(card.comments||{})};
   delete comments[commentKey];
-  await set(child(tRef, key),{...card,comments});
+  await update(child(tRef, key),{['comments/'+commentKey]:null});
   if(arq) state.arquivoCards[key]={...card,comments};
   renderKanbanComments({...card,comments});
 };
@@ -918,9 +919,9 @@ window.deleteKanbanComment = async(commentKey)=>{
 export async function cleanLixeira(){
   const cutoff = Date.now() - 30*24*60*60*1000;
   const toRemove = Object.entries(state.kanbanCards)
-    .filter(([,card]) => card.column==='lixeira' && card.archivedAt && card.archivedAt < cutoff)
+    .filter(([,card]) => card.column==='lixeira' && card.archivedAt && card.archivedAt < cutoff && !Object.keys(card).some(k=>k.startsWith('ajuste_')))   // item 4: nota de avaliacao nunca some na limpeza
     .map(([k]) => remove(child(kanbanRef, k)));
-  if(toRemove.length) await Promise.all(toRemove);
+  if(toRemove.length) await Promise.all(toRemove).catch(e=>console.error('[cleanLixeira]',e));   // item 5: membro pode ser negado
 }
 
 // A11: popula o select de módulo a partir das colunas do Arquivo Morto da equipe
@@ -1025,21 +1026,21 @@ window.saveKanbanCard = async () => {
   const fromEntryKey = (!state.editingKanbanId && window._pendingFromEntryKey) ? window._pendingFromEntryKey : (state.kanbanCards[state.editingKanbanId]?.fromEntryKey||null);
   window._pendingFromEntryKey = null;
 
+  const editing = !!(state.editingKanbanId && state.kanbanCards[state.editingKanbanId]);
   const cardData = {
     name,
     assignee,
-    assignees,
+    // null explícito apaga o campo opcional no update (array vazio dependia do SDK)
+    assignees: assignees.length ? assignees : null,
     // Curador (só Revisão): salva o escolhido ou null para limpar; outras equipes não tocam.
     ...(EQUIPE_ID === 'revisao' ? { curador: (document.getElementById('kcCurador')?.value || null) } : {}),
     column,
     module,
     obs: obs || '',
-    tags,
-    links: validLinks,
-    hours: 0,
-    workers: {},
-    comments: {},
-    adjustCycles: 0,
+    tags: tags?.length ? tags : null,
+    links: validLinks.length ? validLinks : null,
+    // horas/workers/comentários só nascem na criação; editar NUNCA os toca
+    ...(editing ? {} : { hours: 0, workers: {}, comments: {}, adjustCycles: 0 }),
     ...(fromEntryKey ? {fromEntryKey} : {}),
     history: state.editingKanbanId
       ? [...(state.kanbanCards[state.editingKanbanId]?.history || [])]
@@ -1049,6 +1050,14 @@ window.saveKanbanCard = async () => {
       : now,
     updatedAt: now
   };
+
+  // Editar sem mexer no responsável não regrava assignee/assignees: a regra trava a troca em card avaliado
+  // e cards antigos (sem assignees, ou assignee != assignees[0]) seriam recusados.
+  if (editing) {
+    const old = state.kanbanCards[state.editingKanbanId];
+    const oldList = Array.isArray(old.assignees) ? old.assignees : (old.assignee ? [old.assignee] : []);
+    if (JSON.stringify(oldList) === JSON.stringify(assignees)) { delete cardData.assignee; delete cardData.assignees; }
+  }
 
   try {
     setSyncStatus('loading', state.editingKanbanId ? 'Atualizando...' : 'Criando...');
@@ -1070,8 +1079,7 @@ window.saveKanbanCard = async () => {
       });
 
       // ✅ AUDIT: modifiedBy no save do card
-      await set(child(kanbanRef, state.editingKanbanId), {
-        ...state.kanbanCards[state.editingKanbanId],
+      await update(child(kanbanRef, state.editingKanbanId), {
         ...cardData,
         history: oldHistory,
         modifiedBy: state.currentUser?.email||'desconhecido'
@@ -1138,15 +1146,15 @@ window.openKanbanDetail=(key)=>{
   else { document.getElementById('kdObsSection').style.display='none'; }
   document.getElementById('kdHistory').innerHTML=(card.history||[]).slice().reverse().map(h=>{
     const hc=state.COLLABS[h.by]||{label:h.by||'?',initials:'?',color:'#94A3B8'};
-    return`<div class="k-history-item"><div class="k-history-dot"></div><div style="flex:1"><span style="font-weight:700">${escH(h.action)}</span> <span style="font-size:0.65rem;color:var(--muted)">por ${hc.label}</span></div><div style="font-family:var(--mono);font-size:0.62rem;color:var(--muted);white-space:nowrap">${kFmtDate(h.ts)}</div></div>`;
+    return`<div class="k-history-item"><div class="k-history-dot"></div><div style="flex:1"><span style="font-weight:700">${escH(h.action)}</span> <span style="font-size:0.65rem;color:var(--muted)">por ${escH(hc.label)}</span></div><div style="font-family:var(--mono);font-size:0.62rem;color:var(--muted);white-space:nowrap">${kFmtDate(h.ts)}</div></div>`;
   }).join('');
   const workers=card.workers||{};
   document.getElementById('kdWorkers').innerHTML=Object.entries(workers).length
     ? Object.entries(workers).map(([k,mins])=>{
         const wc=state.COLLABS[k]||{label:k,initials:'?',color:'#94A3B8'};
         return`<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;">
-          <div style="width:20px;height:20px;border-radius:50%;background:${wc.color};display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff">${wc.initials}</div>
-          <span style="font-size:0.78rem;font-weight:700">${wc.label}</span>
+          <div style="width:20px;height:20px;border-radius:50%;background:${wc.color};display:flex;align-items:center;justify-content:center;font-size:0.48rem;font-weight:800;color:#fff">${escH(wc.initials)}</div>
+          <span style="font-size:0.78rem;font-weight:700">${escH(wc.label)}</span>
           <span style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">${kFmtHours(mins)}</span>
         </div>`;
       }).join('')
@@ -1614,9 +1622,9 @@ window.renderIndicadores = ()=>{
       return `
         <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="width:28px;height:28px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:800;color:#fff;">${col.initials}</div>
+            <div style="width:28px;height:28px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
             <div style="flex:1">
-              <div style="font-size:0.82rem;font-weight:800;">${col.label}</div>
+              <div style="font-size:0.82rem;font-weight:800;">${escH(col.label)}</div>
               <div style="font-size:0.65rem;color:var(--muted);font-family:var(--mono);">${r.total} card${r.total!==1?'s':''} avaliados</div>
             </div>
             <div style="text-align:right;">
@@ -1646,8 +1654,8 @@ window.renderIndicadores = ()=>{
         <td style="padding:9px 14px;font-size:0.78rem;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${c.manual?'':'cursor:pointer;'}" ${c.manual?'':`onclick="openKanbanDetail('${c._key}')"`} title="${c.manual?escH('Adicionada manualmente'+(c.motivo?': '+c.motivo:'')):'Abrir card'}">${escH(c.name||c.title||'Sem nome')}${c.manual?' <span class="ind-manual-tag">manual</span>':''}</td>
         <td style="padding:9px 14px;">
           <div style="display:flex;align-items:center;gap:5px;">
-            <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${col.initials}</div>
-            <span style="font-size:0.75rem;font-weight:700;">${col.label}</span>
+            <div style="width:18px;height:18px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
+            <span style="font-size:0.75rem;font-weight:700;">${escH(col.label)}</span>
           </div>
         </td>
         <td style="padding:9px 14px;">
@@ -1675,9 +1683,9 @@ window.renderIndicadores = ()=>{
       const col = state.COLLABS[c.assignee]||{label:c.assignee||'?',initials:'?',color:'#94A3B8'};
       return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:9px;padding:9px 14px;cursor:pointer;"
         onclick="openKanbanDetail('${c._key}');setTimeout(()=>showPage('kanban',null),0)">
-        <div style="width:20px;height:20px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${col.initials}</div>
+        <div style="width:20px;height:20px;border-radius:50%;background:${col.color};display:flex;align-items:center;justify-content:center;font-size:0.42rem;font-weight:800;color:#fff;">${escH(col.initials)}</div>
         <div style="flex:1;font-size:0.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(c.name||'—')}</div>
-        <div style="font-size:0.65rem;font-family:var(--mono);color:var(--muted);">${kColLabel(c.column)||'Arquivo'}</div>
+        <div style="font-size:0.65rem;font-family:var(--mono);color:var(--muted);">${escH(kColLabel(c.column)||'Arquivo')}</div>
       </div>`;
     }).join('') || '<div style="font-size:0.78rem;color:var(--muted);">✅ Todos os cards avaliados!</div>';
   }
@@ -1942,7 +1950,7 @@ window.kdSaveLinksNow = async(links)=>{
   const clean = links.filter(l=>l && l.trim());
   try{
     const updated = { ...card, links: clean, modifiedBy: state.currentUser?.email||'desconhecido', updatedAt: Date.now() };
-    await set(child(tRef, key), updated);
+    await update(child(tRef, key), { links: clean, modifiedBy: updated.modifiedBy, updatedAt: updated.updatedAt });
     if(arq) state.arquivoCards[key] = updated;   // sem listener no arquivo: atualiza cache
     kdRenderLinks(clean);
     showToast('Link salvo','Link adicionado com sucesso.');
@@ -1978,7 +1986,7 @@ window.deleteKanbanCard=async(key)=>{
   const now=Date.now();
   const hist=[...(card.history||[]),{action:'Arquivado na Lixeira',by:state.currentCollabKey,ts:now}];
   try{
-    await set(child(kanbanRef, key),{...card,column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    await update(child(kanbanRef, key),{column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
     closeKanbanDetail();
     showToast('Card arquivado','Movido para a Lixeira.');
   }catch(err){
@@ -2286,7 +2294,22 @@ function _baseModule(card){
 // move um card ATIVO (kanban) → nó arquivo (arquiva de verdade)
 async function moveCardToArquivo(key, cardData){
   const data = {...cardData, archived:true, archiveYear:_archiveYearOf(cardData), module:_baseModule(cardData)};
-  await set(child(arquivoRef, key), data);
+  try { await set(child(arquivoRef, key), data); }
+  catch(e){
+    if(e?.code !== 'PERMISSION_DENIED') throw e;
+    // cache velho (nota/responsável mudou no servidor): relê o card do banco e tenta UMA vez
+    const snap = await get(child(kanbanRef, key));
+    if(!snap.exists()) throw e;
+    const f = snap.val();
+    for(const k of ['name','assignee','ajuste_diagramacao','ajuste_diagramacao_obs','ajuste_curadoria','ajuste_curadoria_obs','ajuste_avaliado_em']){
+      if(f[k] === undefined) delete data[k]; else data[k] = f[k];
+    }
+    try { await set(child(arquivoRef, key), data); }
+    catch(e2){
+      if(e2?.code === 'PERMISSION_DENIED') showToast('Dados desatualizados','Este card mudou no servidor. Recarregue a página (F5) e tente de novo.');
+      throw e2;
+    }
+  }
   await remove(child(kanbanRef, key));
   state.arquivoCards[key] = data;
   delete state.kanbanCards[key];
@@ -2379,7 +2402,7 @@ window._updateArquivoDropdown = (query)=>{
   drop.innerHTML = matches.map(card=>{
     const mod = state.MODS.find(m=>m.id===card.module)||{};
     const col = state.COLLABS[card.assignee]||{};
-    return `<div class="k-search-drop-item" onmousedown="event.preventDefault()" onclick="window._goToArquivoCard('${escH(card._key)}','${escH((card.name||'').replace(/'/g,"\\'"))}')">
+    return `<div class="k-search-drop-item" onmousedown="event.preventDefault()" onclick="window._goToArquivoCard(this.dataset.k,this.dataset.n)" data-k="${escH(card._key)}" data-n="${escH(card.name||'')}">
       <div class="k-search-drop-name">${escH(card.name||'Sem título')}</div>
       <div class="k-search-drop-meta">
         <span style="color:${mod.color||'#94A3B8'}">${escH(mod.label||'Arquivo Morto')}</span>
@@ -2643,7 +2666,7 @@ window.renderArquivo = ()=>{
         ${labelsHtml?`<div class="k-card-labels">${labelsHtml}</div>`:''}
         ${linksHtml?`<div class="k-card-links">${linksHtml}</div>`:''}
         <div class="k-card-meta">
-          <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
+          <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${escH(col.initials)}</div>${escH(col.label)}</div>
           ${card.hours?`<span class="k-card-hours">${ICONS.clock} ${kFmtHours(card.hours)}</span>`:''}
         </div>
         <div style="font-family:var(--mono);font-size:0.58rem;color:var(--muted);margin-top:5px;">Arquivado em ${card.archivedAt?new Date(card.archivedAt).toLocaleDateString('pt-BR'):'-'}</div>
@@ -2660,7 +2683,7 @@ window.renderArquivo = ()=>{
         return`<div class="k-card" style="opacity:0.75;">
           <div class="k-card-name" style="cursor:default;">${escH(card.name||'')}</div>
           <div class="k-card-meta">
-            <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${col.initials}</div>${col.label}</div>
+            <div class="k-card-assignee"><div class="k-card-av" style="background:${col.color}">${escH(col.initials)}</div>${escH(col.label)}</div>
             <span style="font-family:var(--mono);font-size:0.58rem;color:var(--muted)">${card.archivedAt?new Date(card.archivedAt).toLocaleDateString('pt-BR'):''}</span>
           </div>
           ${state.isManager?`<button onclick="unarchiveKanbanCard('${card._key}')" style="width:100%;margin-top:6px;padding:4px 0;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;font-size:0.7rem;font-weight:700;cursor:pointer;">${ICONS.archive} Desarquivar</button>`:''}
@@ -2743,7 +2766,7 @@ window.kArchiveToLixeira = async(key)=>{
   const now = Date.now();
   const hist = [...(card.history||[]),{action:'Arquivado na Lixeira',by:state.currentCollabKey,ts:now}];
   try{
-    await set(child(kanbanRef,key),{...card,column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    await update(child(kanbanRef,key),{column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
     showToast('Card excluído','Movido para a Lixeira.');
   }catch(e){
     showToast('Erro','Falha ao mover para lixeira. Tente novamente.');

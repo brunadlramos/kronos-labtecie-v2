@@ -7,7 +7,7 @@ import {
   escH, fmtDur, fmtTime, fmtDate, dKey, dateKey, todayKey
 } from './utils.js';
 import {
-  db, kanbanRef, entriesRef, notifsRef, EQUIPE_ID
+  db, kanbanRef, arquivoRef, entriesRef, notifsRef, EQUIPE_ID
 } from './firebase-refs.js';
 import {
   ref, push, set, update, get, remove, child, onValue
@@ -305,7 +305,7 @@ window.handleTrelloFile = (event)=>{
       _trelloBuildMap();
       _trelloGoPanel(2);
     } catch(err){
-      showToast('❌ Erro ao ler JSON', err.message);
+      console.error('[importJSON]',err); showToast('❌ Erro ao ler JSON', 'Arquivo inválido ou ilegível.');
     }
   };
   reader.readAsText(file, 'utf-8');
@@ -490,9 +490,9 @@ window.startTrelloImport = async()=>{
       _trelloLog('ok', `✓ [${assignee||'—'}] ${card.name.slice(0,45)}`);
 
     } catch(e){
-      err++;
+      console.error('[trello]',e); err++;
       document.getElementById('trelloCntErr').textContent = err;
-      _trelloLog('err', `✗ ${card.name.slice(0,40)} — ${e.message}`);
+      _trelloLog('err', `✗ ${card.name.slice(0,40)} — falha ao importar`);
     }
 
     if((i+1)%10===0) await new Promise(r=>setTimeout(r,300));
@@ -674,7 +674,7 @@ function _avRenderValidacao(){
     const nivelDiagLabel = m.reg.nivelDiag || '(sem avaliação)';
     const nivelCurLabel  = m.reg.nivelCur  || '(sem avaliação)';
     const cardInfo = c
-      ? `<span style="font-weight:700;">"${escH((c.name||'').slice(0,50))}"</span> — ${cardColabLabel} — <span style="font-size:0.65rem;color:var(--muted);">${c._fonte==='arquivo'?'📦 Arquivo':'📋 Kanban'}</span>`
+      ? `<span style="font-weight:700;">"${escH((c.name||'').slice(0,50))}"</span> — ${escH(cardColabLabel)} — <span style="font-size:0.65rem;color:var(--muted);">${c._fonte==='arquivo'?'📦 Arquivo':'📋 Kanban'}</span>`
       : '<span style="color:var(--muted);font-style:italic;">Nenhum card encontrado</span>';
 
     const canSelect = m.tipo !== 'nenhum';
@@ -761,8 +761,7 @@ window.avImportar = async()=>{
       fields.updatedAt          = now;
 
       // Determina se é kanban ou arquivo morto
-      const dbPath = card._fonte==='arquivo' ? `arquivo/${card._key}` : `kanban/${card._key}`;
-      await update(ref(db, dbPath), fields);
+      await update(child(card._fonte==='arquivo' ? arquivoRef : kanbanRef, card._key), fields);   // item 11: caminho da equipe, nao a raiz
 
       // Atualiza cache local
       if(card._fonte==='arquivo' && window._arquivoCards?.[card._key]){
@@ -775,9 +774,9 @@ window.avImportar = async()=>{
       document.getElementById('avCntOk').textContent = ok;
       _avLog('ok', `✓ ${reg.disciplina.slice(0,45)}`);
     } catch(e){
-      err++;
+      console.error('[avaliacoes]',e); err++;
       document.getElementById('avCntErr').textContent = err;
-      _avLog('err', `✗ ${reg.disciplina.slice(0,40)} — ${e.message}`);
+      _avLog('err', `✗ ${reg.disciplina.slice(0,40)} — falha ao importar`);
     }
   }
 

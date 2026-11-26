@@ -142,12 +142,15 @@ export async function stopTimer(endTime = null) {
     showToast('Registro descartado', 'Timer muito curto — mínimo de 2 segundos para salvar.', 'warning');
   }
 
+  // consome já: qualquer saída (descartado, sem permissão, erro) não deixa o próximo timer somar neste registro
+  const restartKey = window._restartingFromKey;
+  window._restartingFromKey = null;
+
   if (dur > 2000) {
     try { _assertCanWrite(collab); }
     catch(err) { showToast('Sem permissão', err.message); return; }
 
     setSyncStatus('loading', 'Salvando...');
-    const restartKey = window._restartingFromKey;
 
     try {
       if (restartKey && state.allEntries[restartKey]) {
@@ -167,18 +170,16 @@ export async function stopTimer(endTime = null) {
         const linked = Object.entries(state.kanbanCards || {}).find(([, c]) => c.fromEntryKey === restartKey);
         if (linked) {
           const [cardKey, cardData] = linked;
-          await set(child(kanbanRef, cardKey), { ...cardData, updatedAt: fin });
+          await update(child(kanbanRef, cardKey), { updatedAt: fin });
         }
       } else {
         await push(entriesRef, { task, project, collab, obs, tags, startTime: state.startTime, endTime: fin, duration: dur, createdAt: fin });
       }
-      window._restartingFromKey = null;
       setSyncStatus('ok', 'Sincronizado ✓');
     } catch(saveErr) {
       setSyncStatus('err', 'Erro ao salvar');
       showToast('Erro ao salvar registro', 'O timer parou mas o registro pode não ter sido salvo. Verifique sua conexão.');
       console.error('[stopTimer] save failed:', saveErr);
-      window._restartingFromKey = null;
     }
   }
 

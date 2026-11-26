@@ -38,6 +38,10 @@
         "source": "**",
         "headers": [
           {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains"
+          },
+          {
             "key": "X-Frame-Options",
             "value": "DENY"
           },
@@ -60,5 +64,10 @@
         ]
       }
     ]
+  },
+  "emulators": {
+    "database": { "host": "127.0.0.1", "port": 9000 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
   }
 }
