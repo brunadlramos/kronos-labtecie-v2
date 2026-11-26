@@ -36,6 +36,8 @@ const BIA   = 'uid_bia';      // colaborador, mesma equipe, key 'bia'
 const GEST  = 'uid_gestora';  // gestora da diagramacao, key 'gestora'
 const COORD = 'uid_coord';    // coordenador da coordenacao 'ensino'
 const ADMIN = 'uid_admin';    // admin global
+const CFG   = 'uid_cfg';       // colaborador no global, gestora SO em config/usuarios (promovida pelo coordenador)
+const TMP   = 'uid_tmp';       // colaborador com gestorTemp === true em config/usuarios
 const NOVO  = 'uid_novo';     // conta que ainda não tem perfil em /usuarios
 
 const EQ = 'diagramacao';
@@ -55,6 +57,8 @@ function seed() {
       [BIA]:   { nome: 'Bia',      email: 'bia@fatecie.edu.br',      papel: 'colaborador', equipeId: EQ },
       [GEST]:  { nome: 'Gestora',  email: 'gestora@fatecie.edu.br',  papel: 'gestora',     equipeId: EQ },
       [COORD]: { nome: 'Coord',    email: 'coord@fatecie.edu.br',    papel: 'coordenador', equipeId: EQ, coordenacaoId: 'ensino' },
+      [CFG]:   { nome: 'Cfg',      email: 'cfg@fatecie.edu.br',      papel: 'colaborador', equipeId: EQ },
+      [TMP]:   { nome: 'Tmp',      email: 'tmp@fatecie.edu.br',      papel: 'colaborador', equipeId: EQ },
       [ADMIN]: { nome: 'Admin',    email: 'admin@fatecie.edu.br',    papel: 'admin',       equipeId: EQ },
     },
     equipes: {
@@ -64,6 +68,8 @@ function seed() {
             [ANA]:  colab('ana', 'Ana'),
             [BIA]:  colab('bia', 'Bia'),
             [GEST]: { ...colab('gestora', 'Gestora'), papel: 'gestora' },
+            [CFG]:  { ...colab('cfg', 'Cfg'), papel: 'gestora' },
+            [TMP]:  { ...colab('tmp', 'Tmp'), gestorTemp: true },
           },
           metas: { horasDia: 9, threshold: 90, janelaEdicao: 7 },
         },
@@ -182,6 +188,18 @@ describe('B1 · criação de usuário com papel arbitrário', () => {
   it('NAO-REGRESSAO: admin cria gestora (papel da lista)', async () => {
     await assertSucceeds(ref(ADMIN, 'usuarios/uid_nova_gestora').set({
       nome: 'G', email: 'g@fatecie.edu.br', papel: 'gestora', equipeId: EQ,
+    }));
+  });
+
+  it('ATAQUE: gestora NÃO pode criar usuário com papel gestora', async () => {
+    await assertFails(ref(GEST, `usuarios/${NOVO}`).set({
+      nome: 'Fantasma', email: 'f@fatecie.edu.br', papel: 'gestora', equipeId: EQ,
+    }));
+  });
+
+  it('ATAQUE: coordenador NÃO pode criar usuário com papel coordenador', async () => {
+    await assertFails(ref(COORD, `usuarios/${NOVO}`).set({
+      nome: 'Fantasma', email: 'f@fatecie.edu.br', papel: 'coordenador', equipeId: EQ,
     }));
   });
 
@@ -453,6 +471,42 @@ describe('E7 · formato das chaves de card, comentário e post', () => {
     await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo`).update({
       'a_nota/module': 'MOD2', 'a_nota/reorganizadoEm': 1750100000000,
     }));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F1 · gestão = a mesma de `entries` (papel de config da equipe e gestorTemp)
+// ═════════════════════════════════════════════════════════════════════════════
+describe('F1 · gestora só de config/usuarios e gestorTemp', () => {
+  for (const [nome, uid] of [['gestora só de config', CFG], ['gestorTemp', TMP]]) {
+    it(`NAO-REGRESSAO: ${nome} avalia card no kanban`, async () => {
+      await assertSucceeds(ref(uid, `equipes/${EQ}/kanban/k_livre`).update({
+        ajuste_diagramacao: 'bom', ajuste_avaliado_em: 1750100000000,
+      }));
+    });
+
+    it(`NAO-REGRESSAO: ${nome} restaura card com avaliação no kanban`, async () => {
+      await assertSucceeds(ref(uid, `equipes/${EQ}/kanban/k_restaurado`).set({
+        name: 'Restaurado', column: 'concluido', assignee: 'ana',
+        ajuste_diagramacao: 'bom', updatedAt: 1750100000000,
+      }));
+    });
+
+    it(`NAO-REGRESSAO: ${nome} altera avaliação de card arquivado`, async () => {
+      await assertSucceeds(ref(uid, `equipes/${EQ}/arquivo/a_nota`).update({ ajuste_diagramacao: 'ruim' }));
+    });
+
+    it(`NAO-REGRESSAO: ${nome} limpa o mural inteiro`, async () => {
+      await assertSucceeds(ref(uid, `equipes/${EQ}/mural`).set(null));
+    });
+  }
+
+  it('NAO-REGRESSAO: gestora só de config apaga post de colaborador', async () => {
+    await assertSucceeds(ref(CFG, `equipes/${EQ}/mural/m_bia`).remove());
+  });
+
+  it('ATAQUE: colaborador sem papel de gestão NÃO altera ajuste_curadoria', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_livre`).update({ ajuste_curadoria: 'bom' }));
   });
 });
 
