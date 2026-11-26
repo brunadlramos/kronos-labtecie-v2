@@ -771,6 +771,11 @@ describe('C2 · approvalRequests amarrado ao autor', () => {
     await assertFails(ar(ANA, 'r1', { ...base, type: 'new', entryKey: null, payload: { collab: 'ana' } }));
   });
 
+  it('ATAQUE (revisao Opus): Ana NAO usa o campo legado editingId para apontar registro da Bia', async () => {
+    await assertFails(ar(ANA, 'r1', { ...base, type: 'delete', editingId: 'e_bia', payload: { collab: 'ana' }, requestedBy: 'ana' }));
+    await assertFails(ar(ANA, 'r1', { ...base, type: 'edit', editingId: 'e_bia', payload: { collab: 'ana', task: 'x' }, requestedBy: 'ana' }));
+  });
+
   it('NAO-REGRESSAO: Ana pede edição do próprio registro', async () => {
     await assertSucceeds(ar(ANA, 'r1', { ...base, type: 'edit', entryKey: 'e_ana', payload: { collab: 'ana', task: 'x' }, requestedBy: 'ana' }));
   });
@@ -813,8 +818,29 @@ describe('C6 · notifs.from amarrado ao autor', () => {
     await assertSucceeds(nf(ADMIN, 'n3', { ...n, from: 'sistema' }));
   });
 
+  it('NAO-REGRESSAO (revisao Opus): gestora cuja chave do front difere da de config notifica; gestorTemp e gestora so-config tambem', async () => {
+    await assertSucceeds(nf(GEST, 'n4', { ...n, from: 'chave_gerada_do_nome' }));
+    await assertSucceeds(nf(CFG, 'n5', { ...n, from: 'chave_gerada_do_nome' }));
+    await assertSucceeds(nf(TMP, 'n6', { ...n, from: 'chave_gerada_do_nome' }));
+    await assertFails(nf(ANA, 'n7', { ...n, from: 'chave_gerada_do_nome' }));
+  });
+
   it('NAO-REGRESSAO: Ana marca como lida (regrava a notificação inteira, com _key)', async () => {
     await assertSucceeds(nf(ANA, 'n1', { to: 'ana', title: 'Oi', msg: 'tudo bem', from: 'gestora', ts: 1750000000000, read: true, _key: 'n1' }));
+  });
+});
+
+describe('C5b · peso so muda pela gestao (revisao Opus)', () => {
+  const e = (u, id) => ref(u, `equipes/${EQ}/entries/${id}`);
+  it('ATAQUE: Ana NAO grava peso no proprio registro (update e set)', async () => {
+    await assertFails(e(ANA, 'e_ana').update({ peso: 100 }));
+    await assertFails(e(ANA, 'e_ana').update({ peso: 2 }));
+  });
+  it('NAO-REGRESSAO: Ana edita o registro mantendo o peso igual ou removendo-o; gestora e admin mudam', async () => {
+    await assertSucceeds(e(GEST, 'e_ana').update({ peso: 1.5 }));
+    await assertSucceeds(e(ADMIN, 'e_ana').update({ peso: 2 }));
+    await assertSucceeds(e(ANA, 'e_ana').update({ peso: 2, task: 'x' }));
+    await assertSucceeds(e(ANA, 'e_ana').update({ peso: null }));
   });
 });
 
@@ -843,18 +869,21 @@ describe('C5 · entries: tipos e faixas, sem allowlist de nomes', () => {
     await assertFails(ref(ANA, `equipes/${EQ}/entries/e_ana`).update({ duration: 1e12 }));
   });
 
-  it('NAO-REGRESSAO: registro completo com campos opcionais reais (peso, periods, tags, clockify)', async () => {
-    await assertSucceeds(put({ peso: 7.2, tags: ['a'], needsReview: true, importedFrom: 'clockify_csv',
+  it('NAO-REGRESSAO: registro completo com campos opcionais reais (peso, periods, tags, clockify), gravado pela gestao', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/entries/e_novo`).set({ ...e, peso: 7.2, tags: ['a'], needsReview: true, importedFrom: 'clockify_csv',
       createdBy: 'ana@fatecie.edu.br', kanbanCardKey: '-Nabc',
       periods: [{ startTime: 1750007200000, endTime: 1750010800000, duration: 3600000 }] }));
+    await assertSucceeds(put({ tags: ['a'], needsReview: true, importedFrom: 'clockify_csv', kanbanCardKey: '-Nabc' }));
+    await assertFails(put({ peso: 7.2 }));
   });
 
   it('NAO-REGRESSAO: campo novo desconhecido continua aceito (sem allowlist)', async () => {
     await assertSucceeds(put({ campoNovoDoFuturo: 'x' }));
   });
 
-  it('NAO-REGRESSAO: duration no maior valor real do snapshot (104220000) e peso 0', async () => {
-    await assertSucceeds(put({ duration: 104220000, peso: 0 }));
+  it('NAO-REGRESSAO: duration no maior valor real do snapshot (104220000); peso 0 pela gestao', async () => {
+    await assertSucceeds(put({ duration: 104220000 }));
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/entries/e_novo`).set({ ...e, duration: 104220000, peso: 0 }));
   });
 
   it('NAO-REGRESSAO: reinício de timer regrava o registro com periods e duration somada', async () => {
