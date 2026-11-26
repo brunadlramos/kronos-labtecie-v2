@@ -410,7 +410,9 @@ window.openNovoColabModal = function(){
         <label class="modal-label">Papel
           <select class="modal-input" id="editColabPapel" style="width:100%;margin-top:4px;">
             <option value="colaborador">Colaborador</option>
-            ${state.userPapel === 'admin' ? '<option value="gestora">Gestão</option><option value="coordenador">Coordenador</option><option value="rh">RH (somente leitura)</option>' : ''}
+            <option value="gestora">Gestão</option>
+            <option value="coordenador">Coordenador</option>
+            ${state.userPapel === 'admin' ? '<option value="rh">RH (somente leitura)</option>' : ''}
           </select>
         </label>
         <label class="modal-label">Cor
@@ -479,9 +481,8 @@ window.saveNovoColab = async function(){
       if(equipeId === 'all' || isCoord){
         await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId:equipeIdGlobal,equipes:todasEquipes,papel});
       } else {
-        // shortcut: usuarios/ primeiro; se config falhar, sobra usuarios/ sem config (gestora nao pode apagar), limpar manual.
-        await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId,papel});
         await set(ref(db,`equipes/${equipeId}/config/usuarios/${firebaseUid}`),userData);
+        await set(ref(db,`usuarios/${firebaseUid}`),{nome,email,equipeId,papel});
       }
       await signOut(secAuth);
     } catch(dbErr) {
