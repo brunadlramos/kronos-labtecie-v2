@@ -5,7 +5,7 @@
 // ÚNICA fronteira de segurança deste sistema (não há backend), e até agora não
 // tinham teste nenhum.
 //
-// Organização (PLANO_CORRECAO_SEGURANCA.md, Fase 1):
+// Organização (Fase 1 do plano de correção de segurança):
 //   • ATAQUE       — o que NÃO pode ser permitido. Antes da Fase 2 estes testes
 //                    FALHAM de propósito: a falha é a prova de que o achado é
 //                    real. Depois da correção, todos passam.

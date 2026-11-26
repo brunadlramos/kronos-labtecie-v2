@@ -4,8 +4,8 @@ Suíte que exercita `database.rules.json` no emulador oficial do Realtime Databa
 As regras são a **única** fronteira de segurança do Kronos (não há backend), e até
 esta onda não tinham teste nenhum.
 
-Rege este diretório: `PLANO_CORRECAO_SEGURANCA.md` (Fase 1) e
-`PLAYBOOK_ENGENHARIA.md` (mandamento 5 — testes primeiro).
+Rege este diretório: a Fase 1 do plano de correção de segurança (fora do
+repositório) e o princípio de testes primeiro do playbook de engenharia.
 
 ## Pré-requisito: JDK
 

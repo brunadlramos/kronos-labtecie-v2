@@ -1,7 +1,7 @@
 # DEPLOY.md — runbook de deploy do Kronos
 
 Projeto de produção: `kronoslabtecie`. Cópia candidata de ensaio: `kronos-fdb75` (**NÃO CONFIRMADA** como cópia — ver seção 7).
-Este documento é um roteiro: **nenhum comando daqui foi executado ainda.** Origem das decisões: `PLANO_CORRECAO_SEGURANCA.md` (D1–D9, Fases 0, 2, 3, 4).
+Este documento é um roteiro: **nenhum comando daqui foi executado ainda.** Origem das decisões: o plano de correção de segurança (D1–D9, Fases 0, 2, 3, 4), mantido fora do repositório porque descreve as falhas abertas em produção.
 
 Legenda: **[DONO]** = passo que exige `firebase login` ou decisão do Allan/Bruna. O assistente prepara e valida; não faz login nem deploy.
 
@@ -129,7 +129,7 @@ Vale a pré-condição (a) da seção 3.
 ## 6. Pós-deploy
 
 - [ ] Novo backup (`...-pos-<motivo>.json`) e contagem de nós **comparada** com a da seção 2 (plano 4.3). Diferenças só explicáveis por uso normal entre os dois momentos; qualquer queda inexplicada → rollback + investigar.
-- [ ] Registrar em `PLANO_CORRECAO_SEGURANCA.md`, seção 7: data, o que foi publicado, commit, contagens, resultado do smoke test.
+- [ ] Registrar no plano (fora do repositório), seção 7: data, o que foi publicado, commit, contagens, resultado do smoke test.
 - [ ] Red team contra a cópia (plano 4.2) e atualização do relatório (4.4–4.5), se ainda pendentes.
 - [ ] **Encerrar a sessão [DONO]:** `docker compose -f docker-compose.testes.yml exec dev npx --no firebase logout` e depois `docker compose -f docker-compose.testes.yml down` (o container guarda o login de produção e enxerga `backups/`; não deixar de pé).
 
