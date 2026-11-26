@@ -75,14 +75,19 @@ window.doResetPassword = async function () {
   try {
     await sendPasswordResetEmail(auth, email);
     err.style.color = '#10b981';
-    err.textContent = 'Enviamos um link de redefinição para ' + email + '. Confira sua caixa de entrada (e o spam).';
+    err.textContent = 'Se o e-mail estiver cadastrado, enviamos um link de redefinição. Confira a caixa de entrada (e o spam).';
     err.classList.add('show');
   } catch (e) {
     const code = e.code || '';
     err.style.color = '';
-    err.textContent = code === 'auth/user-not-found'
-      ? 'E-mail não encontrado. Verifique ou contate o gestor.'
-      : code === 'auth/invalid-email'
+    // F1: user-not-found recebe a mesma mensagem do sucesso (sem enumerar contas)
+    if (code === 'auth/user-not-found') {
+      err.style.color = '#10b981';
+      err.textContent = 'Se o e-mail estiver cadastrado, enviamos um link de redefinição. Confira a caixa de entrada (e o spam).';
+      err.classList.add('show');
+      return;
+    }
+    err.textContent = code === 'auth/invalid-email'
       ? 'E-mail inválido.'
       : code === 'auth/too-many-requests'
       ? 'Muitas tentativas. Aguarde alguns minutos.'
