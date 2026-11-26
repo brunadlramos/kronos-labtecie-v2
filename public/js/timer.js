@@ -167,7 +167,7 @@ export async function stopTimer(endTime = null) {
         const linked = Object.entries(state.kanbanCards || {}).find(([, c]) => c.fromEntryKey === restartKey);
         if (linked) {
           const [cardKey, cardData] = linked;
-          await set(child(kanbanRef, cardKey), { ...cardData, updatedAt: fin });
+          await update(child(kanbanRef, cardKey), { updatedAt: fin });
         }
       } else {
         await push(entriesRef, { task, project, collab, obs, tags, startTime: state.startTime, endTime: fin, duration: dur, createdAt: fin });
