@@ -45,6 +45,7 @@
           "usuarios": {
             "$cu": {
               ".validate": "data.exists() || !newData.exists() || $cu.matches(/^[-A-Za-z0-9_]+$/)",
+              "key": { ".validate": "newData.isString() && newData.val().matches(/^[-A-Za-z0-9_]{1,60}$/)" },
               "papel": {
                 ".validate": "root.child('usuarios').child(auth.uid).child('papel').val() === 'admin' || root.child('usuarios').child(auth.uid).child('papel').val() === 'coordenador' || newData.val() === data.val() || (!data.exists() && newData.val() === 'colaborador')"
               },
