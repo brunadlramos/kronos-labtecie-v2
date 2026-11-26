@@ -93,7 +93,7 @@ function _buildUserCards(entries, canEdit, equipeId = EQUIPE_ID, avatarsMap = nu
   const _card = ([uid,u])=>{
     const key      = u.key || uid;
     const initials = u.iniciais || (u.nome||key).slice(0,2).toUpperCase();
-    const color    = u.cor || '#94A3B8';
+    const color    = escH(u.cor || '#94A3B8');
     const active   = u.ativo !== false;
     const roleLabel = u.papel === 'gestora' ? 'Gestão' : u.papel === 'admin' ? 'Administração' : '';
     // Foto: na visão multi-equipe usa o avatarsMap da equipe certa; senão, o avatar da equipe ativa.
@@ -338,7 +338,7 @@ window.openEditColabModal = async function(key, equipeId = EQUIPE_ID){
       <label class="modal-label">Equipe
         <select class="filter-select" id="editColabNovaEquipe" style="width:100%;margin-top:4px;">
           <option value="all"${equipeId==='all'?' selected':''}>Todas as equipes (acesso global)</option>
-          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===equipeId?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
+          ${(state.userEquipes||[]).map(eq=>`<option value="${escH(eq)}"${eq===equipeId?' selected':''}>${escH(state.EQUIPE_LABELS[eq]||eq)}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabNovaEquipe" value="${equipeId}">`}
       <label class="modal-label">Papel
@@ -348,7 +348,7 @@ window.openEditColabModal = async function(key, equipeId = EQUIPE_ID){
         </select>
       </label>
       <label class="modal-label">Cor
-        <input type="color" id="editColabCor" value="${u.cor||'#94A3B8'}" style="width:60px;height:32px;margin-left:10px;border-radius:6px;padding:2px;">
+        <input type="color" id="editColabCor" value="${escH(u.cor||'#94A3B8')}" style="width:60px;height:32px;margin-left:10px;border-radius:6px;padding:2px;">
       </label>
       <label class="modal-label" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="editColabCuradora" ${u.curadora?'checked':''}>
@@ -403,7 +403,7 @@ window.openNovoColabModal = function(){
       <label class="modal-label">Equipe
         <select class="modal-input" id="editColabEquipe" style="width:100%;margin-top:4px;">
           ${state.userPapel === 'admin' ? '<option value="all">Todas as equipes (acesso global)</option>' : ''}
-          ${(state.userEquipes||[]).map(eq=>`<option value="${eq}"${eq===EQUIPE_ID?' selected':''}>${state.EQUIPE_LABELS[eq]||eq}</option>`).join('')}
+          ${(state.userEquipes||[]).map(eq=>`<option value="${escH(eq)}"${eq===EQUIPE_ID?' selected':''}>${escH(state.EQUIPE_LABELS[eq]||eq)}</option>`).join('')}
         </select>
       </label>` : `<input type="hidden" id="editColabEquipe" value="${EQUIPE_ID}">`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -510,7 +510,7 @@ window.saveNovoColab = async function(){
       'auth/weak-password':       'Senha fraca — use pelo menos 6 caracteres.',
       'auth/network-request-failed':'Sem conexão. Verifique sua internet.',
     };
-    showErr(msgs[err.code]||'Erro: '+err.message);
+    showErr(msgs[err.code]||'Não foi possível criar o usuário. Tente novamente.');
     console.error('[saveNovoColab]',err);
   }finally{
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='+ Criar colaborador';}
@@ -794,7 +794,7 @@ async function _setCoordenadorProfile(uid, dados, coordId){
 window.cfgCriarCoordenador = async(coordId)=>{
   const nome=prompt('Nome do coordenador:'); if(!nome||!nome.trim()) return;
   const email=(prompt('E-mail do coordenador:')||'').trim().toLowerCase(); if(!email.includes('@')){ showToast('Erro','E-mail inv\u00E1lido.'); return; }
-  const senha=prompt('Senha inicial (m\u00EDn. 6 caracteres):','0123456'); if(!senha||senha.length<6){ showToast('Erro','Senha muito curta.'); return; }
+  const senha=prompt('Senha inicial (m\u00EDn. 6 caracteres):'); if(!senha||senha.length<6||senha==='0123456'){ showToast('Erro','Senha inv\u00E1lida: m\u00EDnimo 6 caracteres e diferente da padr\u00E3o.'); return; }
   try{
     const secAuth=_getSecondaryAuth();
     const cred=await createUserWithEmailAndPassword(secAuth,email,senha);
@@ -804,7 +804,7 @@ window.cfgCriarCoordenador = async(coordId)=>{
     registrarLog('usuario','Criou coordenador', `${nome.trim()} (${email}) \u2192 ${coordId}`);
     showToast('Coordenador criado',`${nome.trim()} j\u00E1 acessa a coordena\u00E7\u00E3o com o e-mail e senha informados.`);
   }catch(err){
-    const msg = err?.code==='auth/email-already-in-use' ? 'Esse e-mail j\u00E1 tem conta \u2014 use "Vincular coordenador existente".' : (err?.message||'Falha ao criar.');
+    const msg = err?.code==='auth/email-already-in-use' ? 'Esse e-mail j\u00E1 tem conta \u2014 use "Vincular coordenador existente".' : 'Falha ao criar. Tente novamente.';
     showToast('Erro', msg); console.error('[cfgCriarCoordenador]',err);
   }
 };
