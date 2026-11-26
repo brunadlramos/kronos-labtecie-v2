@@ -60,7 +60,7 @@ export async function renderCfgColaboradores(targetEl){
         <th>Ações</th>
       </tr></thead>
       <tbody>
-        ${(()=>{ const _row = ([uid,u]) => `<tr>
+        ${(()=>{ const _row = ([uid,u]) => !/^[-A-Za-z0-9_]+$/.test(uid) ? '' : `<tr>
           <td><input class="filter-select" value="${escH(u.nome||u.key||uid)}" id="unm_${uid}" style="width:120px;height:var(--ctrl-h)"></td>
           <td style="font-size:0.75rem;color:var(--muted);white-space:nowrap">${escH(u.email||'')}</td>
           <td><select class="filter-select" id="upl_${uid}" style="width:110px" ${_canPromover()?'':'disabled title="Apenas o coordenador altera o cargo. A gestão só ativa a curadoria."'}>
@@ -99,7 +99,7 @@ export async function renderCfgColaboradores(targetEl){
             <button class="btn-sm" onclick="cfgSaveColaborador('${uid}')">${ICONS.save} Salvar</button>
             <button class="btn-sm" onclick="openAusenciasModal('${uid}')" title="Ausências recorrentes (ex.: estágio)" style="font-size:0.7rem;">⏰ Ausências${Array.isArray(u.ausencias)&&u.ausencias.length?` (${u.ausencias.length})`:''}</button>
             <button class="btn-sm" onclick="openFeriasModal('${uid}')" title="Períodos de férias" style="font-size:0.7rem;">Férias${Array.isArray(u.ferias)&&u.ferias.length?` (${u.ferias.length})`:''}</button>
-            ${u.email?`<button class="btn-sm" onclick="cfgResetPassword('${escH(u.email)}')" title="Enviar e-mail de redefinição de senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
+            ${u.email?`<button class="btn-sm" data-email="${escH(u.email)}" onclick="cfgResetPassword(this.dataset.email)" title="Enviar e-mail de redefinição de senha" style="font-size:0.7rem;">${ICONS.send} Senha</button>`:''}
           </td>
         </tr>`;
           const _all = Object.entries(data);
@@ -531,10 +531,10 @@ function _abrirDecisaoPesoProjeto(k, label, oldW, newW){
         Como aplicar isso aos registros de horas?
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <button class="btn-sm" onclick="aplicarPesoProjeto('${escH(k)}',${oldW},'futuros')" style="text-align:left;padding:12px;line-height:1.4;">
+        <button class="btn-sm" data-k="${escH(k)}" onclick="aplicarPesoProjeto(this.dataset.k,${oldW},'futuros')" style="text-align:left;padding:12px;line-height:1.4;">
           <strong>Aplicar só aos FUTUROS</strong><br><span style="font-size:0.7rem;color:var(--muted)">Mantém os registros já existentes no peso anterior (${oldW}). O novo peso vale só daqui pra frente.</span>
         </button>
-        <button class="btn-sm" onclick="aplicarPesoProjeto('${escH(k)}',${oldW},'todos')" style="text-align:left;padding:12px;line-height:1.4;">
+        <button class="btn-sm" data-k="${escH(k)}" onclick="aplicarPesoProjeto(this.dataset.k,${oldW},'todos')" style="text-align:left;padding:12px;line-height:1.4;">
           <strong>Aplicar a TODOS os registros</strong><br><span style="font-size:0.7rem;color:var(--muted)">Recalcula todo o histórico (passado e futuro) com o novo peso.</span>
         </button>
       </div>
