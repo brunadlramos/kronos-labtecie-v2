@@ -698,7 +698,7 @@ window.stopKanbanTimer = async()=>{
     if(card){
       const workers = {...(card.workers||{})};
       workers[collab] = (workers[collab]||0) + mins;
-      await set(child(kanbanRef, cardKey),{...card, hours:(card.hours||0)+mins, workers});
+      await update(child(kanbanRef, cardKey),{hours:(card.hours||0)+mins, workers});   // item 7: parcial, nao regrava ajuste_* do cache
     }
 
     showToast('Timer finalizado',`${kFmtHours(mins)} registrados${card?' no card e':''} no timer!`);
@@ -732,13 +732,13 @@ window.concludeKanbanCard = async(key)=>{
   // ✅ FIX BUG 3: state.currentCollabKey em vez de state.currentUser
   const hist=[...(card.history||[]),{action:'Concluído',by:state.currentCollabKey,ts:now}];
   // ✅ AUDIT: modifiedBy registrado ao concluir
-  await set(child(kanbanRef, key),{...card,column:'concluido',concludedAt:now,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+  await update(child(kanbanRef, key),{column:'concluido',concludedAt:now,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
   showToast('Disciplina concluída!','Card movido para Concluído.');
   registrarLog('concluir', `Concluiu "${(card.name||'').slice(0,40)}"`);
   // Notifica todos os responsáveis (exceto quem concluiu)
   kCardAssignees(card)
     .filter(a=>a && a!==state.currentCollabKey)
-    .forEach(a=>push(notifsRef,{to:a,title:'Disciplina concluída',msg:'"'+(card.name||'').slice(0,30)+'" foi liberada!',from:state.currentCollabKey,ts:now,read:false}));
+    .forEach(a=>push(notifsRef,{to:a,title:'Disciplina concluída',msg:'"'+(card.name||'').slice(0,30)+'" foi liberada!',from:state.currentCollabKey,ts:now,read:false}).catch(e=>console.error('[concluir notif]',e)));
 };
 
 // Marca/desmarca um card como URGENTE (gestora ou responsável). Disponível para toda equipe.
@@ -900,7 +900,7 @@ window.addKanbanComment = async()=>{
   const comments={...(card.comments||{})};
   const newKey='c'+Date.now();
   comments[newKey]={text,by:state.currentCollabKey,ts:Date.now()};
-  await set(child(tRef, key),{...card,comments});
+  await update(child(tRef, key),{['comments/'+newKey]:comments[newKey]});
   if(arq) state.arquivoCards[key]={...card,comments};   // sem listener no arquivo: atualiza cache
   input.value='';
   renderKanbanComments({...card,comments});
@@ -911,7 +911,7 @@ window.deleteKanbanComment = async(commentKey)=>{
   const {card, ref:tRef, arq}=_cardAndRef(key); if(!card) return;
   const comments={...(card.comments||{})};
   delete comments[commentKey];
-  await set(child(tRef, key),{...card,comments});
+  await update(child(tRef, key),{['comments/'+commentKey]:null});
   if(arq) state.arquivoCards[key]={...card,comments};
   renderKanbanComments({...card,comments});
 };
@@ -919,9 +919,9 @@ window.deleteKanbanComment = async(commentKey)=>{
 export async function cleanLixeira(){
   const cutoff = Date.now() - 30*24*60*60*1000;
   const toRemove = Object.entries(state.kanbanCards)
-    .filter(([,card]) => card.column==='lixeira' && card.archivedAt && card.archivedAt < cutoff)
+    .filter(([,card]) => card.column==='lixeira' && card.archivedAt && card.archivedAt < cutoff && !Object.keys(card).some(k=>k.startsWith('ajuste_')))   // item 4: nota de avaliacao nunca some na limpeza
     .map(([k]) => remove(child(kanbanRef, k)));
-  if(toRemove.length) await Promise.all(toRemove);
+  if(toRemove.length) await Promise.all(toRemove).catch(e=>console.error('[cleanLixeira]',e));   // item 5: membro pode ser negado
 }
 
 // A11: popula o select de módulo a partir das colunas do Arquivo Morto da equipe
@@ -1071,8 +1071,7 @@ window.saveKanbanCard = async () => {
       });
 
       // ✅ AUDIT: modifiedBy no save do card
-      await set(child(kanbanRef, state.editingKanbanId), {
-        ...state.kanbanCards[state.editingKanbanId],
+      await update(child(kanbanRef, state.editingKanbanId), {
         ...cardData,
         history: oldHistory,
         modifiedBy: state.currentUser?.email||'desconhecido'
@@ -1943,7 +1942,7 @@ window.kdSaveLinksNow = async(links)=>{
   const clean = links.filter(l=>l && l.trim());
   try{
     const updated = { ...card, links: clean, modifiedBy: state.currentUser?.email||'desconhecido', updatedAt: Date.now() };
-    await set(child(tRef, key), updated);
+    await update(child(tRef, key), { links: clean, modifiedBy: updated.modifiedBy, updatedAt: updated.updatedAt });
     if(arq) state.arquivoCards[key] = updated;   // sem listener no arquivo: atualiza cache
     kdRenderLinks(clean);
     showToast('Link salvo','Link adicionado com sucesso.');
@@ -1979,7 +1978,7 @@ window.deleteKanbanCard=async(key)=>{
   const now=Date.now();
   const hist=[...(card.history||[]),{action:'Arquivado na Lixeira',by:state.currentCollabKey,ts:now}];
   try{
-    await set(child(kanbanRef, key),{...card,column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    await update(child(kanbanRef, key),{column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
     closeKanbanDetail();
     showToast('Card arquivado','Movido para a Lixeira.');
   }catch(err){
@@ -2744,7 +2743,7 @@ window.kArchiveToLixeira = async(key)=>{
   const now = Date.now();
   const hist = [...(card.history||[]),{action:'Arquivado na Lixeira',by:state.currentCollabKey,ts:now}];
   try{
-    await set(child(kanbanRef,key),{...card,column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
+    await update(child(kanbanRef,key),{column:'lixeira',archivedAt:now,archived:true,history:hist,modifiedBy:state.currentUser?.email||'desconhecido'});
     showToast('Card excluído','Movido para a Lixeira.');
   }catch(e){
     showToast('Erro','Falha ao mover para lixeira. Tente novamente.');
