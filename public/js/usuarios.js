@@ -510,7 +510,7 @@ window.saveNovoColab = async function(){
       'auth/weak-password':       'Senha fraca — use pelo menos 6 caracteres.',
       'auth/network-request-failed':'Sem conexão. Verifique sua internet.',
     };
-    showErr(msgs[err.code]||'Erro: '+err.message);
+    showErr(msgs[err.code]||'Não foi possível criar o usuário. Tente novamente.');
     console.error('[saveNovoColab]',err);
   }finally{
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='+ Criar colaborador';}
@@ -804,7 +804,7 @@ window.cfgCriarCoordenador = async(coordId)=>{
     registrarLog('usuario','Criou coordenador', `${nome.trim()} (${email}) \u2192 ${coordId}`);
     showToast('Coordenador criado',`${nome.trim()} j\u00E1 acessa a coordena\u00E7\u00E3o com o e-mail e senha informados.`);
   }catch(err){
-    const msg = err?.code==='auth/email-already-in-use' ? 'Esse e-mail j\u00E1 tem conta \u2014 use "Vincular coordenador existente".' : (err?.message||'Falha ao criar.');
+    const msg = err?.code==='auth/email-already-in-use' ? 'Esse e-mail j\u00E1 tem conta \u2014 use "Vincular coordenador existente".' : 'Falha ao criar. Tente novamente.';
     showToast('Erro', msg); console.error('[cfgCriarCoordenador]',err);
   }
 };
