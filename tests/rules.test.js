@@ -997,3 +997,58 @@ describe('B2 · ajuste_* só da gestão (conferência)', () => {
     }
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ONDA 3 · itens 4, 6, 8, 9 da revisão da Onda 2
+// ═════════════════════════════════════════════════════════════════════════════
+describe('Onda 3 · arquivo: membro não esvazia nem troca o crédito (item 4)', () => {
+  it('ATAQUE: colaborador NÃO esvazia item do arquivo por set', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/a_nota`).set({ ajuste_diagramacao: 'bom' }));
+  });
+  it('ATAQUE: colaborador NÃO troca assignee nem name de item do arquivo', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/a_nota`).update({ assignee: 'ana' }));
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/a_nota`).update({ name: 'outro' }));
+  });
+  it('ATAQUE: R3 encadeado — arquivo só com ajuste_* e depois remove do kanban', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/arquivo/k_nota`).set({
+      ajuste_diagramacao: 'excelente', ajuste_diagramacao_obs: 'ótimo', ajuste_avaliado_em: 1750000000000 }));
+  });
+  it('NAO-REGRESSAO: colaborador comenta em item do arquivo; gestora ainda reatribui', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/a_nota/comments/c1`).set({ text: 'oi', by: 'ana', ts: 1 }));
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/arquivo/a_nota`).update({ assignee: 'ana' }));
+  });
+  it('NAO-REGRESSAO: colaborador arquiva card completo (set com name/assignee do kanban)', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/arquivo/k_livre`).set({ name: 'Card sem nota', column: 'fazendo', assignee: 'ana', module: 'MOD1', archived: true }));
+  });
+});
+
+describe('Onda 3 · card fantasma (item 6)', () => {
+  it('ATAQUE: update parcial em card que não existe NÃO cria card sem name', async () => {
+    await assertFails(ref(ANA, `equipes/${EQ}/kanban/k_sumiu`).update({ column: 'fazendo', updatedAt: 1 }));
+    await assertFails(ref(GEST, `equipes/${EQ}/kanban/k_sumiu`).update({ column: 'fazendo', updatedAt: 1 }));
+  });
+  it('NAO-REGRESSAO: criar card com name e update parcial em card existente', async () => {
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_novo`).set({ name: 'N', column: 'fazendo', assignee: 'ana' }));
+    await assertSucceeds(ref(ANA, `equipes/${EQ}/kanban/k_nota`).update({ column: 'fazendo', updatedAt: 2 }));
+  });
+});
+
+describe('Onda 3 · config/usuarios (itens 8 e 9)', () => {
+  it('ATAQUE: gestorTemp apaga linha do colega e recria como gestora', async () => {
+    await assertSucceeds(ref(TMP, `equipes/${EQ}/config/usuarios/${BIA}`).remove());
+    await assertFails(ref(TMP, `equipes/${EQ}/config/usuarios/${BIA}`).set({ key: 'bia', nome: 'Bia', papel: 'gestora' }));
+  });
+  it('ATAQUE: gestora comum também não recria linha como gestora', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/config/usuarios/${BIA}`).remove());
+    await assertFails(ref(GEST, `equipes/${EQ}/config/usuarios/${BIA}`).set({ key: 'bia', nome: 'Bia', papel: 'gestora' }));
+  });
+  it('ATAQUE: chave com JS é recusada na criação', async () => {
+    await assertFails(ref(GEST, `equipes/${EQ}/config/usuarios/${encodeURIComponent("x');alert(1)//")}`).set({ key: 'x', nome: 'X', papel: 'colaborador' }));
+  });
+  it('NAO-REGRESSAO: gestora cria colaborador (chave uid); coordenador e admin criam gestora; edição mantém papel', async () => {
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/config/usuarios/uid_Novo-1_x`).set({ key: 'novo', nome: 'Novo', papel: 'colaborador', ativo: true }));
+    await assertSucceeds(ref(COORD, `equipes/${EQ}/config/usuarios/uid_g3`).set({ key: 'g3', nome: 'G3', papel: 'gestora' }));
+    await assertSucceeds(ref(ADMIN, `equipes/${EQ}/config/usuarios/uid_g4`).set({ key: 'g4', nome: 'G4', papel: 'gestora' }));
+    await assertSucceeds(ref(GEST, `equipes/${EQ}/config/usuarios/${GEST}`).update({ nome: 'Gestora 2', papel: 'gestora' }));
+  });
+});
