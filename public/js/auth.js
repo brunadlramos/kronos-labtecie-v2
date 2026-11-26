@@ -157,7 +157,7 @@ function _renderEquipePills(equipes, equipeAtiva){
       const label = escH(state.EQUIPE_LABELS[eq] || EQUIPE_LABELS[eq] || eq.charAt(0).toUpperCase()+eq.slice(1));
       const active = eq === equipeAtiva;
       return `<button class="equipe-pill${active?' active':''}"
-        onclick="window._doEquipeSwitch('${escH(eq)}')"
+        data-eq="${escH(eq)}" onclick="window._doEquipeSwitch(this.dataset.eq)"
         aria-pressed="${active}"
         aria-label="Ver equipe ${label}">${label}</button>`;
     }).join('');
